@@ -79,6 +79,15 @@ interface CartRow {
 interface PelangganRef { id: number; nama: string; sub: string; piutang: number }
 interface ToastState { msg: string; undo: boolean }
 interface DoneState { label: string; amount: string; sub: string }
+interface FinishedTx {
+  id: string;
+  nota: string;
+  time: string;
+  jenis: Jenis;
+  pelanggan: string | null;
+  items: { name: string; qty: number; unit: string; price: number; disc: number }[];
+  total: number;
+}
 
 interface KasirState {
   cart: CartRow[];
@@ -104,6 +113,10 @@ interface KasirState {
   pin: string | null;
   pinBuf: string;
   editing: boolean;
+  menuOpen: boolean;
+  historyOpen: boolean;
+  historyExpanded: string | null;
+  history: FinishedTx[];
 }
 
 // ---- demo props the design exposes as editable, hardcoded here (no host to pass them) ----
@@ -172,6 +185,11 @@ function priced(p: Produk): boolean {
 function defSatuan(p: Produk): Satuan {
   return p.satuan.find((s) => s.def && s.harga !== null) ?? p.satuan.find((s) => s.harga !== null) ?? p.satuan[0];
 }
+function timeNow(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 function notaNo(seq: number): string {
   return 'PJ/KODE/2026/08/' + String(seq).padStart(4, '0');
 }
@@ -202,6 +220,7 @@ const INITIAL_STATE: KasirState = {
   diskonNota: 0, pembulatan: 0, bulatSign: 1, custOpen: false, satuanFor: null,
   error: '', newId: null, seq: 1, notaSeq: 1, lastDeleted: null,
   pin: null, pinBuf: '', editing: false,
+  menuOpen: false, historyOpen: false, historyExpanded: null, history: [],
 };
 
 export default function KasirScreen() {
@@ -382,8 +401,20 @@ export default function KasirScreen() {
     const doneState: DoneState = s.jenis === 'TUNAI'
       ? { label: 'KEMBALIAN', amount: rp(Math.max(0, paid - t.total)), sub: `${notaNo(s.notaSeq)} · POSTED · LUNAS · struk tercetak` }
       : { label: 'PIUTANG TERCATAT', amount: rp(t.total), sub: `${notaNo(s.notaSeq)} · POSTED · BELUM · ${s.pelanggan?.nama}` };
+    const record: FinishedTx = {
+      id: 'tx' + s.notaSeq,
+      nota: notaNo(s.notaSeq),
+      time: timeNow(),
+      jenis: s.jenis,
+      pelanggan: s.pelanggan?.nama ?? null,
+      items: s.cart.map((r) => ({ name: r.name, qty: r.qty, unit: r.unit, price: r.price, disc: r.disc })),
+      total: t.total,
+    };
     if (doneTimer.current) clearTimeout(doneTimer.current);
-    patch((st) => ({ cart: [], activeId: null, mode: 'qty', buffer: '', query: '', editing: false, diskonNota: 0, pembulatan: 0, jenis: 'TUNAI', pelanggan: null, done: doneState, notaSeq: st.notaSeq + 1 }));
+    patch((st) => ({
+      cart: [], activeId: null, mode: 'qty', buffer: '', query: '', editing: false, diskonNota: 0, pembulatan: 0,
+      jenis: 'TUNAI', pelanggan: null, done: doneState, notaSeq: st.notaSeq + 1, history: [record, ...st.history],
+    }));
     doneTimer.current = setTimeout(() => patch({ done: null }), 4500);
     focusSearch();
   }
@@ -456,12 +487,91 @@ export default function KasirScreen() {
           <View style={styles.offlineDot} />
           <Text style={styles.offlineText}>Offline · 4 tertunda</Text>
         </View>
-        <Pressable onPress={() => router.back()} style={styles.hamburger}>
+        <Pressable onPress={() => patch((s) => ({ menuOpen: !s.menuOpen }))} style={styles.hamburger}>
           <View style={styles.hamburgerBar} />
           <View style={styles.hamburgerBar} />
           <View style={styles.hamburgerBar} />
         </Pressable>
       </View>
+
+      {state.menuOpen && (
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={() => patch({ menuOpen: false })}
+          accessibilityLabel="Tutup menu">
+          <View style={styles.menuBackdrop} />
+        </Pressable>
+      )}
+      {state.menuOpen && (
+        <View style={styles.menuDropdown}>
+          <Pressable onPress={() => patch({ menuOpen: false, historyOpen: true })} style={styles.menuItem}>
+            <Text style={styles.menuItemText}>Transaksi hari ini</Text>
+            <Text style={styles.menuItemHint}>{state.history.length} transaksi · untuk cek retur</Text>
+          </Pressable>
+          <View style={styles.menuDivider} />
+          <Pressable onPress={() => { patch({ menuOpen: false }); router.replace('/'); }} style={styles.menuItem}>
+            <Text style={[styles.menuItemText, { color: K.red }]}>Keluar</Text>
+            <Text style={styles.menuItemHint}>Logout dari kasir ini</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {state.historyOpen && (
+        <View style={styles.historyOverlay}>
+          <View style={styles.historyHead}>
+            <Text style={styles.historyTitle}>Transaksi hari ini</Text>
+            <Text style={styles.historyCount}>{state.history.length} transaksi</Text>
+            <View style={{ flex: 1 }} />
+            <Pressable onPress={() => patch({ historyOpen: false, historyExpanded: null })}>
+              <Text style={styles.overlayCloseBtn}>Tutup</Text>
+            </Pressable>
+          </View>
+          <ScrollView style={{ flex: 1 }}>
+            {state.history.length === 0 ? (
+              <View style={styles.historyEmpty}>
+                <Text style={styles.historyEmptyTitle}>Belum ada transaksi hari ini</Text>
+                <Text style={styles.historyEmptySub}>Transaksi yang sudah selesai akan muncul di sini · buka lagi setelah ada penjualan.</Text>
+              </View>
+            ) : (
+              state.history.map((tx) => {
+                const expanded = state.historyExpanded === tx.id;
+                return (
+                  <View key={tx.id} style={styles.historyRowWrap}>
+                    <Pressable
+                      onPress={() => patch((s) => ({ historyExpanded: s.historyExpanded === tx.id ? null : tx.id }))}
+                      style={styles.historyRow}>
+                      <Text style={styles.historyTime}>{tx.time}</Text>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={styles.historyNota} numberOfLines={1}>{tx.nota}</Text>
+                        <Text style={styles.historySub} numberOfLines={1}>{tx.pelanggan ?? 'Umum'} · {tx.items.length} barang</Text>
+                      </View>
+                      <View style={styles.historyJenisBadge}>
+                        <Text style={styles.historyJenisText}>{tx.jenis}</Text>
+                      </View>
+                      <Text style={styles.historyTotal}>{rp(tx.total)}</Text>
+                    </Pressable>
+                    {expanded && (
+                      <View style={styles.historyDetail}>
+                        {tx.items.map((it, i) => (
+                          <View key={i} style={styles.historyItemRow}>
+                            <Text style={styles.historyItemName} numberOfLines={1}>{it.qty} {it.unit} · {it.name}</Text>
+                            <Text style={styles.historyItemPrice}>{rp(it.price * it.qty - it.disc)}</Text>
+                          </View>
+                        ))}
+                        <Pressable
+                          onPress={() => showToast('Fitur retur belum dibangun — gunakan detail ini sebagai referensi manual dulu')}
+                          style={styles.historyReturBtn}>
+                          <Text style={styles.historyReturText}>Retur barang dari nota ini</Text>
+                        </Pressable>
+                      </View>
+                    )}
+                  </View>
+                );
+              })
+            )}
+          </ScrollView>
+        </View>
+      )}
 
       <View style={styles.main}>
         <View style={styles.leftMiddleWrap}>
@@ -925,6 +1035,49 @@ const styles = StyleSheet.create({
   offlineText: { fontSize: 12.5, fontWeight: '500', color: K.amberText },
   hamburger: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', gap: 4, borderRadius: 8, borderWidth: 1, borderColor: K.borderCard, backgroundColor: '#fff' },
   hamburgerBar: { width: 16, height: 1.5, backgroundColor: K.dark2 },
+
+  // ---- hamburger dropdown (logout / riwayat transaksi) ----
+  menuBackdrop: { flex: 1, backgroundColor: 'rgba(16,18,22,0.15)' },
+  menuDropdown: {
+    position: 'absolute', top: 64, right: 16, width: 260, zIndex: 30,
+    backgroundColor: K.card, borderRadius: 12, borderWidth: 1, borderColor: K.borderCard,
+    elevation: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 16,
+    paddingVertical: 6,
+  },
+  menuItem: { paddingVertical: 10, paddingHorizontal: 14, gap: 2 },
+  menuItemText: { fontSize: 14.5, fontWeight: '600', color: K.text },
+  menuItemHint: { fontSize: 12, color: K.muted3 },
+  menuDivider: { height: 1, backgroundColor: K.borderLight, marginVertical: 4 },
+
+  // ---- transaksi hari ini overlay ----
+  historyOverlay: {
+    position: 'absolute', top: 56, left: 0, right: 0, bottom: 0, zIndex: 25,
+    backgroundColor: K.card,
+  },
+  historyHead: {
+    height: 52, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16,
+    borderBottomWidth: 1, borderBottomColor: K.borderCard,
+  },
+  historyTitle: { fontSize: 15.5, fontWeight: '600', color: K.text },
+  historyCount: { fontSize: 12.5, color: K.muted3 },
+  overlayCloseBtn: { fontSize: 13, fontWeight: '600', color: K.primary },
+  historyEmpty: { padding: 40, alignItems: 'center' },
+  historyEmptyTitle: { fontSize: 14.5, fontWeight: '500', color: K.dark2 },
+  historyEmptySub: { marginTop: 6, fontSize: 13, color: K.muted2, textAlign: 'center', lineHeight: 19 },
+  historyRowWrap: { borderBottomWidth: 1, borderBottomColor: K.borderLighter },
+  historyRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 16 },
+  historyTime: { width: 46, fontSize: 13, color: K.muted3 },
+  historyNota: { fontFamily: 'monospace', fontSize: 12.5, fontWeight: '600', color: K.text },
+  historySub: { fontSize: 12.5, color: K.muted3, marginTop: 2 },
+  historyJenisBadge: { height: 22, paddingHorizontal: 8, borderRadius: 6, backgroundColor: K.primaryTintSoft, alignItems: 'center', justifyContent: 'center' },
+  historyJenisText: { fontSize: 11, fontWeight: '600', color: K.primaryDark },
+  historyTotal: { width: 110, textAlign: 'right', fontSize: 14.5, fontWeight: '600', color: K.text },
+  historyDetail: { paddingHorizontal: 16, paddingBottom: 14, paddingLeft: 58, gap: 6, backgroundColor: K.rowBg },
+  historyItemRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
+  historyItemName: { flex: 1, fontSize: 13, color: K.dark2 },
+  historyItemPrice: { fontSize: 13, fontWeight: '500', color: K.dark2 },
+  historyReturBtn: { marginTop: 6, height: 36, borderRadius: 8, borderWidth: 1, borderColor: K.border, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  historyReturText: { fontSize: 12.5, fontWeight: '600', color: K.primary },
 
   main: { flex: 1, flexDirection: 'row', gap: 1, backgroundColor: K.borderCard },
   leftMiddleWrap: { flex: 1, flexDirection: 'row', gap: 1, position: 'relative' },
