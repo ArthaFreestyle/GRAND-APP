@@ -12,6 +12,9 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { useBreakpoint } from '@/hooks/use-breakpoint';
 import type { SvgProps } from 'react-native-svg';
 
 import LogoSvg from '@/assets/images/login/logo.svg';
@@ -107,10 +110,17 @@ function RoleCard({
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { width, height } = useWindowDimensions();
+  const bp = useBreakpoint();
+  // This screen draws its own navbar instead of a navigator header, so the
+  // insets go on the two elements that actually touch the edges — that way the
+  // navbar's card colour still runs up under the status bar rather than leaving
+  // a strip of page background above it.
+  const insets = useSafeAreaInsets();
   const { vh, vw } = useFluid();
-  const isPortrait = height >= width;
-  const roleRows = useMemo(() => chunk(ROLES, isPortrait ? 2 : 3), [isPortrait]);
+  // Two cards to a row on a phone, three from a tablet up. This used to ask
+  // `height >= width`, which gave a tablet held upright the phone's two columns
+  // and left a third of its 820pt of width unused.
+  const roleRows = useMemo(() => chunk(ROLES, bp === 'phone' ? 2 : 3), [bp]);
   const [view, setView] = useState<'home' | 'login' | 'context'>('home');
   const [roleId, setRoleId] = useState<RoleId | null>(null);
   const [username, setUsername] = useState('');
@@ -220,7 +230,16 @@ export default function LoginScreen() {
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         {view !== 'home' ? (
-          <View style={[styles.navbar, { height: vh(52, 7.2, 68), paddingHorizontal: vw(6, 1.4, 16) }]}>
+          <View
+            style={[
+              styles.navbar,
+              {
+                height: vh(52, 7.2, 68) + insets.top,
+                paddingTop: insets.top,
+                paddingLeft: vw(6, 1.4, 16) + insets.left,
+                paddingRight: vw(6, 1.4, 16) + insets.right,
+              },
+            ]}>
             <Pressable
               onPress={back}
               accessibilityRole="button"
@@ -235,7 +254,13 @@ export default function LoginScreen() {
         <View
           style={[
             styles.root,
-            { paddingVertical: vh(16, 2.6, 34), paddingHorizontal: vw(20, 3.4, 52) },
+            {
+              // The navbar already absorbs the top inset when it is on screen.
+              paddingTop: vh(16, 2.6, 34) + (view === 'home' ? insets.top : 0),
+              paddingBottom: vh(16, 2.6, 34) + insets.bottom,
+              paddingLeft: vw(20, 3.4, 52) + insets.left,
+              paddingRight: vw(20, 3.4, 52) + insets.right,
+            },
           ]}>
           <View style={[styles.brandRow, { marginBottom: vh(8, 2, 28) }]}>
             <LogoSvg width={vh(38, 4.6, 58)} height={vh(38, 4.6, 58)} />
