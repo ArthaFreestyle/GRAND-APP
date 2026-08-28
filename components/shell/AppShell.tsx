@@ -1,8 +1,10 @@
 import { usePathname, useRouter } from 'expo-router';
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
-import { Colors as C } from '@/constants/theme-erp';
+import { Box } from '@/components/ui/box';
+import { Pressable } from '@/components/ui/pressable';
+import { Text } from '@/components/ui/text';
 import { logout } from '@/services/auth';
 import { useSession } from '@/services/session';
 
@@ -49,35 +51,52 @@ export function AdminShellProvider({ children }: { children: ReactNode }) {
   const [navShown, setNavShown] = useState(false);
   const active = NAV_ITEMS.find((n) => n.href === pathname)?.key ?? null;
 
-  const ctxValue = useMemo(() => ({ navShown, toggleNav: () => setNavShown((v) => !v) }), [navShown]);
+  const ctxValue = useMemo(
+    () => ({ navShown, toggleNav: () => setNavShown((v) => !v) }),
+    [navShown]
+  );
+
+  const activeUnit = session?.grants.find(
+    (g) => g.id_user_role === session.active?.id_user_role
+  )?.nama_unit_kerja;
 
   return (
     <AdminNavContext.Provider value={ctxValue}>
-      <View style={styles.root}>
-        <View style={styles.main}>{children}</View>
+      <Box className="flex-1 bg-background">
+        <Box className="min-w-0 flex-1">{children}</Box>
 
         {navShown && (
           <Pressable
             style={StyleSheet.absoluteFill}
             onPress={() => setNavShown(false)}
             accessibilityLabel="Tutup menu">
-            <View style={styles.backdrop} />
+            <Box className="flex-1 bg-toast/25" />
           </Pressable>
         )}
 
         {navShown && (
-          <View style={styles.aside}>
-            <View style={styles.asideHead}>
-              <Text style={styles.asideHeadText}>Manajemen</Text>
-            </View>
-            <Pressable onPress={() => router.push('/kasir' as never)} style={styles.kasirBtn}>
-              <View style={styles.kasirDot} />
-              <View>
-                <Text style={styles.kasirTitle}>Buka Kasir</Text>
-                <Text style={styles.kasirSub}>Layar penjualan</Text>
-              </View>
+          <Box
+            // The drawer floats over the content, so it carries its own shadow;
+            // elevation is Android's and has no className equivalent.
+            style={{ elevation: 12 }}
+            className="absolute bottom-0 left-0 top-0 w-[236px] border-r border-line-card bg-card shadow-lg">
+            <Box className="h-16 justify-center border-b border-line-light px-[18px]">
+              <Text className="text-[16.5px] font-semibold tracking-tight text-foreground">
+                Manajemen
+              </Text>
+            </Box>
+
+            <Pressable
+              onPress={() => router.push('/kasir' as never)}
+              className="mx-3 mb-1.5 mt-3 h-[60px] flex-row items-center gap-3 rounded-[11px] bg-primary px-3.5 data-[active=true]:bg-primary-dark">
+              <Box className="h-[9px] w-[9px] rounded-full bg-primary-tintline" />
+              <Box>
+                <Text className="text-base font-semibold text-white">Buka Kasir</Text>
+                <Text className="text-[12.5px] text-white opacity-80">Layar penjualan</Text>
+              </Box>
             </Pressable>
-            <ScrollView style={styles.nav} contentContainerStyle={{ gap: 4, paddingBottom: 12 }}>
+
+            <ScrollView style={{ flex: 1, paddingHorizontal: 12 }} contentContainerStyle={{ gap: 4, paddingBottom: 12 }}>
               {NAV_ITEMS.map((n) => {
                 const isActive = n.key === active;
                 return (
@@ -87,45 +106,52 @@ export function AdminShellProvider({ children }: { children: ReactNode }) {
                       setNavShown(false);
                       if (!isActive) router.replace(n.href as never);
                     }}
-                    style={[styles.navItem, isActive && styles.navItemActive]}>
-                    <Text style={[styles.navItemText, { color: isActive ? C.primaryDark : C.dark2 }]}>
+                    className={`h-[52px] justify-center rounded-[10px] px-3.5 ${
+                      isActive
+                        ? 'border-[1.5px] border-primary-tintline bg-primary-tint'
+                        : 'data-[active=true]:bg-line-lighter'
+                    }`}>
+                    <Text
+                      className={`text-[15.5px] font-semibold ${
+                        isActive ? 'text-primary-dark' : 'text-dark2'
+                      }`}>
                       {n.label}
                     </Text>
                   </Pressable>
                 );
               })}
             </ScrollView>
-            <View style={styles.asideFoot}>
+
+            <Box className="border-t border-line-light p-3">
               <Pressable
                 onPress={() => {
                   // Drop the session first — the login screen sends a live one
-                  // straight back in. Revoking the refresh token is a network
-                  // round trip that logout() finishes on its own.
+                  // straight back in. logout() finishes the revoke itself.
                   void logout();
                   router.replace('/');
                 }}
                 accessibilityRole="button"
                 accessibilityLabel="Keluar"
-                style={({ pressed }) => [styles.userCard, pressed && styles.userCardPressed]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.userName} numberOfLines={1}>
+                className="h-14 flex-row items-center justify-between rounded-[10px] border border-line-card bg-thead px-3.5 data-[active=true]:border-danger-line data-[active=true]:bg-danger-bg">
+                <Box className="flex-1">
+                  <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>
                     {session?.user.username ?? '—'}
                   </Text>
-                  <Text style={styles.userUnit} numberOfLines={1}>
-                    {session?.grants.find(
-                      (g) => g.id_user_role === session.active?.id_user_role
-                    )?.nama_unit_kerja ?? 'Semua unit kerja'}
+                  <Text className="text-[12.5px] text-faint-2" numberOfLines={1}>
+                    {activeUnit ?? 'Semua unit kerja'}
                   </Text>
-                </View>
-                <View style={{ alignItems: 'flex-end', gap: 3 }}>
-                  <Text style={styles.userRole}>{session?.active?.role ?? '—'}</Text>
-                  <Text style={styles.userLogoutHint}>Keluar</Text>
-                </View>
+                </Box>
+                <Box className="items-end gap-[3px]">
+                  <Text className="text-xs font-semibold tracking-wide text-dark2">
+                    {session?.active?.role ?? '—'}
+                  </Text>
+                  <Text className="text-[11px] font-semibold text-danger">Keluar</Text>
+                </Box>
               </Pressable>
-            </View>
-          </View>
+            </Box>
+          </Box>
         )}
-      </View>
+      </Box>
     </AdminNavContext.Provider>
   );
 }
@@ -143,104 +169,26 @@ export function AppShell({
 
   return (
     <>
-      <View style={styles.header}>
-        <Pressable onPress={toggleNav} style={styles.hamburger}>
+      <Box className="h-16 flex-row items-center gap-3.5 border-b border-line-card bg-card px-[18px]">
+        <Pressable
+          onPress={toggleNav}
+          accessibilityRole="button"
+          accessibilityLabel="Buka menu"
+          className="h-10 w-10 items-center justify-center gap-1 rounded-[9px] border border-border data-[active=true]:bg-line-lighter">
           <View style={styles.hamburgerBar} />
           <View style={styles.hamburgerBar} />
           <View style={styles.hamburgerBar} />
         </Pressable>
-        <Text style={styles.headerTitle}>{title}</Text>
-        <View style={{ flex: 1 }} />
+        <Text className="text-[18.5px] font-semibold tracking-tight text-foreground">{title}</Text>
+        <Box className="flex-1" />
         {headerRight}
-      </View>
+      </Box>
       {children}
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg },
-  backdrop: { flex: 1, backgroundColor: 'rgba(16,18,22,0.28)' },
-  aside: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    width: 236,
-    backgroundColor: '#fff',
-    borderRightWidth: 1,
-    borderRightColor: C.borderCard,
-    elevation: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 2, height: 0 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-  },
-  asideHead: {
-    height: 64,
-    justifyContent: 'center',
-    paddingHorizontal: 18,
-    borderBottomWidth: 1,
-    borderBottomColor: C.borderLight,
-  },
-  asideHeadText: { fontSize: 16.5, fontWeight: '600', color: C.text, letterSpacing: -0.2 },
-  kasirBtn: {
-    height: 60,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginHorizontal: 12,
-    marginTop: 12,
-    marginBottom: 6,
-    paddingHorizontal: 14,
-    borderRadius: 11,
-    backgroundColor: C.primary,
-  },
-  kasirDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: C.primaryTintBorder },
-  kasirTitle: { fontSize: 16, fontWeight: '600', color: '#fff' },
-  kasirSub: { fontSize: 12.5, color: '#fff', opacity: 0.8 },
-  nav: { flex: 1, paddingHorizontal: 12 },
-  navItem: { height: 52, justifyContent: 'center', paddingHorizontal: 14, borderRadius: 10 },
-  navItemActive: { backgroundColor: C.primaryTintBg, borderWidth: 1.5, borderColor: C.primaryTintBorder },
-  navItemText: { fontSize: 15.5, fontWeight: '600' },
-  asideFoot: { padding: 12, borderTopWidth: 1, borderTopColor: C.borderLight },
-  userCard: {
-    height: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    backgroundColor: C.tableHeaderBg,
-    borderWidth: 1,
-    borderColor: C.borderCard,
-  },
-  userCardPressed: { backgroundColor: C.redBg, borderColor: C.redBorder },
-  userName: { fontSize: 14, fontWeight: '600', color: C.text },
-  userUnit: { fontSize: 12.5, color: C.muted2 },
-  userRole: { fontSize: 12, fontWeight: '600', letterSpacing: 0.5, color: C.dark2 },
-  userLogoutHint: { fontSize: 11, fontWeight: '600', color: C.red },
-  main: { flex: 1, minWidth: 0 },
-  header: {
-    height: 64,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    paddingHorizontal: 18,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: C.borderCard,
-  },
-  hamburger: {
-    width: 40,
-    height: 40,
-    borderRadius: 9,
-    borderWidth: 1,
-    borderColor: C.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-  },
-  hamburgerBar: { width: 17, height: 2, borderRadius: 2, backgroundColor: C.dark2 },
-  headerTitle: { fontSize: 18.5, fontWeight: '600', color: C.text, letterSpacing: -0.2 },
+  // Three 2px bars: too small for a class to read more clearly than this.
+  hamburgerBar: { width: 17, height: 2, borderRadius: 2, backgroundColor: '#3A3F47' },
 });

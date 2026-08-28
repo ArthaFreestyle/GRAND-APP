@@ -1,83 +1,34 @@
-import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+/**
+ * The three dialogs the Master Produk screen opens.
+ *
+ * Everything they are built from — the shell, fields, pickers, checkbox, error
+ * banner — comes from `components/shell/ui.tsx`, which is now gluestack-backed.
+ * This file used to carry its own private copy of all six, styled from a second
+ * palette import; they were identical in appearance and drifted only by
+ * accident, so the copies are gone.
+ */
+import { Box } from '@/components/ui/box';
+import { Text } from '@/components/ui/text';
+import {
+  CheckBox,
+  ErrorBanner,
+  Field,
+  ModalFooter,
+  ModalHead,
+  ModalShell,
+  OptionPicker,
+  TextField,
+} from '@/components/shell/ui';
 
-import { ProdukColors as C } from '@/constants/produk';
+export { Toast } from '@/components/shell/ui';
 
-function ModalShell({
-  visible,
-  width,
-  onRequestClose,
-  children,
-}: {
-  visible: boolean;
-  width: number;
-  onRequestClose: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onRequestClose}>
-      <View style={styles.backdrop}>
-        <View style={[styles.sheet, { maxWidth: width, width: '100%' }]}>{children}</View>
-      </View>
-    </Modal>
-  );
+/** Shared padding for every dialog body here. */
+function ModalBody({ children }: { children: React.ReactNode }) {
+  return <Box className="gap-3.5 p-5">{children}</Box>;
 }
 
-function ErrorBanner({ message }: { message: string }) {
-  if (!message) return null;
-  return (
-    <View style={styles.errorBanner}>
-      <Text style={styles.errorText}>{message}</Text>
-    </View>
-  );
-}
-
-function CheckBox({ checked, onPress, label }: { checked: boolean; onPress: () => void; label: string }) {
-  return (
-    <Pressable onPress={onPress} style={styles.checkboxRow}>
-      <View style={[styles.checkboxBox, checked && { backgroundColor: C.primary, borderColor: C.primary }]}>
-        {checked ? <Text style={styles.checkboxMark}>✓</Text> : null}
-      </View>
-      <Text style={styles.checkboxLabel}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function Field({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
-  return (
-    <View style={styles.field}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      {children}
-      {hint ? <Text style={styles.fieldHint}>{hint}</Text> : null}
-    </View>
-  );
-}
-
-function OptionPicker({
-  options,
-  value,
-  onChange,
-}: {
-  options: { value: string; label: string }[];
-  value: string | null;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <View style={styles.pickerWrap}>
-      {options.map((o) => {
-        const active = o.value === value;
-        return (
-          <Pressable
-            key={o.value}
-            onPress={() => onChange(o.value)}
-            style={[styles.pickerOption, active && styles.pickerOptionActive]}>
-            <Text style={[styles.pickerOptionText, active && styles.pickerOptionTextActive]} numberOfLines={1}>
-              {o.label}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
+function Note({ children }: { children: React.ReactNode }) {
+  return <Text className="text-[12.5px] leading-[18px] text-faint-2">{children}</Text>;
 }
 
 export interface SatuanModalProps {
@@ -97,13 +48,11 @@ export interface SatuanModalProps {
 export function SatuanModal(p: SatuanModalProps) {
   return (
     <ModalShell visible={p.visible} width={460} onRequestClose={p.onCancel}>
-      <View style={styles.headBlock}>
-        <Text style={styles.title}>Tambah satuan konversi</Text>
-        <Text style={styles.subtitle}>
-          Pilih satuan dan faktornya terhadap satuan dasar. Satuan yang sudah terdaftar akan diperbarui faktornya.
-        </Text>
-      </View>
-      <View style={styles.body}>
+      <ModalHead
+        title="Tambah satuan konversi"
+        sub="Pilih satuan dan faktornya terhadap satuan dasar. Satuan yang sudah terdaftar akan diperbarui faktornya."
+      />
+      <ModalBody>
         <Field label="Satuan">
           <OptionPicker
             options={p.satuanOptions}
@@ -112,12 +61,11 @@ export function SatuanModal(p: SatuanModalProps) {
           />
         </Field>
         <Field label="Faktor">
-          <TextInput
+          <TextField
             value={p.faktor}
             onChangeText={p.onFaktorChange}
             placeholder="mis. 12"
             keyboardType="numeric"
-            style={styles.input}
           />
         </Field>
         <CheckBox
@@ -126,15 +74,8 @@ export function SatuanModal(p: SatuanModalProps) {
           label="Jadikan satuan input default — penanda lama otomatis dilepas"
         />
         <ErrorBanner message={p.error} />
-      </View>
-      <View style={styles.footer}>
-        <Pressable onPress={p.onCancel} style={styles.btnSecondary}>
-          <Text style={styles.btnSecondaryText}>Batal</Text>
-        </Pressable>
-        <Pressable onPress={p.onSave} style={styles.btnPrimary}>
-          <Text style={styles.btnPrimaryText}>Simpan satuan</Text>
-        </Pressable>
-      </View>
+      </ModalBody>
+      <ModalFooter onCancel={p.onCancel} onSave={p.onSave} saveLabel="Simpan satuan" />
     </ModalShell>
   );
 }
@@ -157,15 +98,15 @@ export interface HargaModalProps {
 export function HargaModal(p: HargaModalProps) {
   return (
     <ModalShell visible={p.visible} width={520} onRequestClose={p.onCancel}>
-      <View style={styles.headBlock}>
-        <Text style={styles.title}>{p.isEdit ? 'Koreksi harga' : 'Versi harga baru'}</Text>
-        <Text style={styles.subtitle}>
-          {p.isEdit
+      <ModalHead
+        title={p.isEdit ? 'Koreksi harga' : 'Versi harga baru'}
+        sub={
+          p.isEdit
             ? 'Ubah nilai harga untuk versi ini. Satuan dan periode tidak berubah.'
-            : 'Tambahkan versi harga baru untuk salah satu satuan produk ini.'}
-        </Text>
-      </View>
-      <View style={styles.body}>
+            : 'Tambahkan versi harga baru untuk salah satu satuan produk ini.'
+        }
+      />
+      <ModalBody>
         <Field label="Satuan">
           <OptionPicker
             options={p.satuanOptions}
@@ -174,35 +115,27 @@ export function HargaModal(p: HargaModalProps) {
           />
         </Field>
         <Field label="Harga">
-          <TextInput
+          <TextField
             value={p.harga}
             onChangeText={p.onHargaChange}
             placeholder="mis. 52000"
             keyboardType="numeric"
-            style={styles.input}
           />
         </Field>
         <Field label="Berlaku dari">
-          <TextInput
-            value={p.dari}
-            onChangeText={p.onDariChange}
-            placeholder="YYYY-MM-DD"
-            style={styles.input}
-          />
+          <TextField value={p.dari} onChangeText={p.onDariChange} placeholder="YYYY-MM-DD" />
         </Field>
-        <Text style={styles.smallMuted}>
-          Versi terbuka untuk satuan yang sama otomatis ditutup pada tanggal ini. Periode yang tumpang tindih ditolak.
-        </Text>
+        <Note>
+          Versi terbuka untuk satuan yang sama otomatis ditutup pada tanggal ini. Periode yang
+          tumpang tindih ditolak.
+        </Note>
         <ErrorBanner message={p.error} />
-      </View>
-      <View style={styles.footer}>
-        <Pressable onPress={p.onCancel} style={styles.btnSecondary}>
-          <Text style={styles.btnSecondaryText}>Batal</Text>
-        </Pressable>
-        <Pressable onPress={p.onSave} style={styles.btnPrimary}>
-          <Text style={styles.btnPrimaryText}>{p.isEdit ? 'Simpan koreksi' : 'Buka versi baru'}</Text>
-        </Pressable>
-      </View>
+      </ModalBody>
+      <ModalFooter
+        onCancel={p.onCancel}
+        onSave={p.onSave}
+        saveLabel={p.isEdit ? 'Simpan koreksi' : 'Buka versi baru'}
+      />
     </ModalShell>
   );
 }
@@ -230,30 +163,34 @@ export interface ProductFormModalProps {
 export function ProductFormModal(p: ProductFormModalProps) {
   return (
     <ModalShell visible={p.visible} width={560} onRequestClose={p.onCancel}>
-      <View style={styles.headBlock}>
-        <Text style={styles.title}>{p.isNew ? 'Produk baru' : 'Ubah produk'}</Text>
-        <Text style={styles.subtitle}>
-          {p.isNew
+      <ModalHead
+        title={p.isNew ? 'Produk baru' : 'Ubah produk'}
+        sub={
+          p.isNew
             ? 'Produk dan satuan dasarnya ditulis dalam satu transaksi — satuan dasar terdaftar otomatis dengan faktor 1.'
-            : 'Hanya nama, stok minimum, dan status aktif yang bisa diubah.'}
-        </Text>
-      </View>
-      <View style={styles.body}>
-        <View style={styles.row2}>
-          <View style={styles.col}>
+            : 'Hanya nama, stok minimum, dan status aktif yang bisa diubah.'
+        }
+      />
+      <ModalBody>
+        <Box className="flex-row items-start gap-3">
+          <Box className="flex-1">
             <Field
               label="Kode barang"
-              hint={!p.isNew ? 'Tidak bisa diubah — kode ini yang menamai barang di setiap dokumen lama.' : undefined}>
-              <TextInput
+              hint={
+                !p.isNew
+                  ? 'Tidak bisa diubah — kode ini yang menamai barang di setiap dokumen lama.'
+                  : undefined
+              }>
+              <TextField
                 value={p.kode}
                 onChangeText={p.onKodeChange}
                 editable={p.isNew}
                 placeholder="BRG-001"
-                style={[styles.input, styles.mono, !p.isNew && styles.inputLocked]}
+                mono
               />
             </Field>
-          </View>
-          <View style={styles.col}>
+          </Box>
+          <Box className="flex-1">
             {p.isNew ? (
               <Field label="Satuan dasar">
                 <OptionPicker
@@ -266,174 +203,49 @@ export function ProductFormModal(p: ProductFormModalProps) {
               <Field
                 label="Satuan dasar"
                 hint="Terkunci — menggantinya membatalkan seluruh faktor dan saldo kartu stok.">
-                <TextInput value={p.satuanDasarLabel} editable={false} style={[styles.input, styles.inputLocked]} />
+                <TextField value={p.satuanDasarLabel} onChangeText={() => {}} editable={false} />
               </Field>
             )}
-          </View>
-        </View>
+          </Box>
+        </Box>
         <Field label="Nama">
-          <TextInput
+          <TextField
             value={p.nama}
             onChangeText={p.onNamaChange}
             placeholder="Kertas A4 70gr"
-            style={styles.input}
           />
         </Field>
-        <View style={styles.row2}>
-          <View style={{ width: 180 }}>
+        <Box className="flex-row items-start gap-3">
+          <Box className="w-[180px]">
             <Field label="Stok minimum">
-              <TextInput
+              <TextField
                 value={p.stokMin}
                 onChangeText={p.onStokMinChange}
                 keyboardType="numeric"
-                style={styles.input}
               />
             </Field>
-          </View>
-          <View style={styles.col}>
+          </Box>
+          <Box className="flex-1 justify-center">
             {p.isNew ? (
-              <Text style={styles.smallMuted}>
+              <Note>
                 Satuan konversi dan harga jual diatur di halaman detail setelah produk tersimpan.
-              </Text>
+              </Note>
             ) : (
-              <CheckBox checked={p.aktif} onPress={p.onToggleAktif} label="Aktif — bisa dijual di kasir" />
+              <CheckBox
+                checked={p.aktif}
+                onPress={p.onToggleAktif}
+                label="Aktif — bisa dijual di kasir"
+              />
             )}
-          </View>
-        </View>
+          </Box>
+        </Box>
         <ErrorBanner message={p.error} />
-      </View>
-      <View style={styles.footer}>
-        <Pressable onPress={p.onCancel} style={styles.btnSecondary}>
-          <Text style={styles.btnSecondaryText}>Batal</Text>
-        </Pressable>
-        <Pressable onPress={p.onSave} style={styles.btnPrimary}>
-          <Text style={styles.btnPrimaryText}>{p.isNew ? 'Simpan produk' : 'Simpan perubahan'}</Text>
-        </Pressable>
-      </View>
+      </ModalBody>
+      <ModalFooter
+        onCancel={p.onCancel}
+        onSave={p.onSave}
+        saveLabel={p.isNew ? 'Simpan produk' : 'Simpan perubahan'}
+      />
     </ModalShell>
   );
 }
-
-export function Toast({ message }: { message: string | null }) {
-  if (!message) return null;
-  return (
-    <View style={styles.toast} pointerEvents="none">
-      <Text style={styles.toastText}>{message}</Text>
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(22,24,28,0.42)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  sheet: {
-    backgroundColor: C.card,
-    borderRadius: 14,
-    maxHeight: '100%',
-    overflow: 'hidden',
-  },
-  headBlock: { paddingHorizontal: 20, paddingTop: 18 },
-  title: { fontSize: 19, fontWeight: '600', color: C.text, letterSpacing: -0.2 },
-  subtitle: { marginTop: 4, fontSize: 14, color: C.muted3, lineHeight: 20 },
-  body: { padding: 20, gap: 14 },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 8,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderTopWidth: 1,
-    borderTopColor: C.borderLight,
-    backgroundColor: C.tableHeaderBg,
-  },
-  row2: { flexDirection: 'row', gap: 12 },
-  col: { flex: 1, minWidth: 0 },
-  field: { gap: 6 },
-  fieldLabel: { fontSize: 13, fontWeight: '600', color: C.dark2 },
-  fieldHint: { fontSize: 13, color: C.muted, lineHeight: 18 },
-  smallMuted: { fontSize: 13.5, color: C.muted2, lineHeight: 19 },
-  input: {
-    height: 44,
-    paddingHorizontal: 12,
-    borderRadius: 9,
-    borderWidth: 1,
-    borderColor: C.border,
-    backgroundColor: C.card,
-    fontSize: 15,
-    color: C.text,
-  },
-  inputLocked: { backgroundColor: C.badgeBg, color: C.muted3 },
-  mono: { fontFamily: 'monospace' },
-  errorBanner: {
-    padding: 11,
-    borderRadius: 9,
-    backgroundColor: C.redBg,
-    borderWidth: 1,
-    borderColor: C.redBorder,
-  },
-  errorText: { fontSize: 14, fontWeight: '500', color: C.red, lineHeight: 20 },
-  checkboxRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 2 },
-  checkboxBox: {
-    width: 20,
-    height: 20,
-    borderRadius: 5,
-    borderWidth: 1.5,
-    borderColor: '#B9C1C6',
-    backgroundColor: C.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkboxMark: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  checkboxLabel: { fontSize: 14, color: C.dark2, flex: 1, lineHeight: 19 },
-  pickerWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  pickerOption: {
-    paddingHorizontal: 12,
-    height: 40,
-    borderRadius: 9,
-    borderWidth: 1,
-    borderColor: C.border,
-    backgroundColor: C.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-    maxWidth: 220,
-  },
-  pickerOptionActive: { backgroundColor: C.primaryTintBg, borderColor: C.primaryTintBorder },
-  pickerOptionText: { fontSize: 14, color: C.dark2 },
-  pickerOptionTextActive: { color: C.primaryDark, fontWeight: '600' },
-  btnSecondary: {
-    height: 44,
-    paddingHorizontal: 16,
-    borderRadius: 9,
-    borderWidth: 1,
-    borderColor: C.border,
-    backgroundColor: C.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  btnSecondaryText: { fontSize: 14.5, fontWeight: '600', color: C.dark2 },
-  btnPrimary: {
-    height: 44,
-    paddingHorizontal: 18,
-    borderRadius: 9,
-    backgroundColor: C.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  btnPrimaryText: { fontSize: 14.5, fontWeight: '600', color: '#fff' },
-  toast: {
-    position: 'absolute',
-    left: 18,
-    bottom: 18,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 11,
-    backgroundColor: C.toastBg,
-    maxWidth: 420,
-  },
-  toastText: { fontSize: 15, fontWeight: '500', color: '#fff' },
-});
