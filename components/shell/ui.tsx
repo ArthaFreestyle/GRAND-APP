@@ -476,11 +476,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   fade: { position: 'absolute' },
-  fadeRight: { top: 0, bottom: 0, right: 0, width: 18, flexDirection: 'row' },
+  fadeRight: { top: 0, bottom: 0, right: 0, width: 14, flexDirection: 'row' },
   fadeBottom: { left: 0, right: 0, bottom: 0, height: 14, flexDirection: 'column' },
   scrollHint: {
     position: 'absolute',
-    right: 22,
+    left: 16,
     bottom: 10,
     paddingHorizontal: 9,
     paddingVertical: 4,
@@ -641,7 +641,7 @@ export function DataTable({
         {moreRight && <EdgeFade side="right" />}
         {moreRight && atStart && (
           <View pointerEvents="none" style={styles.scrollHint}>
-            <Text style={styles.scrollHintText}>geser →</Text>
+            <Text style={styles.scrollHintText}>geser untuk kolom lain →</Text>
           </View>
         )}
       </View>
