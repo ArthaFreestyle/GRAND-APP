@@ -4,6 +4,7 @@
  * Writing here belongs to `CASHIER` (or `SUPERADMIN`), not `INVENTARIS` —
  * pelanggan is the one master record the contract hands to the sales side.
  */
+import { createRecordBus } from '@/hooks/use-record-bus';
 import { buildQuery, type ListQuery, type Paged } from '@/services/api';
 import { authedList, authedRequest } from '@/services/client';
 import type { components } from '@/types/api';
@@ -40,6 +41,13 @@ function toPelanggan(p: ApiPelanggan): Pelanggan {
     plafon: p.plafon_kredit ?? null,
   };
 }
+
+/**
+ * Customer writes announced to whichever pelanggan screens are mounted — the
+ * detail saves, the list underneath it patches the row it already has. See
+ * `hooks/use-record-bus.ts`.
+ */
+export const pelangganBus = createRecordBus<Pelanggan>();
 
 export async function listPelanggan(query: ListQuery): Promise<Paged<Pelanggan>> {
   const page = await authedList<ApiPelanggan>(`/api/v1/pelanggan${buildQuery({ ...query })}`);

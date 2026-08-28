@@ -6,6 +6,7 @@
  * refresh are one round trip: callers replace their detail state with what
  * comes back rather than patching it locally and hoping the two agree.
  */
+import { createRecordBus } from '@/hooks/use-record-bus';
 import { buildQuery, type ListQuery, type Paged } from '@/services/api';
 import { authedList, authedRequest } from '@/services/client';
 import type { components } from '@/types/api';
@@ -25,6 +26,16 @@ export interface ProductRow {
   aktif: boolean;
   updatedAt: string;
 }
+
+/**
+ * Product writes announced to whichever product screens are mounted.
+ *
+ * The list, the detail, and the create form are three routes now: the detail
+ * saves a name and the list sitting underneath it would otherwise keep drawing
+ * the old one until something forced a refetch. Publishing what the server
+ * answered lets the list patch that one row and keep its scroll.
+ */
+export const produkBus = createRecordBus<ProductRow>();
 
 export interface ProductSatuanRow {
   id: number;

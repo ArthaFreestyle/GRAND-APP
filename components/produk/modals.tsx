@@ -140,112 +140,144 @@ export function HargaModal(p: HargaModalProps) {
   );
 }
 
-export interface ProductFormModalProps {
-  visible: boolean;
-  isNew: boolean;
+export interface ProductFormValues {
   kode: string;
-  onKodeChange: (v: string) => void;
   nama: string;
-  onNamaChange: (v: string) => void;
   stokMin: string;
-  onStokMinChange: (v: string) => void;
-  satuanMasterOptions: { value: string; label: string }[];
+  /** Only asked for while creating — the base unit is locked once it exists. */
   idDasar: number | null;
-  onIdDasarChange: (id: number) => void;
-  satuanDasarLabel: string;
   aktif: boolean;
-  onToggleAktif: () => void;
+}
+
+export interface ProductFormFieldsProps {
+  isNew: boolean;
+  values: ProductFormValues;
+  /** Patch, not a value per callback: the form has five fields and one owner. */
+  onChange: (patch: Partial<ProductFormValues>) => void;
+  satuanMasterOptions: { value: string; label: string }[];
+  /** The locked base unit's name, shown in place of the picker when editing. */
+  satuanDasarLabel: string;
   error: string;
+}
+
+/**
+ * The product form's body, with no opinion about what surrounds it.
+ *
+ * Creating a product is its own route now (`produk/baru`), where the form is
+ * the page; editing one is still a dialog on the detail, because it is three
+ * fields on a record already on screen. Both ask for the same things, so the
+ * fields stopped belonging to the dialog.
+ */
+export function ProductFormFields({
+  isNew,
+  values,
+  onChange,
+  satuanMasterOptions,
+  satuanDasarLabel,
+  error,
+}: ProductFormFieldsProps) {
+  return (
+    <ModalBody>
+      <Box className="flex-row items-start gap-3">
+        <Box className="flex-1">
+          <Field
+            label="Kode barang"
+            hint={
+              !isNew
+                ? 'Tidak bisa diubah — kode ini yang menamai barang di setiap dokumen lama.'
+                : undefined
+            }>
+            <TextField
+              value={values.kode}
+              onChangeText={(v) => onChange({ kode: v })}
+              editable={isNew}
+              placeholder="BRG-001"
+              mono
+            />
+          </Field>
+        </Box>
+        <Box className="flex-1">
+          {isNew ? (
+            <Field label="Satuan dasar">
+              <OptionPicker
+                options={satuanMasterOptions}
+                value={values.idDasar !== null ? String(values.idDasar) : null}
+                onChange={(v) => onChange({ idDasar: parseInt(v, 10) })}
+              />
+            </Field>
+          ) : (
+            <Field
+              label="Satuan dasar"
+              hint="Terkunci — menggantinya membatalkan seluruh faktor dan saldo kartu stok.">
+              <TextField value={satuanDasarLabel} onChangeText={() => {}} editable={false} />
+            </Field>
+          )}
+        </Box>
+      </Box>
+      <Field label="Nama">
+        <TextField
+          value={values.nama}
+          onChangeText={(v) => onChange({ nama: v })}
+          placeholder="Kertas A4 70gr"
+        />
+      </Field>
+      <Box className="flex-row items-start gap-3">
+        <Box className="w-[180px]">
+          <Field label="Stok minimum">
+            <TextField
+              value={values.stokMin}
+              onChangeText={(v) => onChange({ stokMin: v })}
+              keyboardType="numeric"
+            />
+          </Field>
+        </Box>
+        <Box className="flex-1 justify-center">
+          {isNew ? (
+            <Note>
+              Satuan konversi dan harga jual diatur di halaman detail setelah produk tersimpan.
+            </Note>
+          ) : (
+            <CheckBox
+              checked={values.aktif}
+              onPress={() => onChange({ aktif: !values.aktif })}
+              label="Aktif — bisa dijual di kasir"
+            />
+          )}
+        </Box>
+      </Box>
+      <ErrorBanner message={error} />
+    </ModalBody>
+  );
+}
+
+export interface ProductFormModalProps
+  extends Omit<ProductFormFieldsProps, 'isNew' | 'satuanMasterOptions'> {
+  visible: boolean;
   onCancel: () => void;
   onSave: () => void;
 }
 
+/**
+ * Editing only. The create half moved out to `app/(admin)/produk/baru.tsx`: a
+ * page-sized form was living in a dialog purely because there was no route to
+ * put it on.
+ */
 export function ProductFormModal(p: ProductFormModalProps) {
   return (
     <ModalShell visible={p.visible} width={560} onRequestClose={p.onCancel}>
       <ModalHead
-        title={p.isNew ? 'Produk baru' : 'Ubah produk'}
-        sub={
-          p.isNew
-            ? 'Produk dan satuan dasarnya ditulis dalam satu transaksi — satuan dasar terdaftar otomatis dengan faktor 1.'
-            : 'Hanya nama, stok minimum, dan status aktif yang bisa diubah.'
-        }
+        title="Ubah produk"
+        sub="Hanya nama, stok minimum, dan status aktif yang bisa diubah."
       />
-      <ModalBody>
-        <Box className="flex-row items-start gap-3">
-          <Box className="flex-1">
-            <Field
-              label="Kode barang"
-              hint={
-                !p.isNew
-                  ? 'Tidak bisa diubah — kode ini yang menamai barang di setiap dokumen lama.'
-                  : undefined
-              }>
-              <TextField
-                value={p.kode}
-                onChangeText={p.onKodeChange}
-                editable={p.isNew}
-                placeholder="BRG-001"
-                mono
-              />
-            </Field>
-          </Box>
-          <Box className="flex-1">
-            {p.isNew ? (
-              <Field label="Satuan dasar">
-                <OptionPicker
-                  options={p.satuanMasterOptions}
-                  value={p.idDasar !== null ? String(p.idDasar) : null}
-                  onChange={(v) => p.onIdDasarChange(parseInt(v, 10))}
-                />
-              </Field>
-            ) : (
-              <Field
-                label="Satuan dasar"
-                hint="Terkunci — menggantinya membatalkan seluruh faktor dan saldo kartu stok.">
-                <TextField value={p.satuanDasarLabel} onChangeText={() => {}} editable={false} />
-              </Field>
-            )}
-          </Box>
-        </Box>
-        <Field label="Nama">
-          <TextField
-            value={p.nama}
-            onChangeText={p.onNamaChange}
-            placeholder="Kertas A4 70gr"
-          />
-        </Field>
-        <Box className="flex-row items-start gap-3">
-          <Box className="w-[180px]">
-            <Field label="Stok minimum">
-              <TextField
-                value={p.stokMin}
-                onChangeText={p.onStokMinChange}
-                keyboardType="numeric"
-              />
-            </Field>
-          </Box>
-          <Box className="flex-1 justify-center">
-            {p.isNew ? (
-              <Note>
-                Satuan konversi dan harga jual diatur di halaman detail setelah produk tersimpan.
-              </Note>
-            ) : (
-              <CheckBox
-                checked={p.aktif}
-                onPress={p.onToggleAktif}
-                label="Aktif — bisa dijual di kasir"
-              />
-            )}
-          </Box>
-        </Box>
-        <ErrorBanner message={p.error} />
-      </ModalBody>
-      <ModalFooter
-        onCancel={p.onCancel}
-        onSave={p.onSave}
-        saveLabel={p.isNew ? 'Simpan produk' : 'Simpan perubahan'}
+      <ProductFormFields
+        isNew={false}
+        values={p.values}
+        onChange={p.onChange}
+        satuanMasterOptions={[]}
+        satuanDasarLabel={p.satuanDasarLabel}
+        error={p.error}
       />
+      <ModalFooter onCancel={p.onCancel} onSave={p.onSave} saveLabel="Simpan perubahan" />
     </ModalShell>
   );
 }

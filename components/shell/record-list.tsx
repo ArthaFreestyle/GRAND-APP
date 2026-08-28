@@ -482,8 +482,6 @@ export function RecordList({
   loadingMore = false,
   moreError = '',
   onRetryMore,
-  initialScrollOffset = 0,
-  onScrollOffset,
   leadRow,
 }: {
   items: RecordItem[];
@@ -519,9 +517,6 @@ export function RecordList({
   /** A failed page fetch. Shows a way out instead of a spinner that never ends. */
   moreError?: string;
   onRetryMore?: () => void;
-  /** Restores the scroll position a screen saved before opening a detail view. */
-  initialScrollOffset?: number;
-  onScrollOffset?: (y: number) => void;
   /**
    * A first entry above the records that scrolls with them - "add a new one",
    * as a row rather than a button competing for width in the header.
@@ -532,21 +527,6 @@ export function RecordList({
   const [selected, setSelected] = useState<number[]>([]);
   const [menuFor, setMenuFor] = useState<number | null>(null);
   const selecting = selected.length > 0;
-
-  const listRef = useRef<FlatList<RecordItem>>(null);
-  const offsetRef = useRef(0);
-  const restoredRef = useRef(false);
-
-  /**
-   * Runs on the first content measurement only. Coming back from a detail view
-   * remounts this list, and an infinite list that snaps to the top has thrown
-   * away everything the reader scrolled past.
-   */
-  const restoreScroll = useCallback(() => {
-    if (restoredRef.current || initialScrollOffset <= 0) return;
-    restoredRef.current = true;
-    listRef.current?.scrollToOffset({ offset: initialScrollOffset, animated: false });
-  }, [initialScrollOffset]);
 
   // Drop only what is genuinely gone - a filter change replaces the rows and a
   // selection must not survive it, but appending a page leaves every selected
@@ -639,7 +619,6 @@ export function RecordList({
         />
       ) : (
         <FlatList
-          ref={listRef}
           data={items}
           // The record id, never the index: an index key re-binds every row to
           // different data when a page changes and defeats the `memo` above.
@@ -651,13 +630,11 @@ export function RecordList({
           ListFooterComponent={
             <ListEnd loading={loadingMore} error={moreError} onRetry={onRetryMore} />
           }
-          onScroll={(e) => {
-            const y = e.nativeEvent.contentOffset.y;
-            offsetRef.current = y;
-            onScrollOffset?.(y);
-          }}
-          scrollEventThrottle={100}
-          onContentSizeChange={restoreScroll}
+          // Nothing here saves or restores a scroll offset: opening a record
+          // pushes a route, which leaves this list mounted underneath holding
+          // its own position. The offset ref that used to do it by hand went
+          // with the `view` state machine it was compensating for.
+          //
           // No `getItemLayout`: rows are not a uniform height here - the field
           // stack on a phone grows with the field count, and any row wraps when
           // the system font size is turned up. A wrong one breaks scrolling
