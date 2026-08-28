@@ -6,11 +6,18 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import { AppShell } from '@/components/shell/AppShell';
 import { HargaModal, ProductFormModal, SatuanModal, Toast } from '@/components/produk/modals';
+import {
+  RecordList,
+  UndoBar,
+  type RecordAction,
+  type RecordItem,
+} from '@/components/shell/record-list';
+import { FilterPills } from '@/components/shell/ui';
+import { atLeast, useBreakpoint } from '@/hooks/use-breakpoint';
 import {
   ProdukColors as C,
   formatNumber,
@@ -18,6 +25,8 @@ import {
   formatTanggal,
   todayISO,
 } from '@/constants/produk';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { ApiError } from '@/services/api';
 import { rupiahToDecimal } from '@/services/decimal';
 import { useActiveRole, useCanWrite } from '@/services/permissions';
@@ -29,6 +38,7 @@ import {
   listProducts,
   listSatuan,
   listStok,
+  listStokMinimum,
   updateHarga,
   updateProduct,
   upsertSatuan,
@@ -36,15 +46,58 @@ import {
   type ProductHargaRow,
   type ProductRow,
   type ProductSatuanRow,
+  type StokMinimumRow,
   type StokRuang,
 } from '@/services/produk';
 import type { components } from '@/types/api';
 
-const PAGE_SIZE = 8;
+// 20 per page: the list is text-only, so the fetch is small and the reader gets
+// a screenful in one round trip. Halve it if a row ever carries an image.
+const PAGE_SIZE = 20;
 /** Long enough that typing a code doesn't fire a request per keystroke. */
 const SEARCH_DEBOUNCE_MS = 350;
 
 type ModalKind = 'new' | 'edit' | null;
+
+/**
+ * What the chips can actually ask the API for.
+ *
+ * "Stok menipis" is `GET /product/stok-minimum`, a different endpoint rather
+ * than a parameter: the product list carries no stock at all. There is
+ * deliberately no "Habis" chip - a product sitting at zero with `stok_minimum`
+ * still at its 0 default never appears in that endpoint, so the chip would be
+ * telling a comfortable lie - and no "Draft", which the `Product` schema has no
+ * field for.
+ */
+type Filter = 'semua' | 'menipis' | 'nonaktif';
+
+/**
+ * The chip is remembered across launches. There is no sort parameter on
+ * `GET /product` to persist instead, and this is the nearest thing to one:
+ * whoever minds the stock wants the reorder list, which arrives sorted
+ * worst-first, and should not have to ask for it every morning.
+ */
+const FILTER_KEY = 'produk.filter';
+
+const FILTER_OPTIONS: { key: Filter; label: string }[] = [
+  { key: 'semua', label: 'Semua' },
+  { key: 'menipis', label: 'Stok menipis' },
+  { key: 'nonaktif', label: 'Nonaktif' },
+];
+
+// Module-level so each row's `actions` array keeps the same identity between
+// renders and `RecordRow`'s `memo` holds. Archiving is reversible - it flips
+// `is_aktif`, the only removal the contract offers - so it is a safe swipe with
+// an undo behind it rather than a `danger` action behind a confirmation.
+const ACTIONS_AKTIF: RecordAction[] = [
+  { key: 'ubah', label: 'Ubah produk' },
+  { key: 'arsip', label: 'Arsipkan', quick: true },
+];
+const ACTIONS_NONAKTIF: RecordAction[] = [
+  { key: 'ubah', label: 'Ubah produk' },
+  { key: 'aktifkan', label: 'Aktifkan', quick: true },
+];
+const ACTIONS_READONLY: RecordAction[] = [];
 
 interface ProductDraft {
   id: number | null;
@@ -78,12 +131,11 @@ function messageOf(e: unknown, fallback: string): string {
 }
 
 export default function ProdukScreen() {
-  const { width } = useWindowDimensions();
-  const wide = width >= 900;
+  // Detail view: the two cards sit side by side once there is room for both at
+  // their minimum widths, and stack otherwise.
+  const wide = atLeast(useBreakpoint(), 'large');
 
   const [rows, setRows] = useState<ProductRow[]>([]);
-  const [totalItem, setTotalItem] = useState(0);
-  const [totalPage, setTotalPage] = useState(1);
   const [listErr, setListErr] = useState('');
   const [listLoading, setListLoading] = useState(true);
 
@@ -95,6 +147,20 @@ export default function ProdukScreen() {
   const [query, setQuery] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [filter, setFilter] = useState<Filter>('semua');
+  /** Rows for the "Stok menipis" chip, which answers a different shape. */
+  const [lowRows, setLowRows] = useState<StokMinimumRow[]>([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [moreErr, setMoreErr] = useState('');
+  /**
+   * Where the list was left. Opening a product swaps this screen's `view`,
+   * which unmounts the list, so the offset is parked here and handed back on
+   * the way in - an infinite list that snaps to the top after every detail
+   * visit makes the reader re-scroll everything they already read.
+   */
+  const scrollY = useRef(0);
+  const [undo, setUndo] = useState<{ message: string; revert: () => Promise<void> } | null>(null);
 
   const [satuanMaster, setSatuanMaster] = useState<components['schemas']['Satuan'][]>([]);
 
@@ -126,25 +192,90 @@ export default function ProdukScreen() {
 
   // ---- list ----
 
+  /**
+   * One page from whichever endpoint the active chip means. The reorder list is
+   * its own endpoint and takes no `search`, so the search field is disabled
+   * while that chip is on rather than quietly ignoring what is typed into it.
+   */
+  const fetchPage = useCallback(
+    async (p: number) => {
+      if (filter === 'menipis') {
+        const result = await listStokMinimum({ page: p, size: PAGE_SIZE });
+        return { low: result.data, rows: [] as ProductRow[], paging: result.paging };
+      }
+      const result = await listProducts({
+        page: p,
+        size: PAGE_SIZE,
+        search: search || undefined,
+        is_aktif: filter === 'nonaktif' ? false : undefined,
+      });
+      return { low: [] as StokMinimumRow[], rows: result.data, paging: result.paging };
+    },
+    [filter, search]
+  );
+
   const reloadList = useCallback(async () => {
     setListLoading(true);
+    setMoreErr('');
     try {
-      const result = await listProducts({ page, size: PAGE_SIZE, search: search || undefined });
-      setRows(result.data);
-      setTotalItem(result.paging.total_item ?? result.data.length);
-      setTotalPage(Math.max(1, result.paging.total_page ?? 1));
+      const r = await fetchPage(1);
+      setRows(r.rows);
+      setLowRows(r.low);
+      setPage(1);
+      setHasMore(Math.max(1, r.paging.total_page ?? 1) > 1);
       setListErr('');
+      scrollY.current = 0;
     } catch (e) {
       setListErr(messageOf(e, 'Gagal memuat daftar produk.'));
       setRows([]);
+      setLowRows([]);
+      setHasMore(false);
     } finally {
       setListLoading(false);
     }
-  }, [page, search]);
+  }, [fetchPage]);
 
   useEffect(() => {
     reloadList();
   }, [reloadList]);
+
+  /**
+   * `onEndReached` fires more than once per approach, so the in-flight flag is
+   * the guard, not the threshold. A page that failed stops the loop until the
+   * reader asks again - otherwise every scroll nudge retries a broken request.
+   */
+  const loadMore = useCallback(async (force = false) => {
+    if (loadingMore || listLoading || !hasMore) return;
+    if (!force && moreErr !== '') return;
+    setLoadingMore(true);
+    const next = page + 1;
+    try {
+      const r = await fetchPage(next);
+      // The contract pages by offset, not cursor: a product created while the
+      // reader is scrolling shifts the window, and the same row can arrive
+      // twice. Merging by id keeps that from becoming a duplicate-key render.
+      setRows((list) => {
+        const seen = new Set(list.map((x) => x.id));
+        return [...list, ...r.rows.filter((x) => !seen.has(x.id))];
+      });
+      setLowRows((list) => {
+        const seen = new Set(list.map((x) => x.id));
+        return [...list, ...r.low.filter((x) => !seen.has(x.id))];
+      });
+      setPage(next);
+      setHasMore(next < Math.max(1, r.paging.total_page ?? 1));
+      setMoreErr('');
+    } catch (e) {
+      setMoreErr(messageOf(e, 'Gagal memuat halaman berikutnya.'));
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, listLoading, hasMore, moreErr, page, fetchPage]);
+
+  const retryMore = useCallback(() => {
+    setMoreErr('');
+    loadMore(true);
+  }, [loadMore]);
 
   // Searching is server-side now, so the field is debounced rather than
   // filtering an array that is only ever one page deep.
@@ -168,10 +299,6 @@ export default function ProdukScreen() {
     (id: number | null | undefined) => satuanMaster.find((s) => s.id === id)?.nama ?? '—',
     [satuanMaster]
   );
-
-  const pagingLabel = totalItem
-    ? `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, totalItem)} dari ${totalItem} · halaman ${page}/${totalPage}`
-    : '0 hasil';
 
   // ---- detail ----
 
@@ -441,128 +568,223 @@ export default function ProdukScreen() {
     ? current.satuan.map((x) => ({ value: String(x.idSatuan), label: x.nama || satuanNama(x.idSatuan) }))
     : [];
 
+  // ---- list rows and their actions ----
+
+  /**
+   * The two sources answer different shapes, so both are flattened to what the
+   * list actually draws. Building it here keeps `RecordList` unaware of what a
+   * product is, and the memo keeps each row's `actions` array stable.
+   */
+  const items = useMemo<RecordItem[]>(() => {
+    if (filter === 'menipis') {
+      return lowRows.map((r) => ({
+        id: r.id,
+        title: r.nama,
+        meta: `${r.kode || 'tanpa kode'} · kurang ${formatNumber(r.selisih)}`,
+        fields: [
+          { label: 'Stok', value: formatNumber(r.totalStok), danger: true, width: 110 },
+          { label: 'Minimum', value: formatNumber(r.stokMin), width: 110 },
+        ],
+        // The endpoint answers only active products, so the archive direction
+        // is the only one that applies here.
+        actions: canWrite ? ACTIONS_AKTIF : ACTIONS_READONLY,
+      }));
+    }
+    return rows.map((r) => ({
+      id: r.id,
+      title: r.nama,
+      badge: r.aktif ? undefined : 'Nonaktif',
+      dimmed: !r.aktif,
+      meta: `${r.kode} · diperbarui ${formatTanggal(r.updatedAt)}`,
+      fields: [
+        {
+          label: 'Stok minimum',
+          value: `${formatNumber(r.stokMin)} ${r.namaSatuanDasar}`,
+          width: 150,
+        },
+      ],
+      actions: !canWrite ? ACTIONS_READONLY : r.aktif ? ACTIONS_AKTIF : ACTIONS_NONAKTIF,
+    }));
+  }, [filter, lowRows, rows, canWrite]);
+
+  const bulkActions = useMemo<RecordAction[]>(() => {
+    if (!canWrite) return ACTIONS_READONLY;
+    return filter === 'nonaktif'
+      ? [{ key: 'aktifkan', label: 'Aktifkan' }]
+      : [{ key: 'arsip', label: 'Arsipkan' }];
+  }, [canWrite, filter]);
+
+  /**
+   * Runs first and offers to undo, rather than asking first. Flipping
+   * `is_aktif` is the only removal the contract has - there is no
+   * `DELETE /product` - so nothing here is unrecoverable, and a confirmation
+   * dialog on every archive would cost more taps than the rare undo saves.
+   */
+  const setAktif = useCallback(
+    async (ids: number[], aktif: boolean, label: string) => {
+      try {
+        await Promise.all(ids.map((id) => updateProduct(id, { is_aktif: aktif })));
+      } catch (e) {
+        toast(messageOf(e, 'Gagal mengubah status produk.'));
+        reloadList();
+        return;
+      }
+      setRows((list) => list.map((r) => (ids.includes(r.id) ? { ...r, aktif } : r)));
+      // An archived product leaves the reorder list; the endpoint only answers
+      // active ones.
+      if (!aktif) setLowRows((list) => list.filter((r) => !ids.includes(r.id)));
+      setUndo({
+        message: `${label} ${aktif ? 'diaktifkan' : 'diarsipkan'}`,
+        revert: async () => {
+          await Promise.all(ids.map((id) => updateProduct(id, { is_aktif: !aktif })));
+          reloadList();
+        },
+      });
+    },
+    [reloadList]
+  );
+
+  // Read through a ref, not a dependency: `rows` grows with every appended page,
+  // and a handler that changes identity each time would hand every row a new
+  // `onAction` and re-render the whole list.
+  const rowsRef = useRef<ProductRow[]>([]);
+  rowsRef.current = rows;
+
+  const runRowAction = useCallback(
+    (key: string, item: RecordItem) => {
+      if (key === 'ubah') {
+        const row = rowsRef.current.find((r) => r.id === item.id);
+        if (row) openEditModal(row);
+        // A reorder-list row is not a `ProductRow`, so the form is fed from the
+        // detail endpoint instead of half-filled from what the list happens to
+        // carry.
+        else getProduct(item.id).then(openEditModal).catch(() => toast('Gagal memuat produk.'));
+        return;
+      }
+      if (key === 'arsip' || key === 'aktifkan') {
+        setAktif([item.id], key === 'aktifkan', item.title);
+      }
+    },
+    [setAktif]
+  );
+
+  const runBulkAction = useCallback(
+    (key: string, ids: number[]) => {
+      setAktif(ids, key === 'aktifkan', `${ids.length} produk`);
+    },
+    [setAktif]
+  );
+
+  useEffect(() => {
+    let alive = true;
+    AsyncStorage.getItem(FILTER_KEY)
+      .then((saved) => {
+        if (!alive) return;
+        if (saved === 'menipis' || saved === 'nonaktif') setFilter(saved);
+      })
+      .catch(() => {
+        // A missing preference is not an error; 'semua' is the right default.
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const pickFilter = useCallback((k: Filter) => {
+    setFilter(k);
+    AsyncStorage.setItem(FILTER_KEY, k).catch(() => {});
+    // The reorder endpoint takes no `search`, so leaving a query sitting in the
+    // now-disabled field would show text that no longer does anything.
+    if (k === 'menipis') setQuery('');
+  }, []);
+
+  const clearFilter = useCallback(() => {
+    setQuery('');
+    setFilter('semua');
+    AsyncStorage.setItem(FILTER_KEY, 'semua').catch(() => {});
+  }, []);
+
+  const forgetUndo = useCallback(() => setUndo(null), []);
+
+  const rememberScroll = useCallback((y: number) => {
+    scrollY.current = y;
+  }, []);
+
+  const onEndReached = useCallback(() => {
+    loadMore();
+  }, [loadMore]);
+
+  const undoLast = useCallback(() => {
+    const pending = undo;
+    setUndo(null);
+    pending?.revert().catch(() => toast('Gagal membatalkan.'));
+  }, [undo]);
+
   const stokTotal = stok.reduce((sum, s) => sum + (s.stok_akhir ?? 0), 0);
 
   return (
     <AppShell title="Master Produk">
         {view === 'list' && (
           <View style={styles.listWrap}>
-            <View style={styles.toolbar}>
-              <View style={styles.searchWrap}>
-                <View style={styles.searchIcon} />
-                <View style={styles.searchIconHandle} />
-                <TextInput
-                  value={query}
-                  onChangeText={(t) => {
-                    setQuery(t);
-                    setPage(1);
-                  }}
-                  placeholder="Cari nama atau kode barang"
-                  style={styles.searchInput}
-                />
-              </View>
-              <Text style={styles.countLabel}>{totalItem} produk</Text>
-              <View style={{ flex: 1 }} />
-              {canWrite && (
-                <Pressable onPress={openNewModal} style={styles.newBtn}>
-                  <Text style={styles.newBtnText}>Produk baru</Text>
-                </Pressable>
-              )}
-            </View>
-
-            <View style={styles.tableCard}>
-              <View style={styles.tableHeadRow}>
-                <Text style={[styles.thText, { width: 120 }]}>KODE BARANG</Text>
-                <Text style={[styles.thText, { flex: 1 }]}>NAMA</Text>
-                <Text style={[styles.thText, { width: 150, textAlign: 'right' }]}>
-                  STOK MINIMUM{'\n'}
-                  <Text style={{ color: '#B4BAC2', fontWeight: '500' }}>ambang pesan ulang</Text>
-                </Text>
-                <View style={{ width: 90 }} />
-              </View>
-
-              <ScrollView style={styles.tableBody}>
-                {rows.map((r) => {
-                  return (
-                    <View key={r.id} style={styles.row}>
-                      <Pressable
-                        style={styles.rowMain}
-                        onPress={() => openDetail(r.id)}>
-                        <Text style={[styles.kodeText, { width: 120 }]}>{r.kode}</Text>
-                        <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
-                            <Text
-                              style={[styles.namaText, { color: r.aktif ? C.text : C.muted2 }]}
-                              numberOfLines={1}>
-                              {r.nama}
-                            </Text>
-                            {!r.aktif && (
-                              <View style={styles.badgeNeutral}>
-                                <Text style={styles.badgeNeutralText}>Nonaktif</Text>
-                              </View>
-                            )}
-                          </View>
-                          <Text style={styles.metaText} numberOfLines={1}>
-                            Diperbarui {formatTanggal(r.updatedAt)}
-                          </Text>
-                        </View>
-                        <Text
-                          style={[
-                            styles.stokText,
-                            { width: 150, color: r.aktif ? C.text : C.muted2 },
-                          ]}>
-                          {formatNumber(r.stokMin)} {r.namaSatuanDasar}
-                        </Text>
-                      </Pressable>
-                      <View style={{ width: 90, alignItems: 'flex-end' }}>
-                        {canWrite && (
-                          <Pressable onPress={() => openEditModal(r)} style={styles.ubahBtn}>
-                            <Text style={styles.ubahBtnText}>Ubah</Text>
-                          </Pressable>
-                        )}
-                      </View>
-                    </View>
-                  );
-                })}
-                {listLoading && rows.length === 0 && (
-                  <View style={styles.emptyState}>
-                    <ActivityIndicator color={C.primary} />
+            <RecordList
+              items={items}
+              loading={listLoading}
+              error={listErr}
+              filtered={search !== '' || filter !== 'semua'}
+              bulkActions={bulkActions}
+              onOpen={openDetail}
+              onAction={runRowAction}
+              onBulkAction={runBulkAction}
+              onRetry={reloadList}
+              onClearFilter={clearFilter}
+              onCreate={canWrite ? openNewModal : undefined}
+              createLabel="Produk baru"
+              emptyTitle="Belum ada produk"
+              emptySub="Master produk masih kosong. Tambahkan produk pertama untuk mulai mencatat stok dan harga."
+              header={
+                <View style={styles.listHeader}>
+                  {/* The search field has the width to itself. It is the control
+                      that gets used on every visit; the count was decoration and
+                      creating a product moved into the list as its first row. */}
+                  <View style={styles.searchWrap}>
+                    <View style={styles.searchIcon} />
+                    <View style={styles.searchIconHandle} />
+                    <TextInput
+                      value={query}
+                      onChangeText={setQuery}
+                      editable={filter !== 'menipis'}
+                      placeholder={
+                        filter === 'menipis'
+                          ? 'Pencarian tidak berlaku di daftar stok menipis'
+                          : 'Cari nama atau kode barang'
+                      }
+                      style={[styles.searchInput, filter === 'menipis' && styles.searchInputOff]}
+                    />
                   </View>
-                )}
-                {!listLoading && listErr !== '' && (
-                  <View style={styles.emptyState}>
-                    <Text style={styles.emptyTitle}>{listErr}</Text>
-                    <Pressable onPress={reloadList} style={styles.ubahBtn}>
-                      <Text style={styles.ubahBtnText}>Coba lagi</Text>
-                    </Pressable>
-                  </View>
-                )}
-                {!listLoading && listErr === '' && rows.length === 0 && (
-                  <View style={styles.emptyState}>
-                    <Text style={styles.emptyTitle}>Tidak ada produk yang cocok</Text>
-                    <Text style={styles.emptySub}>Pencarian mencocokkan sebagian nama atau kode barang.</Text>
-                  </View>
-                )}
-              </ScrollView>
-
-              <View style={styles.pagingBar}>
-                <Text style={styles.pagingLabel}>{pagingLabel}</Text>
-                <View style={{ flexDirection: 'row', gap: 6 }}>
-                  <Pressable
-                    disabled={page <= 1 || listLoading}
-                    onPress={() => setPage((p) => Math.max(1, p - 1))}
-                    style={[styles.pageBtn, (page <= 1 || listLoading) && styles.pageBtnOff]}>
-                    <Text style={styles.pageBtnText}>Sebelumnya</Text>
-                  </Pressable>
-                  <Pressable
-                    disabled={page >= totalPage || listLoading}
-                    onPress={() => setPage((p) => Math.min(totalPage, p + 1))}
-                    style={[styles.pageBtn, (page >= totalPage || listLoading) && styles.pageBtnOff]}>
-                    <Text style={styles.pageBtnText}>Berikutnya</Text>
-                  </Pressable>
+                  <FilterPills options={FILTER_OPTIONS} active={filter} onPick={pickFilter} />
                 </View>
-              </View>
-            </View>
+              }
+              leadRow={
+                canWrite ? (
+                  <Pressable onPress={openNewModal} style={styles.newRow}>
+                    <View style={styles.newRowPlus}>
+                      <Text style={styles.newRowPlusText}>+</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.newRowTitle}>Produk baru</Text>
+                      <Text style={styles.newRowSub}>Tambahkan barang ke master produk</Text>
+                    </View>
+                  </Pressable>
+                ) : null
+              }
+              onEndReached={onEndReached}
+              loadingMore={loadingMore}
+              moreError={moreErr}
+              onRetryMore={retryMore}
+              initialScrollOffset={scrollY.current}
+              onScrollOffset={rememberScroll}
+            />
+            <UndoBar message={undo?.message ?? null} onUndo={undoLast} onExpire={forgetUndo} />
           </View>
         )}
 
@@ -809,8 +1031,10 @@ export default function ProdukScreen() {
 
 const styles = StyleSheet.create({
   listWrap: { flex: 1, padding: 18, gap: 12 },
-  toolbar: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  searchWrap: { position: 'relative', flex: 1, maxWidth: 420, justifyContent: 'center' },
+  // Search and chips sit inside the list card and never scroll away with
+  // the rows - on a long list they are the only way back out.
+  listHeader: { gap: 10, borderBottomWidth: 1, borderBottomColor: C.borderLight, padding: 14 },
+  searchWrap: { position: 'relative', justifyContent: 'center' },
   searchIcon: {
     position: 'absolute',
     left: 13,
@@ -832,64 +1056,43 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   searchInput: {
-    height: 42,
-    paddingLeft: 36,
+    minHeight: 52,
+    paddingLeft: 42,
     paddingRight: 14,
-    borderRadius: 9,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: C.border,
     backgroundColor: '#fff',
-    fontSize: 15.5,
+    fontSize: 16.5,
     color: C.text,
   },
-  countLabel: { fontSize: 14, color: C.muted3 },
-  newBtn: { height: 42, paddingHorizontal: 16, borderRadius: 9, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center' },
-  newBtnText: { fontSize: 15, fontWeight: '600', color: '#fff' },
-  tableCard: { flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: C.borderCard, borderRadius: 12, overflow: 'hidden' },
-  tableHeadRow: {
+  searchInputOff: { backgroundColor: C.tableHeaderBg, color: C.muted2 },
+  newRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    paddingHorizontal: 20,
-    height: 48,
-    backgroundColor: C.tableHeaderBg,
-    borderBottomWidth: 1,
-    borderBottomColor: C.borderLight,
-  },
-  thText: { fontSize: 12.5, fontWeight: '600', letterSpacing: 0.5, color: C.muted },
-  tableBody: { flex: 1 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 13,
     borderBottomWidth: 1,
     borderBottomColor: C.borderLighter,
-    minHeight: 74,
+    backgroundColor: C.tableHeaderBg,
   },
-  rowMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingVertical: 10 },
-  kodeText: { fontFamily: 'monospace', fontSize: 14.5, color: C.dark2 },
-  namaText: { fontSize: 17, fontWeight: '500' },
-  metaText: { fontSize: 12.5, color: C.muted },
-  stokText: { fontSize: 17, fontWeight: '600', textAlign: 'right' },
-  ubahBtn: { height: 40, paddingHorizontal: 14, borderRadius: 9, borderWidth: 1, borderColor: C.border, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  ubahBtnText: { fontSize: 14, fontWeight: '600', color: C.dark2 },
+  newRowPlus: {
+    minWidth: 30,
+    minHeight: 30,
+    borderRadius: 15,
+    backgroundColor: C.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  newRowPlusText: { fontSize: 19, lineHeight: 22, fontWeight: '600', color: '#fff' },
+  newRowTitle: { fontSize: 15.5, fontWeight: '600', color: C.primaryDark },
+  newRowSub: { marginTop: 2, fontSize: 13, color: C.muted3 },
+  thText: { fontSize: 12.5, fontWeight: '600', letterSpacing: 0.5, color: C.muted },
   emptyState: { padding: 44, alignItems: 'center' },
   emptyTitle: { fontSize: 15.5, fontWeight: '500', color: C.dark2 },
   emptySub: { marginTop: 5, fontSize: 14, color: C.muted2, textAlign: 'center' },
-  pagingBar: {
-    height: 48,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    borderTopWidth: 1,
-    borderTopColor: C.borderLight,
-    backgroundColor: C.tableHeaderBg,
-  },
-  pagingLabel: { fontSize: 14, color: C.muted3 },
   detailLoading: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
-  pageBtnOff: { opacity: 0.4 },
-  pageBtn: { height: 30, paddingHorizontal: 12, borderRadius: 7, borderWidth: 1, borderColor: C.border, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  pageBtnText: { fontSize: 14, fontWeight: '600', color: C.dark2 },
   detailWrap: { flex: 1 },
   detailHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 14, flexWrap: 'wrap' },
   backBtn: { height: 38, paddingHorizontal: 13, borderRadius: 9, borderWidth: 1, borderColor: C.border, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },

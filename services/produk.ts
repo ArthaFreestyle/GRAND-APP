@@ -93,6 +93,44 @@ export async function listProducts(query: ListQuery): Promise<Paged<ProductRow>>
   return { data: page.data.map(toRow), paging: page.paging };
 }
 
+/**
+ * One row of `GET /product/stok-minimum` - the reorder work list.
+ *
+ * A separate endpoint rather than a filter on `GET /product`, because the list
+ * payload carries no stock at all: asking for it per row is the N+1 the
+ * contract warns against. It answers only `is_aktif` products, never those with
+ * `stok_minimum = 0` (that is the column default, meaning "not set" rather than
+ * "may run out"), and it arrives sorted worst-first by `selisih`.
+ */
+export interface StokMinimumRow {
+  id: number;
+  kode: string;
+  nama: string;
+  stokMin: number;
+  totalStok: number;
+  /** `stok_minimum - total_stok`, never negative here. */
+  selisih: number;
+}
+
+export async function listStokMinimum(
+  query: { page?: number; size?: number; id_ruang?: number } = {}
+): Promise<Paged<StokMinimumRow>> {
+  const page = await authedList<components['schemas']['StokMinimum']>(
+    `/api/v1/product/stok-minimum${buildQuery({ ...query })}`
+  );
+  return {
+    data: page.data.map((r) => ({
+      id: r.id_product ?? 0,
+      kode: r.kode_barang ?? '',
+      nama: r.nama_product ?? '',
+      stokMin: r.stok_minimum ?? 0,
+      totalStok: r.total_stok ?? 0,
+      selisih: r.selisih ?? 0,
+    })),
+    paging: page.paging,
+  };
+}
+
 export async function getProduct(id: number): Promise<ProductDetail> {
   return toDetail(await authedRequest<ApiProduct>(`/api/v1/product/${id}`));
 }

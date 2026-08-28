@@ -9,6 +9,7 @@ import {
   Card,
   CardHead,
   CheckBox,
+  DataTable,
   EmptyState,
   ErrorBanner,
   Field,
@@ -25,16 +26,17 @@ import {
   StatTile,
   TextField,
   Toast,
+  type ToneName,
 } from '@/components/shell/ui';
 import { Colors as C, num, rp, rpShort, tanggal, todayISO } from '@/constants/theme-erp';
 
 const PAGE_SIZE = 8;
 
 type Tipe = 'distributor' | 'pabrik' | 'perorangan';
-const TIPE_META: Record<Tipe, { label: string; color: string; bg: string; border: string }> = {
-  distributor: { label: 'Distributor', color: C.primaryDark, bg: C.primaryTintBg, border: C.primaryTintBorder },
-  pabrik: { label: 'Pabrik', color: C.green, bg: C.greenBg, border: C.greenBorder },
-  perorangan: { label: 'Perorangan', color: C.muted3, bg: C.badgeBg, border: C.borderCard },
+const TIPE_META: Record<Tipe, { label: string; tone: ToneName }> = {
+  distributor: { label: 'Distributor', tone: 'primary' as const },
+  pabrik: { label: 'Pabrik', tone: 'green' as const },
+  perorangan: { label: 'Perorangan', tone: 'neutral' as const },
 };
 
 interface Faktur {
@@ -213,14 +215,23 @@ export default function SupplierScreen() {
             {canWrite && <PrimaryButton label="Supplier baru" onPress={() => { setDraft(EMPTY_DRAFT); setModalErr(''); setModal('new'); }} />}
           </View>
 
-          <View style={styles.tableCard}>
-            <View style={styles.tableHeadRow}>
-              <Text style={[styles.thText, { flex: 1 }]}>NAMA</Text>
-              <Text style={[styles.thText, { width: 128 }]}>TIPE</Text>
-              <Text style={[styles.thText, { width: 140, textAlign: 'right' }]}>HUTANG</Text>
-              <View style={{ width: 90 }} />
-            </View>
-            <ScrollView style={{ flex: 1 }}>
+          <DataTable
+            minWidth={700}
+            head={
+              <View style={styles.tableHeadRow}>
+                <Text style={[styles.thText, { flex: 1 }]}>NAMA</Text>
+                <Text style={[styles.thText, { width: 128 }]}>TIPE</Text>
+                <Text style={[styles.thText, { width: 140, textAlign: 'right' }]}>HUTANG</Text>
+                <View style={{ width: 90 }} />
+              </View>
+            }
+            footer={
+              <PagingBar
+                label={filtered.length ? `${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, filtered.length)} dari ${filtered.length} · halaman ${currentPage}/${totalPage}` : '0 hasil'}
+                onPrev={() => setPage((p) => Math.max(1, p - 1))}
+                onNext={() => setPage((p) => Math.min(totalPage, p + 1))}
+              />
+            }>
               {slice.map((r) => {
                 const meta = TIPE_META[r.tipe];
                 const hutang = hutangOf(r);
@@ -239,7 +250,7 @@ export default function SupplierScreen() {
                         </Text>
                       </View>
                       <View style={{ width: 128 }}>
-                        <Badge label={meta.label} color={meta.color} bg={meta.bg} border={meta.border} small />
+                        <Badge label={meta.label} tone={meta.tone} small />
                       </View>
                       <View style={{ width: 140, alignItems: 'flex-end', gap: 2 }}>
                         <Text style={{ fontSize: 16, fontWeight: '600', color: hutang <= 0 ? C.muted : jatuhTempo ? C.red : C.text }}>
@@ -255,13 +266,7 @@ export default function SupplierScreen() {
                 );
               })}
               {slice.length === 0 && <EmptyState title="Tidak ada supplier yang cocok" sub="Coba kata kunci lain atau ubah filter tipe." />}
-            </ScrollView>
-            <PagingBar
-              label={filtered.length ? `${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, filtered.length)} dari ${filtered.length} · halaman ${currentPage}/${totalPage}` : '0 hasil'}
-              onPrev={() => setPage((p) => Math.max(1, p - 1))}
-              onNext={() => setPage((p) => Math.min(totalPage, p + 1))}
-            />
-          </View>
+          </DataTable>
         </View>
       )}
 
@@ -280,7 +285,7 @@ export default function SupplierScreen() {
                 <SecondaryButton label="Ubah supplier" onPress={() => openEdit(current)} />
                 <SecondaryButton
                   label={current.aktif ? 'Nonaktifkan' : 'Aktifkan kembali'}
-                  color={current.aktif ? C.red : C.primary}
+                  tone={current.aktif ? 'text-danger' : 'text-primary'}
                   onPress={() => {
                     patch(current.id, { aktif: !current.aktif });
                     toast(current.aktif ? 'Supplier dinonaktifkan' : 'Supplier diaktifkan kembali');
@@ -296,12 +301,12 @@ export default function SupplierScreen() {
             const belum = belumLunasOf(current);
             return (
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-                <StatTile label="Hutang berjalan" value={rp(hutang)} color={hutang <= 0 ? C.text : jatuhTempo ? C.red : C.text}
+                <StatTile label="Hutang berjalan" value={rp(hutang)} valueClass={hutang <= 0 ? 'text-foreground' : jatuhTempo ? 'text-danger' : 'text-foreground'}
                   sub={hutang <= 0 ? 'Tidak ada hutang berjalan' : jatuhTempo ? 'Ada faktur lewat jatuh tempo' : 'Ada hutang berjalan'}
-                  subColor={jatuhTempo ? C.red : C.muted} />
+                  subClass={jatuhTempo ? 'text-danger' : 'text-faint'} />
                 <StatTile label="Tempo bayar" value={current.tempo > 0 ? `${current.tempo} hari` : 'Tunai'} sub={current.tempo > 0 ? 'sejak tanggal faktur' : 'bayar di tempat'} />
                 <StatTile label="Nilai pembelian" value={rp(totalBeliOf(current))} sub={`akumulasi ${current.faktur.length} faktur`} />
-                <StatTile label="Faktur belum lunas" value={num(belum)} color={belum > 0 ? C.red : C.text} sub={`dari ${current.faktur.length} faktur`} />
+                <StatTile label="Faktur belum lunas" value={num(belum)} valueClass={belum > 0 ? C.red : C.text} sub={`dari ${current.faktur.length} faktur`} />
               </View>
             );
           })()}
@@ -325,10 +330,10 @@ export default function SupplierScreen() {
             ) : (
               current.faktur.map((h) => {
                 const status = h.sisa <= 0
-                  ? { label: 'Lunas', color: C.green, bg: C.greenBg, border: C.greenBorder }
+                  ? { label: 'Lunas', tone: 'green' as const }
                   : h.jatuh && h.jatuh < TODAY
-                  ? { label: 'Jatuh tempo', color: C.red, bg: C.redBg, border: C.redBorder }
-                  : { label: 'Belum jatuh tempo', color: C.amber, bg: C.amberBg, border: C.amberBorder };
+                  ? { label: 'Jatuh tempo', tone: 'red' as const }
+                  : { label: 'Belum jatuh tempo', tone: 'amber' as const };
                 return (
                   <View key={h.no} style={styles.notaRow}>
                     <Text style={{ width: 110, fontSize: 14, color: C.dark2 }}>{tanggal(h.tanggal)}</Text>
@@ -446,11 +451,12 @@ const styles = StyleSheet.create({
   listWrap: { flex: 1, padding: 18, gap: 12 },
   toolbar: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
   countLabel: { fontSize: 14, color: C.muted3 },
-  tableCard: { flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: C.borderCard, borderRadius: 12, overflow: 'hidden' },
-  tableHeadRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, height: 48, backgroundColor: C.tableHeaderBg, borderBottomWidth: 1, borderBottomColor: C.borderLight },
+  tableHeadRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: 20,
+    paddingRight: 36, height: 48, backgroundColor: C.tableHeaderBg, borderBottomWidth: 1, borderBottomColor: C.borderLight },
   thText: { fontSize: 12.5, fontWeight: '600', letterSpacing: 0.5, color: C.muted },
   row: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: C.borderLighter, minHeight: 74 },
-  rowMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 10 },
+  rowMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: 20,
+    paddingRight: 36, paddingVertical: 10 },
   namaText: { fontSize: 17, fontWeight: '500' },
   metaText: { fontSize: 12.5, color: C.muted },
   detailHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 14, flexWrap: 'wrap' },

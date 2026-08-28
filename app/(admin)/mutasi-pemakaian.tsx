@@ -8,6 +8,7 @@ import {
   Badge,
   Card,
   CardHead,
+  DataTable,
   EmptyState,
   ErrorBanner,
   Field,
@@ -107,13 +108,13 @@ function prodUnit(kode: string) { return prod(kode)?.unit ?? ''; }
 function totalQty(t: Trx) { return t.items.reduce((s, it) => s + it.qty, 0); }
 function jenisMeta(j: Jenis) {
   return j === 'mutasi'
-    ? { label: 'Mutasi', color: C.primaryDark, bg: C.primaryTintBg, border: C.primaryTintBorder }
-    : { label: 'Pemakaian', color: C.amber, bg: C.amberBg, border: C.amberBorder };
+    ? { label: 'Mutasi', tone: 'primary' as const }
+    : { label: 'Pemakaian', tone: 'amber' as const };
 }
 function statusMeta(t: Trx) {
-  if (t.jenis === 'pemakaian') return { label: 'Tercatat', color: C.green, bg: C.greenBg, border: C.greenBorder };
-  if (t.status === 'transit') return { label: 'Dalam perjalanan', color: C.amber, bg: C.amberBg, border: C.amberBorder };
-  return { label: 'Diterima', color: C.green, bg: C.greenBg, border: C.greenBorder };
+  if (t.jenis === 'pemakaian') return { label: 'Tercatat', tone: 'green' as const };
+  if (t.status === 'transit') return { label: 'Dalam perjalanan', tone: 'amber' as const };
+  return { label: 'Diterima', tone: 'green' as const };
 }
 
 export default function MutasiPemakaianScreen() {
@@ -234,16 +235,25 @@ export default function MutasiPemakaianScreen() {
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
             <KpiCard label="Mutasi antar ruang" value={num(mutasiCount)} sub="transaksi tercatat" />
             <KpiCard label="Pemakaian internal" value={num(pemakaianCount)} sub="transaksi tercatat" />
-            <KpiCard label="Mutasi dalam perjalanan" value={num(transitCount)} color={transitCount > 0 ? C.amber : C.text} sub="menunggu diterima" />
+            <KpiCard label="Mutasi dalam perjalanan" value={num(transitCount)} valueClass={transitCount > 0 ? C.amber : C.text} sub="menunggu diterima" />
           </View>
 
-          <View style={styles.tableCard}>
-            <View style={styles.tableHeadRow}>
-              <Text style={[styles.thText, { flex: 1 }]}>RUTE & DOKUMEN</Text>
-              <Text style={[styles.thText, { width: 176 }]}>STATUS</Text>
-              <Text style={[styles.thText, { width: 130, textAlign: 'right' }]}>ITEM</Text>
-            </View>
-            <ScrollView style={{ flex: 1 }}>
+          <DataTable
+            minWidth={660}
+            head={
+              <View style={styles.tableHeadRow}>
+                <Text style={[styles.thText, { flex: 1 }]}>RUTE & DOKUMEN</Text>
+                <Text style={[styles.thText, { width: 176 }]}>STATUS</Text>
+                <Text style={[styles.thText, { width: 130, textAlign: 'right' }]}>ITEM</Text>
+              </View>
+            }
+            footer={
+              <PagingBar
+                label={filtered.length ? `${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, filtered.length)} dari ${filtered.length} · halaman ${currentPage}/${totalPage}` : '0 hasil'}
+                onPrev={() => setPage((p) => Math.max(1, p - 1))}
+                onNext={() => setPage((p) => Math.min(totalPage, p + 1))}
+              />
+            }>
               {slice.map((t) => {
                 const jm = jenisMeta(t.jenis);
                 const st = statusMeta(t);
@@ -252,13 +262,13 @@ export default function MutasiPemakaianScreen() {
                   <Pressable key={t.id} onPress={() => { setView('detail'); setOpenId(t.id); }} style={styles.row}>
                     <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
-                        <Badge label={jm.label} color={jm.color} bg={jm.bg} border={jm.border} small />
+                        <Badge label={jm.label} tone={jm.tone} small />
                         <Text style={styles.namaText} numberOfLines={1}>{rute}</Text>
                       </View>
                       <Text style={styles.metaText} numberOfLines={1}>{t.no} · {tanggal(t.tanggal)}</Text>
                     </View>
                     <View style={{ width: 176 }}>
-                      <Badge label={st.label} color={st.color} bg={st.bg} border={st.border} small />
+                      <Badge label={st.label} tone={st.tone} small />
                     </View>
                     <View style={{ width: 130, alignItems: 'flex-end', gap: 2 }}>
                       <Text style={{ fontSize: 16, fontWeight: '600' }}>{t.items.length} item</Text>
@@ -268,13 +278,7 @@ export default function MutasiPemakaianScreen() {
                 );
               })}
               {slice.length === 0 && <EmptyState title="Tidak ada transaksi yang cocok" sub="Coba kata kunci lain atau ubah filter jenis." />}
-            </ScrollView>
-            <PagingBar
-              label={filtered.length ? `${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, filtered.length)} dari ${filtered.length} · halaman ${currentPage}/${totalPage}` : '0 hasil'}
-              onPrev={() => setPage((p) => Math.max(1, p - 1))}
-              onNext={() => setPage((p) => Math.min(totalPage, p + 1))}
-            />
-          </View>
+          </DataTable>
         </View>
       )}
 
@@ -290,8 +294,8 @@ export default function MutasiPemakaianScreen() {
                 <View style={styles.detailHead}>
                   <BackButton onPress={() => { setView('list'); setOpenId(null); }} />
                   <Text style={styles.detailNo}>{current.no}</Text>
-                  <Badge label={jm.label} color={jm.color} bg={jm.bg} border={jm.border} />
-                  <Badge label={st.label} color={st.color} bg={st.bg} border={st.border} />
+                  <Badge label={jm.label} tone={jm.tone} />
+                  <Badge label={st.label} tone={st.tone} />
                   <View style={{ flex: 1 }} />
                   {canReceive && <PrimaryButton label="Terima di tujuan" onPress={() => receive(current)} />}
                 </View>
@@ -300,13 +304,13 @@ export default function MutasiPemakaianScreen() {
                   <KpiCard
                     label={isMutasi ? 'Ke ruang' : 'Unit pemakai'}
                     value={isMutasi ? ruangNama(current.ke ?? 0) : unitNama(current.unit ?? 0)}
-                    color={isMutasi ? C.text : C.amber}
+                    valueClass={isMutasi ? 'text-foreground' : 'text-amber'}
                     sub={isMutasi ? (current.status === 'transit' ? 'stok belum ditambahkan' : 'stok bertambah di sini') : 'stok keluar / dikonsumsi'}
                   />
                   <KpiCard label="Tanggal" value={tanggal(current.tanggal)} sub={`${current.items.length} jenis · ${num(totalQty(current))} unit`} />
                 </View>
                 {!!current.catatan && (
-                  <Card style={{ padding: 14 }}>
+                  <Card className="p-3.5">
                     <Text style={{ fontSize: 12.5, color: C.muted2 }}>Catatan</Text>
                     <Text style={{ fontSize: 15, color: C.text, marginTop: 3, lineHeight: 20 }}>{current.catatan}</Text>
                   </Card>
@@ -342,7 +346,7 @@ export default function MutasiPemakaianScreen() {
             <Text style={{ fontSize: 13.5, color: C.muted2 }}>Nomor dokumen dibuat otomatis saat disimpan</Text>
           </View>
 
-          <Card style={{ padding: 16, gap: 14 }}>
+          <Card className="gap-3.5 p-4">
             <View style={{ flexDirection: 'row', gap: 8 }}>
               {(['mutasi', 'pemakaian'] as Jenis[]).map((j) => {
                 const on = draft.jenis === j;
@@ -354,7 +358,7 @@ export default function MutasiPemakaianScreen() {
                     <Text style={{ fontSize: 15.5, fontWeight: '600', color: on ? C.primaryDark : C.dark2 }}>
                       {j === 'mutasi' ? 'Mutasi antar ruang' : 'Pemakaian internal'}
                     </Text>
-                    <Text style={{ fontSize: 12.5, color: on ? '#4C6591' : C.muted }}>
+                    <Text style={{ fontSize: 12.5, color: on ? C.primaryDark : C.muted }}>
                       {j === 'mutasi' ? 'Pindah stok antar lokasi' : 'Konsumsi oleh unit kerja'}
                     </Text>
                   </Pressable>
@@ -420,7 +424,7 @@ export default function MutasiPemakaianScreen() {
           </Card>
 
           <View style={{ alignItems: 'flex-end' }}>
-            <Card style={{ width: 380, maxWidth: '100%', padding: 16, gap: 12 }}>
+            <Card className="w-[380px] max-w-full gap-3 p-4">
               <View style={styles.summaryRow}>
                 <Text style={{ fontSize: 14.5, color: C.muted3 }}>Total baris item</Text>
                 <Text style={{ fontSize: 22, fontWeight: '800' }}>{draft.items.length}</Text>
@@ -449,10 +453,11 @@ const styles = StyleSheet.create({
   wrap: { flex: 1, padding: 18, gap: 12 },
   toolbar: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
   countLabel: { fontSize: 14, color: C.muted3 },
-  tableCard: { flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: C.borderCard, borderRadius: 12, overflow: 'hidden' },
-  tableHeadRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, height: 48, backgroundColor: C.tableHeaderBg, borderBottomWidth: 1, borderBottomColor: C.borderLight },
+  tableHeadRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: 20,
+    paddingRight: 36, height: 48, backgroundColor: C.tableHeaderBg, borderBottomWidth: 1, borderBottomColor: C.borderLight },
   thText: { fontSize: 12.5, fontWeight: '600', letterSpacing: 0.5, color: C.muted },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, minHeight: 74, borderBottomWidth: 1, borderBottomColor: C.borderLighter },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: 20,
+    paddingRight: 36, minHeight: 74, borderBottomWidth: 1, borderBottomColor: C.borderLighter },
   namaText: { fontSize: 16.5, fontWeight: '500' },
   metaText: { fontSize: 12.5, color: C.muted, fontFamily: 'monospace' },
   detailHead: { flexDirection: 'row', alignItems: 'center', gap: 14, flexWrap: 'wrap' },

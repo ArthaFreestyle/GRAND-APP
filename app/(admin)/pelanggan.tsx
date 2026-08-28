@@ -8,6 +8,7 @@ import {
   Card,
   CardHead,
   CheckBox,
+  DataTable,
   EmptyState,
   ErrorBanner,
   Field,
@@ -287,15 +288,24 @@ export default function PelangganScreen() {
             {canWrite && <PrimaryButton label="Pelanggan baru" onPress={openNew} />}
           </View>
 
-          <View style={styles.tableCard}>
-            <View style={styles.tableHeadRow}>
+          <DataTable
+            minWidth={720}
+            head={
+              <View style={styles.tableHeadRow}>
               <Text style={[styles.thText, { flex: 1 }]}>NAMA</Text>
               <Text style={[styles.thText, { width: 180 }]}>NPWP</Text>
               <Text style={[styles.thText, { width: 150, textAlign: 'right' }]}>PLAFON KREDIT</Text>
-              <View style={{ width: 90 }} />
-            </View>
-            <ScrollView style={{ flex: 1 }}>
-              {rows.map((r) => (
+                <View style={{ width: 90 }} />
+              </View>
+            }
+            footer={
+              <PagingBar
+                label={pagingLabel}
+                onPrev={() => setPage((p) => Math.max(1, p - 1))}
+                onNext={() => setPage((p) => Math.min(totalPage, p + 1))}
+              />
+            }>
+            {rows.map((r) => (
                 <View key={r.id} style={styles.row}>
                   <Pressable onPress={() => openDetail(r.id)} style={styles.rowMain}>
                     <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
@@ -345,13 +355,7 @@ export default function PelangganScreen() {
                   sub="Pencarian mencocokkan sebagian kode atau nama pelanggan."
                 />
               )}
-            </ScrollView>
-            <PagingBar
-              label={pagingLabel}
-              onPrev={() => setPage((p) => Math.max(1, p - 1))}
-              onNext={() => setPage((p) => Math.min(totalPage, p + 1))}
-            />
-          </View>
+          </DataTable>
         </View>
       )}
 
@@ -381,7 +385,7 @@ export default function PelangganScreen() {
                 <SecondaryButton label="Ubah pelanggan" onPress={() => openEdit(current)} />
                 <SecondaryButton
                   label={current.aktif ? 'Nonaktifkan' : 'Aktifkan kembali'}
-                  color={current.aktif ? C.red : C.primary}
+                  tone={current.aktif ? 'text-danger' : 'text-primary'}
                   onPress={toggleAktif}
                 />
               </View>
@@ -392,7 +396,7 @@ export default function PelangganScreen() {
             <StatTile
               label="Piutang berjalan"
               value={rp(piutangJalan)}
-              color={piutangJalan <= 0 ? C.text : nearLimit ? C.red : C.text}
+              valueClass={piutangJalan <= 0 ? 'text-foreground' : nearLimit ? 'text-danger' : 'text-foreground'}
               sub={
                 piutangJalan <= 0
                   ? 'Tidak ada tagihan berjalan'
@@ -400,7 +404,7 @@ export default function PelangganScreen() {
                     ? 'Mendekati / melewati plafon'
                     : 'Ada tagihan berjalan'
               }
-              subColor={nearLimit ? C.red : C.muted}
+              subClass={nearLimit ? 'text-danger' : 'text-faint'}
             />
             <StatTile
               label="Plafon kredit"
@@ -416,13 +420,13 @@ export default function PelangganScreen() {
             <StatTile
               label="Sisa plafon"
               value={sisaLimit === null ? '—' : rp(Math.max(0, sisaLimit))}
-              color={sisaLimit !== null && sisaLimit < 0 ? C.red : C.text}
+              valueClass={sisaLimit !== null && sisaLimit < 0 ? 'text-danger' : 'text-foreground'}
               sub={plafonAngka === null ? 'tanpa batas' : `dari ${rp(plafonAngka)}`}
             />
             <StatTile
               label="Nota belum lunas"
               value={num(piutang.length)}
-              color={piutang.length > 0 ? C.red : C.text}
+              valueClass={piutang.length > 0 ? C.red : C.text}
               sub={piutangTotal > piutang.length ? `dari ${piutangTotal} nota` : 'seluruhnya'}
             />
           </View>
@@ -582,19 +586,12 @@ const styles = StyleSheet.create({
   listWrap: { flex: 1, padding: 18, gap: 12 },
   toolbar: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   countLabel: { fontSize: 14, color: C.muted3 },
-  tableCard: {
-    flex: 1,
-    backgroundColor: C.card,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: C.borderCard,
-    overflow: 'hidden',
-  },
   tableHeadRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingHorizontal: 18,
+    paddingLeft: 18,
+    paddingRight: 34,
     paddingVertical: 11,
     backgroundColor: C.tableHeaderBg,
     borderBottomWidth: 1,
@@ -604,7 +601,8 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 18,
+    paddingLeft: 18,
+    paddingRight: 34,
     borderBottomWidth: 1,
     borderBottomColor: C.borderLighter,
   },

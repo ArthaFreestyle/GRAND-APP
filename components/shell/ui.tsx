@@ -1,45 +1,100 @@
-import type { ReactNode } from 'react';
-import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+/**
+ * The shared building blocks every back-office screen is assembled from.
+ *
+ * Built on gluestack-ui primitives (`Button`, `Input`, `Modal`, `Checkbox`) for
+ * the pieces where behaviour matters — focus, pressed and disabled states,
+ * overlay and backdrop handling — and styled with NativeWind classes drawn from
+ * the palette in `tailwind.config.js`, which mirrors `constants/theme-erp.ts`.
+ * The look is the ported design's, not gluestack's defaults.
+ *
+ * Where a colour is genuinely chosen at runtime (a status badge whose tint comes
+ * from data), it stays a `className` string picked by the caller rather than a
+ * hex value: NativeWind resolves classes at build time, so a computed hex would
+ * have to fall back to inline styles and drift away from the palette.
+ */
+import { useState, type ReactNode } from 'react';
+import { ScrollView, View } from 'react-native';
 
-import { Colors as C } from '@/constants/theme-erp';
+import { Badge as GBadge, BadgeText } from '@/components/ui/badge';
+import { Box } from '@/components/ui/box';
+import { Button, ButtonText } from '@/components/ui/button';
+import {
+  Checkbox as GCheckbox,
+  CheckboxIndicator,
+  CheckboxLabel,
+} from '@/components/ui/checkbox';
+import { Input, InputField } from '@/components/ui/input';
+import {
+  Modal as GModal,
+  ModalBackdrop,
+  ModalContent,
+} from '@/components/ui/modal';
+import { Pressable } from '@/components/ui/pressable';
+import { Text } from '@/components/ui/text';
 
-export function KpiCard({ label, value, sub, color = C.text }: { label: string; value: string; sub: string; color?: string }) {
+/** Tailwind classes for a badge tint, so callers pass a palette entry, not a hex. */
+export interface BadgeTone {
+  /** e.g. `'bg-green-bg border-green-line'` */
+  box: string;
+  /** e.g. `'text-green'` */
+  text: string;
+}
+
+export const TONES = {
+  neutral: { box: 'bg-muted border-line-card', text: 'text-muted-foreground' },
+  primary: { box: 'bg-primary-tint border-primary-tintline', text: 'text-primary-dark' },
+  green: { box: 'bg-green-bg border-green-line', text: 'text-green' },
+  amber: { box: 'bg-amber-bg border-amber-line', text: 'text-amber' },
+  red: { box: 'bg-danger-bg border-danger-line', text: 'text-danger' },
+} as const satisfies Record<string, BadgeTone>;
+
+export type ToneName = keyof typeof TONES;
+
+export function KpiCard({
+  label,
+  value,
+  sub,
+  valueClass = 'text-foreground',
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  valueClass?: string;
+}) {
   return (
-    <View style={styles.kpiCard}>
-      <Text style={styles.kpiLabel}>{label}</Text>
-      <Text style={[styles.kpiValue, { color }]}>{value}</Text>
-      <Text style={styles.kpiSub}>{sub}</Text>
-    </View>
+    <Box className="grow shrink-0 basis-[190px] min-w-[180px] gap-1 rounded-xl border border-line-card bg-card p-3.5">
+      <Text className="text-[12.5px] text-faint-2">{label}</Text>
+      <Text className={`text-[22px] font-bold tracking-tight ${valueClass}`}>{value}</Text>
+      <Text className="text-[12.5px] text-faint">{sub}</Text>
+    </Box>
   );
 }
 
 export function Badge({
   label,
-  color,
-  bg,
-  border,
+  tone = 'neutral',
   small,
 }: {
   label: string;
-  color: string;
-  bg: string;
-  border: string;
+  tone?: ToneName;
   small?: boolean;
 }) {
+  const t = TONES[tone];
   return (
-    <View
-      style={[
-        styles.badge,
-        { backgroundColor: bg, borderColor: border },
-        small && { height: 20, paddingHorizontal: 8 },
-      ]}>
-      <Text style={[styles.badgeText, { color }, small && { fontSize: 12.5 }]}>{label}</Text>
-    </View>
+    <GBadge
+      className={`items-center justify-center self-start rounded-full border ${t.box} ${
+        small ? 'h-5 px-2' : 'h-6 px-2.5'
+      }`}>
+      <BadgeText
+        className={`font-semibold normal-case ${t.text} ${small ? 'text-[12.5px]' : 'text-[13px]'}`}>
+        {label}
+      </BadgeText>
+    </GBadge>
   );
 }
 
 export function NeutralBadge({ label = 'Nonaktif' }: { label?: string }) {
-  return <Badge label={label} color={C.muted3} bg={C.badgeBg} border={C.borderCard} small />;
+  return <Badge label={label} tone="neutral" small />;
 }
 
 export function SearchBar({
@@ -54,16 +109,16 @@ export function SearchBar({
   maxWidth?: number;
 }) {
   return (
-    <View style={[styles.searchWrap, { maxWidth }]}>
-      <View style={styles.searchIcon} />
-      <View style={styles.searchIconHandle} />
-      <TextInput
+    <Input
+      className="h-9 flex-1 rounded-lg border border-border bg-card px-0 data-[focus=true]:border-primary"
+      style={{ maxWidth }}>
+      <InputField
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        style={styles.searchInput}
+        className="px-3 text-[14.5px] text-foreground placeholder:text-faint"
       />
-    </View>
+    </Input>
   );
 }
 
@@ -77,22 +132,24 @@ export function FilterPills<T extends string>({
   onPick: (k: T) => void;
 }) {
   return (
-    <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+    <Box className="flex-row flex-wrap gap-1.5">
       {options.map((o) => {
         const on = o.key === active;
         return (
           <Pressable
             key={o.key}
             onPress={() => onPick(o.key)}
-            style={[
-              styles.pillBtn,
-              { backgroundColor: on ? C.primaryTintBg : '#fff', borderColor: on ? C.primaryTintBorder : C.border },
-            ]}>
-            <Text style={[styles.pillText, { color: on ? C.primaryDark : C.dark2 }]}>{o.label}</Text>
+            className={`h-8 items-center justify-center rounded-[7px] border px-3 ${
+              on ? 'border-primary-tintline bg-primary-tint' : 'border-border bg-card'
+            }`}>
+            <Text
+              className={`text-[13px] font-semibold ${on ? 'text-primary-dark' : 'text-dark2'}`}>
+              {o.label}
+            </Text>
           </Pressable>
         );
       })}
-    </View>
+    </Box>
   );
 }
 
@@ -106,107 +163,168 @@ export function TabSwitch<T extends string>({
   onPick: (k: T) => void;
 }) {
   return (
-    <View style={styles.tabWrap}>
+    <Box className="flex-row gap-1 self-start rounded-[10px] border border-line-card bg-muted p-1">
       {options.map((o) => {
         const on = o.key === active;
         return (
           <Pressable
             key={o.key}
             onPress={() => onPick(o.key)}
-            style={[styles.tabBtn, { backgroundColor: on ? C.primary : 'transparent' }]}>
-            <Text style={[styles.tabText, { color: on ? '#fff' : C.dark2 }]}>{o.label}</Text>
+            className={`h-8 items-center justify-center rounded-[7px] px-3.5 ${
+              on ? 'bg-primary' : 'bg-transparent'
+            }`}>
+            <Text className={`text-[13.5px] font-semibold ${on ? 'text-white' : 'text-dark2'}`}>
+              {o.label}
+            </Text>
           </Pressable>
         );
       })}
-    </View>
+    </Box>
   );
 }
 
-export function PagingBar({ label, onPrev, onNext }: { label: string; onPrev: () => void; onNext: () => void }) {
+export function PagingBar({
+  label,
+  onPrev,
+  onNext,
+}: {
+  label: string;
+  onPrev: () => void;
+  onNext: () => void;
+}) {
   return (
-    <View style={styles.pagingBar}>
-      <Text style={styles.pagingLabel}>{label}</Text>
-      <View style={{ flexDirection: 'row', gap: 6 }}>
-        <Pressable onPress={onPrev} style={styles.pageBtn}>
-          <Text style={styles.pageBtnText}>Sebelumnya</Text>
-        </Pressable>
-        <Pressable onPress={onNext} style={styles.pageBtn}>
-          <Text style={styles.pageBtnText}>Berikutnya</Text>
-        </Pressable>
-      </View>
-    </View>
+    <Box className="h-12 flex-row items-center justify-between border-t border-line-light bg-thead px-4">
+      <Text className="text-sm text-muted-foreground">{label}</Text>
+      <Box className="flex-row gap-1.5">
+        <PageButton label="Sebelumnya" onPress={onPrev} />
+        <PageButton label="Berikutnya" onPress={onNext} />
+      </Box>
+    </Box>
+  );
+}
+
+function PageButton({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <Button
+      onPress={onPress}
+      className="h-[30px] rounded-[7px] border border-border bg-card px-3 data-[active=true]:bg-line-lighter">
+      <ButtonText className="text-[13px] font-semibold text-dark2">{label}</ButtonText>
+    </Button>
   );
 }
 
 export function EmptyState({ title, sub }: { title: string; sub: string }) {
   return (
-    <View style={styles.emptyState}>
-      <Text style={styles.emptyTitle}>{title}</Text>
-      <Text style={styles.emptySub}>{sub}</Text>
-    </View>
+    <Box className="items-center gap-1.5 px-5 py-10">
+      <Text className="text-[15px] font-semibold text-dark2">{title}</Text>
+      <Text className="text-center text-[13.5px] text-faint-2">{sub}</Text>
+    </Box>
   );
 }
 
-export function PrimaryButton({ label, onPress, flex }: { label: string; onPress: () => void; flex?: number }) {
+export function PrimaryButton({
+  label,
+  onPress,
+  flex,
+}: {
+  label: string;
+  onPress: () => void;
+  flex?: number;
+}) {
   return (
-    <Pressable onPress={onPress} style={[styles.primaryBtn, flex ? { flex } : null]}>
-      <Text style={styles.primaryBtnText}>{label}</Text>
-    </Pressable>
+    <Button
+      onPress={onPress}
+      style={flex ? { flex } : undefined}
+      className="h-9 rounded-lg bg-primary px-3.5 data-[active=true]:bg-primary-dark">
+      <ButtonText className="text-[13.5px] font-semibold text-white">{label}</ButtonText>
+    </Button>
   );
 }
 
 export function SecondaryButton({
   label,
   onPress,
-  color,
+  tone = 'text-primary',
   flex,
 }: {
   label: string;
   onPress: () => void;
-  color?: string;
+  /** A text-colour class, e.g. `'text-danger'` for a destructive action. */
+  tone?: string;
   flex?: number;
 }) {
   return (
-    <Pressable onPress={onPress} style={[styles.secondaryBtn, flex ? { flex } : null]}>
-      <Text style={[styles.secondaryBtnText, color ? { color } : null]}>{label}</Text>
-    </Pressable>
+    <Button
+      onPress={onPress}
+      style={flex ? { flex } : undefined}
+      className="h-9 rounded-lg border border-border bg-card px-3.5 data-[active=true]:bg-line-lighter">
+      <ButtonText className={`text-[13.5px] font-semibold ${tone}`}>{label}</ButtonText>
+    </Button>
   );
 }
 
 export function GhostButton({ label, onPress }: { label: string; onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} style={styles.ghostBtn}>
-      <Text style={styles.ghostBtnText}>{label}</Text>
-    </Pressable>
+    <Button
+      onPress={onPress}
+      className="h-[30px] rounded-[7px] border border-border bg-card px-2.5 data-[active=true]:bg-line-lighter">
+      <ButtonText className="text-[12.5px] font-semibold text-dark2">{label}</ButtonText>
+    </Button>
   );
 }
 
-export function TinyButton({ label, onPress, danger }: { label: string; onPress: () => void; danger?: boolean }) {
+export function TinyButton({
+  label,
+  onPress,
+  danger,
+}: {
+  label: string;
+  onPress: () => void;
+  danger?: boolean;
+}) {
   return (
-    <Pressable onPress={onPress} style={[styles.tinyBtn, danger && { borderColor: C.redBorder2 }]}>
-      <Text style={[styles.tinyBtnText, danger && { color: C.red }]}>{label}</Text>
-    </Pressable>
+    <Button
+      onPress={onPress}
+      className={`h-7 rounded-md border bg-card px-2 data-[active=true]:bg-line-lighter ${
+        danger ? 'border-danger-line2' : 'border-border'
+      }`}>
+      <ButtonText className={`text-xs font-semibold ${danger ? 'text-danger' : 'text-dark2'}`}>
+        {label}
+      </ButtonText>
+    </Button>
   );
 }
 
-export function BackButton({ label = '← Daftar', onPress }: { label?: string; onPress: () => void }) {
+export function BackButton({
+  label = '← Daftar',
+  onPress,
+}: {
+  label?: string;
+  onPress: () => void;
+}) {
   return (
-    <Pressable onPress={onPress} style={styles.backBtn}>
-      <Text style={styles.backBtnText}>{label}</Text>
-    </Pressable>
+    <Button
+      onPress={onPress}
+      className="h-8 rounded-lg border border-border bg-card px-2.5 data-[active=true]:bg-line-lighter">
+      <ButtonText className="text-[13px] font-semibold text-dark2">{label}</ButtonText>
+    </Button>
   );
 }
 
-export function Card({ children, style }: { children: ReactNode; style?: object }) {
-  return <View style={[styles.card, style]}>{children}</View>;
+export function Card({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <Box className={`overflow-hidden rounded-xl border border-line-card bg-card ${className ?? ''}`}>
+      {children}
+    </Box>
+  );
 }
 
 export function CardHead({ title, right }: { title: string; right?: ReactNode }) {
   return (
-    <View style={styles.cardHead}>
-      <Text style={styles.cardHeadText}>{title}</Text>
+    <Box className="h-[52px] flex-row items-center justify-between border-b border-line-light px-4">
+      <Text className="text-[15px] font-bold text-foreground">{title}</Text>
       {right}
-    </View>
+    </Box>
   );
 }
 
@@ -214,30 +332,32 @@ export function StatTile({
   label,
   value,
   sub,
-  color = C.text,
-  subColor = C.muted,
+  valueClass = 'text-foreground',
+  subClass = 'text-faint',
 }: {
   label: string;
   value: string;
   sub?: string;
-  color?: string;
-  subColor?: string;
+  valueClass?: string;
+  subClass?: string;
 }) {
   return (
-    <View style={styles.statTile}>
-      <Text style={styles.kpiLabel}>{label}</Text>
-      <Text style={[styles.statValue, { color }]}>{value}</Text>
-      {sub ? <Text style={[styles.kpiSub, { color: subColor }]}>{sub}</Text> : null}
-    </View>
+    <Box className="grow shrink-0 basis-[190px] min-w-[170px] gap-1 rounded-xl border border-line-card bg-card p-3.5">
+      <Text className="text-[12.5px] text-faint-2">{label}</Text>
+      <Text className={`text-[19px] font-bold tracking-tight ${valueClass}`}>{value}</Text>
+      {sub ? <Text className={`text-[12.5px] ${subClass}`}>{sub}</Text> : null}
+    </Box>
   );
 }
 
 export function Toast({ message }: { message: string | null }) {
   if (!message) return null;
   return (
-    <View style={styles.toast} pointerEvents="none">
-      <Text style={styles.toastText}>{message}</Text>
-    </View>
+    <Box
+      pointerEvents="none"
+      className="absolute bottom-5 left-5 right-5 self-center rounded-[10px] bg-toast px-4 py-3">
+      <Text className="text-[13.5px] font-medium text-white">{message}</Text>
+    </Box>
   );
 }
 
@@ -255,20 +375,23 @@ export function ModalShell({
   children: ReactNode;
 }) {
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onRequestClose}>
-      <View style={styles.backdrop}>
-        <View style={[styles.sheet, { maxWidth: width, width: '100%' }]}>{children}</View>
-      </View>
-    </Modal>
+    <GModal isOpen={visible} onClose={onRequestClose} size="lg">
+      <ModalBackdrop />
+      <ModalContent
+        className="w-full overflow-hidden rounded-2xl border border-line-card bg-card p-0"
+        style={{ maxWidth: width }}>
+        {children}
+      </ModalContent>
+    </GModal>
   );
 }
 
 export function ModalHead({ title, sub }: { title: string; sub: string }) {
   return (
-    <View style={styles.headBlock}>
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.subtitle}>{sub}</Text>
-    </View>
+    <Box className="gap-1 border-b border-line-light px-5 pb-4 pt-5">
+      <Text className="text-[17px] font-bold text-foreground">{title}</Text>
+      <Text className="text-[13.5px] text-muted-foreground">{sub}</Text>
+    </Box>
   );
 }
 
@@ -282,44 +405,63 @@ export function ModalFooter({
   saveLabel: string;
 }) {
   return (
-    <View style={styles.footer}>
-      <Pressable onPress={onCancel} style={styles.btnSecondary}>
-        <Text style={styles.btnSecondaryText}>Batal</Text>
-      </Pressable>
-      <Pressable onPress={onSave} style={styles.btnPrimary}>
-        <Text style={styles.btnPrimaryText}>{saveLabel}</Text>
-      </Pressable>
-    </View>
+    <Box className="flex-row justify-end gap-2.5 border-t border-line-light bg-thead px-5 py-4">
+      <SecondaryButton label="Batal" onPress={onCancel} tone="text-dark2" />
+      <PrimaryButton label={saveLabel} onPress={onSave} />
+    </Box>
   );
 }
 
 export function ErrorBanner({ message }: { message: string }) {
   if (!message) return null;
   return (
-    <View style={styles.errorBanner}>
-      <Text style={styles.errorText}>{message}</Text>
-    </View>
+    <Box className="rounded-[10px] border border-danger-line bg-danger-bg px-3.5 py-3">
+      <Text className="text-[13.5px] font-medium text-danger">{message}</Text>
+    </Box>
   );
 }
 
-export function CheckBox({ checked, onPress, label }: { checked: boolean; onPress: () => void; label: string }) {
+export function CheckBox({
+  checked,
+  onPress,
+  label,
+}: {
+  checked: boolean;
+  onPress: () => void;
+  label: string;
+}) {
   return (
-    <Pressable onPress={onPress} style={styles.checkboxRow}>
-      <View style={[styles.checkboxBox, checked && { backgroundColor: C.primary, borderColor: C.primary }]}>
-        {checked ? <Text style={styles.checkboxMark}>✓</Text> : null}
-      </View>
-      <Text style={styles.checkboxLabel}>{label}</Text>
-    </Pressable>
+    <GCheckbox
+      value={label}
+      isChecked={checked}
+      onChange={onPress}
+      className="flex-row items-center gap-2.5">
+      <CheckboxIndicator
+        className={`h-[19px] w-[19px] items-center justify-center rounded-[5px] border ${
+          checked ? 'border-primary bg-primary' : 'border-border bg-card'
+        }`}>
+        {checked ? <Text className="text-xs font-bold leading-none text-white">✓</Text> : null}
+      </CheckboxIndicator>
+      <CheckboxLabel className="text-[13.5px] text-dark2">{label}</CheckboxLabel>
+    </GCheckbox>
   );
 }
 
-export function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
+export function Field({
+  label,
+  children,
+  hint,
+}: {
+  label: string;
+  children: ReactNode;
+  hint?: string;
+}) {
   return (
-    <View style={styles.field}>
-      <Text style={styles.fieldLabel}>{label}</Text>
+    <Box className="gap-1.5">
+      <Text className="text-[13px] font-semibold text-dark2">{label}</Text>
       {children}
-      {hint ? <Text style={styles.fieldHint}>{hint}</Text> : null}
-    </View>
+      {hint ? <Text className="text-xs text-faint-2">{hint}</Text> : null}
+    </Box>
   );
 }
 
@@ -341,20 +483,23 @@ export function TextField({
   multiline?: boolean;
 }) {
   return (
-    <TextInput
-      value={value}
-      onChangeText={onChangeText}
-      editable={editable}
-      placeholder={placeholder}
-      keyboardType={keyboardType}
-      multiline={multiline}
-      style={[
-        styles.input,
-        mono && styles.mono,
-        !editable && styles.inputLocked,
-        multiline && { minHeight: 64, textAlignVertical: 'top', paddingTop: 10 },
-      ]}
-    />
+    <Input
+      isDisabled={!editable}
+      className={`rounded-lg border border-border px-0 data-[focus=true]:border-primary ${
+        editable ? 'bg-card' : 'bg-line-lighter'
+      } ${multiline ? 'h-auto min-h-[64px] items-start' : 'h-10'}`}>
+      <InputField
+        value={value}
+        onChangeText={onChangeText}
+        editable={editable}
+        placeholder={placeholder}
+        keyboardType={keyboardType}
+        multiline={multiline}
+        className={`px-3 text-[14.5px] text-foreground placeholder:text-faint ${
+          mono ? 'font-mono' : ''
+        } ${multiline ? 'pt-2.5 align-top' : ''}`}
+      />
+    </Input>
   );
 }
 
@@ -368,180 +513,169 @@ export function OptionPicker({
   onChange: (v: string) => void;
 }) {
   return (
-    <View style={styles.pickerWrap}>
+    <Box className="flex-row flex-wrap gap-1.5">
       {options.map((o) => {
         const active = o.value === value;
         return (
           <Pressable
             key={o.value}
             onPress={() => onChange(o.value)}
-            style={[styles.pickerOption, active && styles.pickerOptionActive]}>
-            <Text style={[styles.pickerOptionText, active && styles.pickerOptionTextActive]} numberOfLines={1}>
+            className={`h-9 items-center justify-center rounded-lg border px-3 ${
+              active ? 'border-primary-tintline bg-primary-tint' : 'border-border bg-card'
+            }`}>
+            <Text
+              numberOfLines={1}
+              className={`text-[13.5px] font-medium ${
+                active ? 'text-primary-dark' : 'text-dark2'
+              }`}>
               {o.label}
             </Text>
           </Pressable>
         );
       })}
-    </View>
+    </Box>
   );
 }
 
-const styles = StyleSheet.create({
-  kpiCard: {
-    flexGrow: 1,
-    flexBasis: 190,
-    minWidth: 180,
-    padding: 14,
-    borderRadius: 12,
-    backgroundColor: C.card,
-    borderWidth: 1,
-    borderColor: C.borderCard,
-    gap: 4,
-  },
-  kpiLabel: { fontSize: 12.5, color: C.muted2 },
-  kpiValue: { fontSize: 24, fontWeight: '700', letterSpacing: -0.2 },
-  kpiSub: { fontSize: 12.5, color: C.muted },
-  badge: {
-    height: 24,
-    paddingHorizontal: 10,
-    borderRadius: 6,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'flex-start',
-  },
-  badgeText: { fontSize: 12.5, fontWeight: '600' },
-  searchWrap: { position: 'relative', flex: 1, minWidth: 220, justifyContent: 'center' },
-  searchIcon: {
-    position: 'absolute',
-    left: 13,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    borderWidth: 2,
-    borderColor: C.muted,
-    zIndex: 1,
-  },
-  searchIconHandle: {
-    position: 'absolute',
-    left: 24,
-    top: 25,
-    width: 8,
-    height: 2,
-    backgroundColor: C.muted,
-    transform: [{ rotate: '45deg' }],
-    zIndex: 1,
-  },
-  searchInput: {
-    height: 44,
-    paddingLeft: 36,
-    paddingRight: 14,
-    borderRadius: 9,
-    borderWidth: 1,
-    borderColor: C.border,
-    backgroundColor: '#fff',
-    fontSize: 15,
-    color: C.text,
-  },
-  pillBtn: { height: 44, paddingHorizontal: 15, borderRadius: 9, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  pillText: { fontSize: 14, fontWeight: '600' },
-  tabWrap: { flexDirection: 'row', gap: 4, padding: 4, borderRadius: 11, backgroundColor: '#fff', borderWidth: 1, borderColor: C.borderCard },
-  tabBtn: { height: 38, paddingHorizontal: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  tabText: { fontSize: 14.5, fontWeight: '600' },
-  pagingBar: {
-    height: 48,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    borderTopWidth: 1,
-    borderTopColor: C.borderLight,
-    backgroundColor: C.tableHeaderBg,
-  },
-  pagingLabel: { fontSize: 14, color: C.muted3 },
-  pageBtn: { height: 30, paddingHorizontal: 12, borderRadius: 7, borderWidth: 1, borderColor: C.border, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  pageBtnText: { fontSize: 13, fontWeight: '600', color: C.dark2 },
-  emptyState: { padding: 44, alignItems: 'center' },
-  emptyTitle: { fontSize: 15.5, fontWeight: '500', color: C.dark2 },
-  emptySub: { marginTop: 5, fontSize: 14, color: C.muted2, textAlign: 'center' },
-  primaryBtn: { height: 44, paddingHorizontal: 16, borderRadius: 9, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center' },
-  primaryBtnText: { fontSize: 14.5, fontWeight: '600', color: '#fff' },
-  secondaryBtn: { height: 40, paddingHorizontal: 15, borderRadius: 9, borderWidth: 1, borderColor: C.border, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  secondaryBtnText: { fontSize: 14.5, fontWeight: '600', color: C.dark2 },
-  ghostBtn: { height: 32, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: C.border, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  ghostBtnText: { fontSize: 14, fontWeight: '600', color: C.primary },
-  tinyBtn: { height: 32, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: C.border, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  tinyBtnText: { fontSize: 13.5, fontWeight: '600', color: C.dark2 },
-  backBtn: { height: 38, paddingHorizontal: 13, borderRadius: 9, borderWidth: 1, borderColor: C.border, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  backBtnText: { fontSize: 14.5, fontWeight: '600', color: C.dark2 },
-  card: { backgroundColor: '#fff', borderWidth: 1, borderColor: C.borderCard, borderRadius: 12, overflow: 'hidden' },
-  cardHead: {
-    height: 52,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: C.borderLight,
-  },
-  cardHeadText: { fontSize: 16.5, fontWeight: '700', color: C.text },
-  statTile: {
-    flexGrow: 1,
-    flexBasis: 190,
-    minWidth: 180,
-    padding: 14,
-    borderRadius: 12,
-    backgroundColor: C.card,
-    borderWidth: 1,
-    borderColor: C.borderCard,
-    gap: 4,
-  },
-  statValue: { fontSize: 24, fontWeight: '700', letterSpacing: -0.2 },
-  toast: {
-    position: 'absolute',
-    left: 18,
-    bottom: 18,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 11,
-    backgroundColor: C.toastBg,
-    maxWidth: 420,
-  },
-  toastText: { fontSize: 14, fontWeight: '500', color: '#fff' },
-  backdrop: { flex: 1, backgroundColor: 'rgba(22,24,28,0.42)', alignItems: 'center', justifyContent: 'center', padding: 24 },
-  sheet: { backgroundColor: C.card, borderRadius: 14, maxHeight: '100%', overflow: 'hidden' },
-  headBlock: { paddingHorizontal: 20, paddingTop: 18 },
-  title: { fontSize: 19, fontWeight: '600', color: C.text, letterSpacing: -0.2 },
-  subtitle: { marginTop: 4, fontSize: 14, color: C.muted3, lineHeight: 20 },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 8,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderTopWidth: 1,
-    borderTopColor: C.borderLight,
-    backgroundColor: C.tableHeaderBg,
-  },
-  btnSecondary: { height: 44, paddingHorizontal: 16, borderRadius: 9, borderWidth: 1, borderColor: C.border, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  btnSecondaryText: { fontSize: 14.5, fontWeight: '600', color: C.dark2 },
-  btnPrimary: { height: 44, paddingHorizontal: 18, borderRadius: 9, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center' },
-  btnPrimaryText: { fontSize: 14.5, fontWeight: '600', color: '#fff' },
-  errorBanner: { padding: 11, borderRadius: 9, backgroundColor: C.redBg, borderWidth: 1, borderColor: C.redBorder },
-  errorText: { fontSize: 14, fontWeight: '500', color: C.red, lineHeight: 20 },
-  checkboxRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 2 },
-  checkboxBox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, borderColor: '#B9C1C6', backgroundColor: C.card, alignItems: 'center', justifyContent: 'center' },
-  checkboxMark: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  checkboxLabel: { fontSize: 14, color: C.dark2, flex: 1, lineHeight: 19 },
-  field: { gap: 6 },
-  fieldLabel: { fontSize: 13, fontWeight: '600', color: C.dark2 },
-  fieldHint: { fontSize: 13, color: C.muted, lineHeight: 18 },
-  input: { height: 44, paddingHorizontal: 12, borderRadius: 9, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, fontSize: 15, color: C.text },
-  inputLocked: { backgroundColor: C.badgeBg, color: C.muted3 },
-  mono: { fontFamily: 'monospace' },
-  pickerWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  pickerOption: { paddingHorizontal: 12, height: 40, borderRadius: 9, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, alignItems: 'center', justifyContent: 'center', maxWidth: 260 },
-  pickerOptionActive: { backgroundColor: C.primaryTintBg, borderColor: C.primaryTintBorder },
-  pickerOptionText: { fontSize: 14, color: C.dark2 },
-  pickerOptionTextActive: { color: C.primaryDark, fontWeight: '600' },
-});
+/**
+ * A table that can be scrolled in both directions, and says so.
+ *
+ * The columns are fixed-width by design, so on a narrow window their total
+ * outgrows the viewport and the right-hand ones simply disappear off the edge.
+ * Two things fix that: the body scrolls horizontally down to `minWidth`, and the
+ * edges fade wherever there is more content past them.
+ *
+ * The fades are the affordance that matters. Platform scroll bars only appear
+ * *while* a scroll is happening, which is no use to someone who does not know
+ * there is anything to scroll to; a fade is visible standing still.
+ */
+export function DataTable({
+  minWidth,
+  head,
+  footer,
+  children,
+}: {
+  /** Width below which the body scrolls horizontally instead of squeezing. */
+  minWidth: number;
+  /** Column header row — stays put while the body scrolls vertically. */
+  head: ReactNode;
+  /** Usually a `PagingBar`; kept outside both scroll axes. */
+  footer?: ReactNode;
+  children: ReactNode;
+}) {
+  // Viewport and content are tracked separately per axis: neither onScroll nor
+  // onContentSizeChange knows both, and the fades need the difference.
+  const [box, setBox] = useState({
+    hView: 0,
+    hContent: 0,
+    hOffset: 0,
+    vView: 0,
+    vContent: 0,
+    vOffset: 0,
+  });
+  const patch = (p: Partial<typeof box>) => setBox((b) => ({ ...b, ...p }));
+
+  const moreRight = box.hContent - (box.hOffset + box.hView) > 1;
+  const moreDown = box.vContent - (box.vOffset + box.vView) > 1;
+  const atStart = box.hOffset <= 1;
+
+  return (
+    <Box className="flex-1 overflow-hidden rounded-[14px] border border-line-card bg-card">
+      <Box className="flex-1">
+        <ScrollView
+          horizontal
+          persistentScrollbar
+          style={{ flex: 1 }}
+          contentContainerStyle={{ flexGrow: 1 }}
+          scrollEventThrottle={16}
+          onLayout={(e) => patch({ hView: e.nativeEvent.layout.width })}
+          onContentSizeChange={(w) => patch({ hContent: w })}
+          onScroll={(e) => patch({ hOffset: e.nativeEvent.contentOffset.x })}>
+          <View style={{ minWidth, flex: 1 }}>
+            {head}
+            <ScrollView
+              style={{ flex: 1 }}
+              persistentScrollbar
+              scrollEventThrottle={16}
+              onLayout={(e) => patch({ vView: e.nativeEvent.layout.height })}
+              onContentSizeChange={(_w, h) => patch({ vContent: h })}
+              onScroll={(e) => patch({ vOffset: e.nativeEvent.contentOffset.y })}>
+              {children}
+            </ScrollView>
+          </View>
+        </ScrollView>
+
+        {moreDown && <EdgeFade side="bottom" />}
+        {moreRight && <EdgeFade side="right" />}
+        {moreRight && atStart && (
+          <Box
+            pointerEvents="none"
+            className="absolute bottom-2.5 left-4 rounded-full bg-toast/70 px-2.5 py-1">
+            <Text className="text-[11.5px] font-bold tracking-wide text-white">
+              geser untuk kolom lain →
+            </Text>
+          </Box>
+        )}
+      </Box>
+      {footer}
+    </Box>
+  );
+}
+
+/** A stepped fade — no gradient library, and none needed at this size. */
+function EdgeFade({ side }: { side: 'right' | 'bottom' }) {
+  const steps = [0.015, 0.03, 0.05, 0.08, 0.12];
+  const horizontal = side === 'right';
+  return (
+    <Box
+      pointerEvents="none"
+      className={
+        horizontal
+          ? 'absolute bottom-0 right-0 top-0 w-3.5 flex-row'
+          : 'absolute bottom-0 left-0 right-0 h-3.5 flex-col'
+      }>
+      {steps.map((opacity, i) => (
+        <View key={i} style={{ flex: 1, backgroundColor: `rgba(14,36,51,${opacity})` }} />
+      ))}
+    </Box>
+  );
+}
+
+/**
+ * The chrome every back-office screen repeats: page padding, the toolbar above
+ * a table, the table's header row and its cells, a data row, the detail header.
+ *
+ * These were nine near-identical StyleSheet entries copied into each of the nine
+ * screens, drifting a pixel here and a colour there. As class strings they are
+ * written once and read at the point of use, which is the whole reason to be on
+ * NativeWind rather than StyleSheet.
+ */
+export const cx = {
+  /** Page body: fills the shell below the header. */
+  screen: 'flex-1 gap-3 p-[18px]',
+  /** Search + filters + primary action, above a table. */
+  toolbar: 'flex-row items-center gap-3',
+  /** "N produk" beside the toolbar. */
+  countLabel: 'text-sm text-muted-foreground',
+  /**
+   * A table's column header. Rows carry more padding on the right than the left
+   * so the last column clears `DataTable`'s fade instead of sitting under it.
+   */
+  tableHead:
+    'h-12 flex-row items-center gap-3 border-b border-line-light bg-thead pl-[18px] pr-[34px]',
+  /** A column heading inside `tableHead`. */
+  th: 'text-[11.5px] font-bold tracking-wider text-faint',
+  /** One data row. */
+  row: 'flex-row items-center border-b border-line-lighter pl-[18px] pr-[34px]',
+  /** The pressable part of a row, left of its action buttons. */
+  rowMain: 'flex-1 flex-row items-center gap-3 py-3',
+  /** A row's primary label. */
+  nameText: 'text-[15.5px] font-semibold',
+  /** The second line under it. */
+  metaText: 'text-[13px] text-faint-2',
+  /** Back button + title + actions, at the top of a detail view. */
+  detailHead: 'flex-row items-center gap-3.5',
+  detailTitle: 'text-[22px] font-bold tracking-tight text-foreground',
+  /** A centred block for a spinner, an error, or an empty message. */
+  centerBox: 'items-center gap-3 p-10',
+} as const;

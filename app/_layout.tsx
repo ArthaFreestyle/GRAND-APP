@@ -3,8 +3,11 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
+import '../global.css';
 
+import { GluestackUIProvider } from '@/components/ui/gluestack-ui-provider';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { hydrateSession } from '@/services/session';
 
@@ -29,10 +32,20 @@ export default function RootLayout() {
 
   if (!ready) return null;
 
+  // The back-office screens are a light-mode design port; forcing the mode here
+  // keeps a device in dark mode from half-inverting components that were never
+  // given a dark palette.
+  // The row swipe in `components/shell/record-list.tsx` is a gesture-handler
+  // gesture, and on Android those only reach the JS side from inside this root
+  // view. Without it the swipe silently does nothing on exactly one platform.
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack screenOptions={{ headerShown: false }} />
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <GluestackUIProvider mode="light">
+        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          <Stack screenOptions={{ headerShown: false }} />
+          <StatusBar style="auto" />
+        </ThemeProvider>
+      </GluestackUIProvider>
+    </GestureHandlerRootView>
   );
 }

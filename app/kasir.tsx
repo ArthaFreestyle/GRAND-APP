@@ -24,7 +24,11 @@
 import { useRouter } from 'expo-router';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  Animated, Pressable, ScrollView, StyleSheet, Text as RNText, TextInput, View,
+  type TextProps, type TextStyle,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useRequireSession } from '@/hooks/use-require-session';
 import { rp } from '@/constants/theme-erp';
@@ -38,34 +42,59 @@ import {
 // ---- exact palette from POS Kasir.dc.html (kept separate from the shared
 // back-office `Colors` token set — this screen was designed standalone) ----
 const K = {
-  bg: '#EDEFF2',
+  bg: '#F1F8FD',
   card: '#fff',
-  text: '#16181C',
-  border: '#D6DAE0',
-  borderCard: '#DFE2E7',
-  borderLight: '#EBEDF0',
-  borderLighter: '#F2F3F5',
-  rowBg: '#FBFBFC',
-  rowBorder: '#E2E5EA',
-  muted: '#9AA0A8',
-  muted2: '#8A9099',
-  muted3: '#6B7280',
-  dark2: '#3A3F47',
-  primary: '#17457E',
-  primaryDark: '#123A69',
-  primaryTint: 'rgba(23,69,126,0.1)',
-  primaryTintSoft: 'rgba(23,69,126,0.07)',
-  amberBg: '#F7F5EC',
-  amberBorder: '#EBE4CB',
-  amberDot: '#B45309',
+  text: '#0E2433',
+  border: '#C7DBEA',
+  borderCard: '#D5E6F2',
+  borderLight: '#E4EFF8',
+  borderLighter: '#EDF5FB',
+  rowBg: '#F7FBFE',
+  rowBorder: '#DDEAF4',
+  muted: '#93A8B8',
+  muted2: '#7C93A5',
+  muted3: '#5A7387',
+  dark2: '#2E4557',
+  primary: '#007CB9',
+  primaryDark: '#005689',
+  primaryTint: 'rgba(0,124,185,0.10)',
+  primaryTintSoft: 'rgba(0,124,185,0.07)',
+  amberBg: '#FDF6E7',
+  amberBorder: '#F0DFB4',
+  amberDot: '#B4780A',
   amberText: '#7C4A06',
   red: '#C8322B',
   redBg: '#FDF2F1',
-  keyActive: '#E9EDF1',
-  backActive: '#E2E6EB',
-  disabled: '#B9C1C6',
-  toastBg: '#16181C',
+  keyActive: '#E4EEF6',
+  backActive: '#D9E7F2',
+  disabled: '#AFC2D0',
+  toastBg: '#0E2433',
 } as const;
+
+// ---- font scaling ----
+// This screen is fixed geometry: three columns that all have to stay on screen
+// at once, so the usual blanket 1.4 cap on the system font size is more than it
+// can absorb. The cap is derived from the text's own size instead, and it goes
+// *down* as the text gets bigger — an 11px column header is what someone who
+// enlarged their system font actually needs enlarged, while the 38px total and
+// the 56px kembalian readout are already legible from across the counter, and
+// growing those only pushes the columns apart.
+function fontCap(size: number | undefined): number {
+  if (size === undefined) return 1.3; // inherits from a parent Text, which is capped already
+  if (size >= 20) return 1; // display readouts: total, kembalian, numpad, PIN
+  if (size >= 15) return 1.15; // row names, key labels — text that sits in a sized box
+  return 1.3; // labels, hints, badges, table headers
+}
+
+/**
+ * `Text` with that cap applied, shadowing the react-native import for the rest
+ * of this file so every call site below gets it without a prop. Pass
+ * `maxFontSizeMultiplier` explicitly to override one.
+ */
+function Text({ style, maxFontSizeMultiplier, ...rest }: TextProps) {
+  const size = (StyleSheet.flatten(style) as TextStyle | undefined)?.fontSize;
+  return <RNText style={style} maxFontSizeMultiplier={maxFontSizeMultiplier ?? fontCap(size)} {...rest} />;
+}
 
 // ---- domain types (mirrors the design's PosProduct/cart-row shape) ----
 type Mode = 'qty' | 'harga' | 'diskon' | 'disknota' | 'bulat' | 'bayar';
@@ -258,6 +287,11 @@ const INITIAL_STATE: KasirState = {
 export default function KasirScreen() {
   const router = useRouter();
   const allowed = useRequireSession();
+  // No navigator header on this screen, and it runs locked to landscape — where
+  // the notch and the gesture bar sit on the *sides*, not just the top. Padding
+  // the root keeps the absolutely positioned sheets (menu, backdrop, toast)
+  // aligned with the header too: they measure from the padding box.
+  const insets = useSafeAreaInsets();
   const [state, setState] = useState<KasirState>(INITIAL_STATE);
   const searchRef = useRef<TextInput>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -637,7 +671,16 @@ export default function KasirScreen() {
   if (!allowed) return null;
 
   return (
-    <View style={styles.root}>
+    <View
+      style={[
+        styles.root,
+        {
+          paddingTop: insets.top,
+          paddingBottom: insets.bottom,
+          paddingLeft: insets.left,
+          paddingRight: insets.right,
+        },
+      ]}>
       <View style={styles.header}>
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10 }}>
           <Text style={styles.cashierName}>{CASHIER_NAME}</Text>
@@ -1070,6 +1113,7 @@ export default function KasirScreen() {
                   onChangeText={onQueryChange}
                   onSubmitEditing={onQuerySubmit}
                   placeholder="Scan barcode, kode barang, atau nama"
+                  maxFontSizeMultiplier={fontCap(15)}
                   style={styles.searchInput}
                 />
                 <Text style={styles.focusLabel} pointerEvents="none">FOKUS</Text>
@@ -1342,18 +1386,18 @@ function NumpadGrid({ big, onDigit, onZeros, onBack }: { big: boolean; onDigit: 
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: K.bg },
-  header: { height: 56, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, backgroundColor: K.card, borderBottomWidth: 1, borderBottomColor: K.borderCard },
+  header: { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, backgroundColor: K.card, borderBottomWidth: 1, borderBottomColor: K.borderCard },
   cashierName: { fontSize: 15, fontWeight: '600', letterSpacing: -0.2, color: K.text },
   shiftText: { fontSize: 12.5, color: K.muted3 },
-  ruangBadge: { flexDirection: 'row', alignItems: 'center', gap: 7, height: 32, paddingHorizontal: 11, borderRadius: 8, backgroundColor: '#F1F3F6', borderWidth: 1, borderColor: K.borderCard },
+  ruangBadge: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingVertical: 4, minHeight: 32, paddingHorizontal: 11, borderRadius: 8, backgroundColor: '#F1F3F6', borderWidth: 1, borderColor: K.borderCard },
   lockIcon: { width: 9, height: 8, borderWidth: 1.5, borderColor: K.muted3, borderRadius: 2, borderTopWidth: 0 },
   ruangText: { fontSize: 12.5, fontWeight: '500', color: K.dark2 },
   lockedText: { fontSize: 11.5, color: K.muted },
-  parkedBtn: { height: 36, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, borderRadius: 8, backgroundColor: '#F1F3F6', borderWidth: 1, borderColor: K.borderCard },
-  parkedCount: { minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5, borderRadius: 6, backgroundColor: K.text },
+  parkedBtn: { paddingVertical: 6, minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, borderRadius: 8, backgroundColor: '#F1F3F6', borderWidth: 1, borderColor: K.borderCard },
+  parkedCount: { minWidth: 20, paddingVertical: 2, minHeight: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5, borderRadius: 6, backgroundColor: K.text },
   parkedCountText: { fontSize: 11.5, fontWeight: '600', color: '#fff' },
   parkedLabel: { fontSize: 13, fontWeight: '500', color: K.text },
-  offlineBadge: { flexDirection: 'row', alignItems: 'center', gap: 7, height: 36, paddingHorizontal: 12, borderRadius: 8, backgroundColor: K.amberBg, borderWidth: 1, borderColor: K.amberBorder },
+  offlineBadge: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingVertical: 6, minHeight: 36, paddingHorizontal: 12, borderRadius: 8, backgroundColor: K.amberBg, borderWidth: 1, borderColor: K.amberBorder },
   offlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: K.amberDot },
   offlineText: { fontSize: 12.5, fontWeight: '500', color: K.amberText },
   hamburger: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', gap: 4, borderRadius: 8, borderWidth: 1, borderColor: K.borderCard, backgroundColor: '#fff' },
@@ -1378,7 +1422,7 @@ const styles = StyleSheet.create({
     backgroundColor: K.card,
   },
   historyHead: {
-    height: 52, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16,
+    minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 8,
     borderBottomWidth: 1, borderBottomColor: K.borderCard,
   },
   historyTitle: { fontSize: 15.5, fontWeight: '600', color: K.text },
@@ -1389,17 +1433,17 @@ const styles = StyleSheet.create({
   historyEmptySub: { marginTop: 6, fontSize: 13, color: K.muted2, textAlign: 'center', lineHeight: 19 },
   historyRowWrap: { borderBottomWidth: 1, borderBottomColor: K.borderLighter },
   historyRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 16 },
-  historyTime: { width: 46, fontSize: 13, color: K.muted3 },
+  historyTime: { minWidth: 46, fontSize: 13, color: K.muted3 },
   historyNota: { fontFamily: 'monospace', fontSize: 12.5, fontWeight: '600', color: K.text },
   historySub: { fontSize: 12.5, color: K.muted3, marginTop: 2 },
-  historyJenisBadge: { height: 22, paddingHorizontal: 8, borderRadius: 6, backgroundColor: K.primaryTintSoft, alignItems: 'center', justifyContent: 'center' },
+  historyJenisBadge: { paddingVertical: 3, minHeight: 22, paddingHorizontal: 8, borderRadius: 6, backgroundColor: K.primaryTintSoft, alignItems: 'center', justifyContent: 'center' },
   historyJenisText: { fontSize: 11, fontWeight: '600', color: K.primaryDark },
-  historyTotal: { width: 110, textAlign: 'right', fontSize: 14.5, fontWeight: '600', color: K.text },
+  historyTotal: { minWidth: 110, textAlign: 'right', fontSize: 14.5, fontWeight: '600', color: K.text },
   historyDetail: { paddingHorizontal: 16, paddingBottom: 14, paddingLeft: 58, gap: 6, backgroundColor: K.rowBg },
   historyItemRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
   historyItemName: { flex: 1, fontSize: 13, color: K.dark2 },
   historyItemPrice: { fontSize: 13, fontWeight: '500', color: K.dark2 },
-  historyReturBtn: { marginTop: 6, height: 36, borderRadius: 8, borderWidth: 1, borderColor: K.border, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  historyReturBtn: { marginTop: 6, minHeight: 36, borderRadius: 8, borderWidth: 1, borderColor: K.border, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   historyReturText: { fontSize: 12.5, fontWeight: '600', color: K.primary },
 
   // ---- pilih printer overlay (Bluetooth / USB) ----
@@ -1411,27 +1455,27 @@ const styles = StyleSheet.create({
   printerStatusDotOn: { backgroundColor: K.primary },
   printerStatusText: { fontSize: 14, fontWeight: '600', color: K.text },
   printerStatusSub: { marginTop: 2, fontSize: 12.5, color: K.muted3 },
-  printerDisconnectBtn: { height: 32, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: K.border, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  printerDisconnectBtn: { paddingVertical: 6, minHeight: 32, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: K.border, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   printerDisconnectText: { fontSize: 12.5, fontWeight: '600', color: K.red },
   printerTabs: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: K.borderLight },
-  printerTab: { position: 'relative', height: 34, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, borderColor: K.borderCard, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  printerTab: { position: 'relative', paddingVertical: 7, minHeight: 34, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, borderColor: K.borderCard, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   printerTabActiveTint: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 8, backgroundColor: K.primaryTint, borderWidth: 1.5, borderColor: K.primary },
   printerTabText: { fontSize: 13, fontWeight: '500', color: K.dark2 },
   printerTabTextActive: { fontWeight: '600', color: K.primaryDark },
-  printerScanBtn: { height: 34, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, borderColor: K.border, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  printerScanBtn: { paddingVertical: 7, minHeight: 34, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, borderColor: K.border, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   printerScanText: { fontSize: 12.5, fontWeight: '600', color: K.primary },
   printerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: K.borderLighter },
   printerName: { fontSize: 14.5, fontWeight: '500', color: K.text },
   printerSub: { marginTop: 2, fontFamily: 'monospace', fontSize: 12, color: K.muted3 },
-  printerConnectBtn: { height: 34, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, borderColor: K.border, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  printerConnectBtn: { paddingVertical: 7, minHeight: 34, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, borderColor: K.border, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   printerConnectText: { fontSize: 12.5, fontWeight: '600', color: K.primary },
-  printerConnectedBadge: { height: 26, paddingHorizontal: 10, borderRadius: 6, backgroundColor: K.primaryTintSoft, alignItems: 'center', justifyContent: 'center' },
+  printerConnectedBadge: { paddingVertical: 4, minHeight: 26, paddingHorizontal: 10, borderRadius: 6, backgroundColor: K.primaryTintSoft, alignItems: 'center', justifyContent: 'center' },
   printerConnectedText: { fontSize: 11.5, fontWeight: '600', color: K.primaryDark },
   printerLoadingText: { paddingHorizontal: 16, paddingVertical: 14, fontSize: 13, color: K.muted2 },
-  printerTestBtn: { height: 32, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: K.border, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  printerTestBtn: { paddingVertical: 6, minHeight: 32, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: K.border, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   printerTestText: { fontSize: 12.5, fontWeight: '600', color: K.primary },
   printerPaperLabel: { fontSize: 12, color: K.muted3 },
-  printerSettingsBtn: { marginTop: 16, height: 38, paddingHorizontal: 16, borderRadius: 9, borderWidth: 1, borderColor: K.border, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  printerSettingsBtn: { marginTop: 16, minHeight: 38, paddingHorizontal: 16, borderRadius: 9, borderWidth: 1, borderColor: K.border, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   printerSettingsText: { fontSize: 13, fontWeight: '600', color: K.primary },
   printerErrorBar: { paddingHorizontal: 16, paddingVertical: 10, backgroundColor: K.redBg, borderBottomWidth: 1, borderBottomColor: K.borderLight },
   printerErrorText: { fontSize: 12.5, color: K.red, lineHeight: 18 },
@@ -1441,36 +1485,36 @@ const styles = StyleSheet.create({
 
   // ---- cart section ----
   cartSection: { width: '34%', minWidth: 380, backgroundColor: K.card, position: 'relative' },
-  cartHead: { height: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: K.borderLight, gap: 8 },
+  cartHead: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: K.borderLight, gap: 8 },
   notaText: { fontFamily: 'monospace', fontSize: 12, fontWeight: '600' },
   draftText: { fontSize: 11, fontWeight: '600', letterSpacing: 0.8, color: K.muted2 },
   itemCountText: { fontSize: 12, color: K.muted3 },
-  custBtn: { height: 30, maxWidth: 150, paddingHorizontal: 11, borderRadius: 7, borderWidth: 1, borderColor: K.borderCard, justifyContent: 'center' },
+  custBtn: { paddingVertical: 5, minHeight: 30, maxWidth: 150, paddingHorizontal: 11, borderRadius: 7, borderWidth: 1, borderColor: K.borderCard, justifyContent: 'center' },
   custBtnText: { fontSize: 12.5, fontWeight: '500', color: K.dark2 },
   cartEmpty: { padding: 28, paddingTop: 56, alignItems: 'center' },
   cartEmptyTitle: { fontSize: 14.5, fontWeight: '500', color: K.dark2, textAlign: 'center' },
   cartEmptySub: { marginTop: 6, fontSize: 13, color: K.muted2, textAlign: 'center', lineHeight: 19 },
   mono: { fontFamily: 'monospace', fontSize: 12.5 },
-  cartEmptyBtn: { marginTop: 22, height: 40, paddingHorizontal: 16, borderRadius: 9, borderWidth: 1, borderColor: K.borderCard, backgroundColor: '#F7F8FA', alignItems: 'center', justifyContent: 'center' },
+  cartEmptyBtn: { marginTop: 22, minHeight: 40, paddingHorizontal: 16, borderRadius: 9, borderWidth: 1, borderColor: K.borderCard, backgroundColor: '#F7F8FA', alignItems: 'center', justifyContent: 'center' },
   cartEmptyBtnText: { fontSize: 13, fontWeight: '500', color: K.dark2 },
   cartRowWrap: { borderBottomWidth: 1, borderBottomColor: K.borderLighter },
-  cartRow: { position: 'relative', height: 56, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14 },
+  cartRow: { position: 'relative', minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14 },
   cartRowActiveTint: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: K.primaryTintSoft, borderLeftWidth: 3, borderLeftColor: K.primary },
   flashOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: K.primary },
-  qtyBtn: { flexShrink: 0, width: 52, height: 40, borderRadius: 8, backgroundColor: '#F1F3F6', borderWidth: 1, borderColor: K.rowBorder, alignItems: 'center', justifyContent: 'center' },
+  qtyBtn: { flexShrink: 0, width: 52, minHeight: 40, borderRadius: 8, backgroundColor: '#F1F3F6', borderWidth: 1, borderColor: K.rowBorder, alignItems: 'center', justifyContent: 'center' },
   qtyBtnText: { fontSize: 15, fontWeight: '600', color: K.text },
   qtyBtnEditing: { position: 'absolute', top: -1, left: -1, right: -1, bottom: -1, borderRadius: 8, backgroundColor: '#fff', borderWidth: 2, borderColor: K.primary, alignItems: 'center', justifyContent: 'center' },
   qtyBtnEditingText: { fontSize: 15, fontWeight: '600', color: K.primaryDark },
   rowName: { fontSize: 15, fontWeight: '500', color: K.text },
   rowNote: { fontSize: 12, color: K.muted3, marginTop: 2 },
   rowStockWarn: { fontSize: 12, fontWeight: '500', color: K.red, marginTop: 2 },
-  satuanBtn: { flexShrink: 0, height: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 8, borderWidth: 1, borderColor: K.rowBorder, backgroundColor: K.rowBg, paddingHorizontal: 8 },
+  satuanBtn: { flexShrink: 0, paddingVertical: 6, minHeight: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 8, borderWidth: 1, borderColor: K.rowBorder, backgroundColor: K.rowBg, paddingHorizontal: 8 },
   satuanBtnText: { fontSize: 12.5, fontWeight: '500', color: K.dark2 },
   satuanArrow: { fontSize: 9, color: K.muted },
   rowSubtotal: { fontSize: 14.5, fontWeight: '600', color: K.text },
   rowPrice: { fontSize: 11.5, color: K.muted2, marginTop: 1 },
   satuanChipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: 14, paddingBottom: 12, paddingLeft: 66, backgroundColor: K.rowBg },
-  satuanChip: { position: 'relative', height: 38, paddingHorizontal: 12, borderRadius: 9, borderWidth: 1, borderColor: K.border, backgroundColor: '#fff', flexDirection: 'row', alignItems: 'baseline', gap: 7, justifyContent: 'center' },
+  satuanChip: { position: 'relative', paddingVertical: 7, minHeight: 38, paddingHorizontal: 12, borderRadius: 9, borderWidth: 1, borderColor: K.border, backgroundColor: '#fff', flexDirection: 'row', alignItems: 'baseline', gap: 7, justifyContent: 'center' },
   satuanChipActiveTint: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9, backgroundColor: K.primaryTint, borderWidth: 1.5, borderColor: K.primary },
   satuanChipLabel: { fontSize: 13, fontWeight: '600', color: K.text },
   satuanChipPrice: { fontSize: 11.5, color: K.muted3 },
@@ -1484,10 +1528,10 @@ const styles = StyleSheet.create({
   totalValue: { fontSize: 38, fontWeight: '600', letterSpacing: -0.3, color: K.text },
 
   overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.98)' },
-  overlayHead: { height: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: K.borderLight },
+  overlayHead: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: K.borderLight },
   overlayTitle: { fontSize: 13.5, fontWeight: '600', color: K.text },
   overlayClose: { fontSize: 12.5, fontWeight: '600', color: K.primary },
-  custRow: { position: 'relative', height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: K.borderLighter },
+  custRow: { position: 'relative', minHeight: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: K.borderLighter },
   custRowActiveTint: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: K.primaryTintSoft, borderLeftWidth: 3, borderLeftColor: K.primary },
   custName: { fontSize: 14.5, fontWeight: '500', color: K.text },
   custSub: { fontSize: 12, color: K.muted3 },
@@ -1505,7 +1549,7 @@ const styles = StyleSheet.create({
   searchInputWrap: { position: 'relative', justifyContent: 'center' },
   searchIconCircle: { position: 'absolute', left: 14, width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: K.muted, zIndex: 1 },
   searchIconHandle: { position: 'absolute', left: 27, top: 26, width: 8, height: 2, backgroundColor: K.muted, transform: [{ rotate: '45deg' }], zIndex: 1 },
-  searchInput: { width: '100%', height: 52, paddingLeft: 40, paddingRight: 60, borderRadius: 10, borderWidth: 1, borderColor: K.border, backgroundColor: '#F8F9FB', fontSize: 15, fontWeight: '500', color: K.text },
+  searchInput: { width: '100%', minHeight: 52, paddingLeft: 40, paddingRight: 60, borderRadius: 10, borderWidth: 1, borderColor: K.border, backgroundColor: '#F8F9FB', fontSize: 15, fontWeight: '500', color: K.text },
   focusLabel: { position: 'absolute', right: 14, fontSize: 11, fontWeight: '600', letterSpacing: 0.6, color: K.primary },
   errorText: { marginTop: 8, fontSize: 13, fontWeight: '500', color: K.red },
   tilesWrap: { padding: 12, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: K.borderLight },
@@ -1513,10 +1557,10 @@ const styles = StyleSheet.create({
   tilesLabel: { fontSize: 11.5, fontWeight: '600', letterSpacing: 0.9, color: K.muted2 },
   tilesHint: { fontSize: 11.5, color: K.muted },
   tilesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  tileBtn: { width: '23%', minWidth: 110, height: 64, justifyContent: 'center', gap: 3, paddingHorizontal: 11, borderRadius: 10, borderWidth: 1, borderColor: K.rowBorder, backgroundColor: K.rowBg },
+  tileBtn: { width: '23%', minWidth: 110, minHeight: 64, justifyContent: 'center', gap: 3, paddingHorizontal: 11, borderRadius: 10, borderWidth: 1, borderColor: K.rowBorder, backgroundColor: K.rowBg },
   tileName: { fontSize: 13.5, fontWeight: '600', color: K.text, lineHeight: 16 },
   tilePrice: { fontSize: 11.5, color: K.muted3 },
-  resultsHeadRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 14, height: 30, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: K.borderLight, backgroundColor: K.rowBg },
+  resultsHeadRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 14, paddingVertical: 6, minHeight: 30, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: K.borderLight, backgroundColor: K.rowBg },
   resultsHeadText: { fontSize: 11, fontWeight: '600', letterSpacing: 0.6, color: K.muted },
   resultRow: { minHeight: 52, flexDirection: 'row', gap: 10, alignItems: 'center', paddingVertical: 7, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: K.borderLighter },
   resultCode: { fontFamily: 'monospace', fontSize: 12, color: K.dark2 },
@@ -1533,31 +1577,31 @@ const styles = StyleSheet.create({
 
   // ---- zone section (display + payment + keypad) ----
   zoneSection: { width: 364, backgroundColor: '#F7F8FA' },
-  zoneHead: { height: 72, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingHorizontal: 14, backgroundColor: K.card, borderBottomWidth: 1, borderBottomColor: K.borderCard },
+  zoneHead: { minHeight: 72, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingHorizontal: 14, backgroundColor: K.card, borderBottomWidth: 1, borderBottomColor: K.borderCard },
   modeLabel: { fontSize: 11.5, fontWeight: '600', letterSpacing: 0.9, color: K.muted2 },
   editingHint: { fontSize: 11, fontWeight: '500', color: K.primary },
-  signBtn: { width: 38, height: 38, borderRadius: 9, borderWidth: 1, borderColor: K.border, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  signBtn: { width: 38, minHeight: 38, borderRadius: 9, borderWidth: 1, borderColor: K.border, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   signBtnText: { fontSize: 17, fontWeight: '600', color: K.text },
   displayValue: { fontSize: 34, fontWeight: '600', letterSpacing: -0.3, color: K.text },
 
   payWrap: { padding: 12, paddingBottom: 0, gap: 8 },
   jenisRow: { flexDirection: 'row', gap: 6 },
-  jenisBtn: { position: 'relative', flex: 1, height: 40, borderRadius: 9, backgroundColor: '#fff', borderWidth: 1, borderColor: K.border, alignItems: 'center', justifyContent: 'center' },
+  jenisBtn: { position: 'relative', flex: 1, minHeight: 40, borderRadius: 9, backgroundColor: '#fff', borderWidth: 1, borderColor: K.border, alignItems: 'center', justifyContent: 'center' },
   jenisBtnActiveTint: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 9, backgroundColor: K.primaryTint, borderWidth: 1.5, borderColor: K.primary },
   jenisBtnText: { fontSize: 13, fontWeight: '600', color: K.dark2 },
-  kembalianRow: { height: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 13, borderRadius: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: K.borderCard },
+  kembalianRow: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 13, borderRadius: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: K.borderCard },
   kembalianLabel: { fontSize: 12.5, color: K.muted3 },
   kembalianValue: { fontSize: 24, fontWeight: '600', letterSpacing: -0.3, color: K.primary },
   quickCashGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  quickCashBtn: { width: '31.3%', height: 44, borderRadius: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: K.border, alignItems: 'center', justifyContent: 'center' },
+  quickCashBtn: { width: '31.3%', minHeight: 44, borderRadius: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: K.border, alignItems: 'center', justifyContent: 'center' },
   quickCashText: { fontSize: 13.5, fontWeight: '600', color: K.text },
   kreditCustRow: { padding: 11, paddingHorizontal: 13, borderRadius: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: K.borderCard, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   kreditCustLabel: { fontSize: 11.5, color: K.muted2 },
   kreditCustName: { fontSize: 14.5, fontWeight: '600', color: K.text },
-  kreditCustBtn: { height: 34, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: K.border, alignItems: 'center', justifyContent: 'center' },
+  kreditCustBtn: { paddingVertical: 6, minHeight: 34, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: K.border, alignItems: 'center', justifyContent: 'center' },
   kreditCustBtnText: { fontSize: 12.5, fontWeight: '600', color: K.primary },
   kreditWarn: { fontSize: 12.5, fontWeight: '500', color: K.red, lineHeight: 18 },
-  kreditStatusRow: { height: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 13, borderRadius: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: K.borderCard },
+  kreditStatusRow: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 13, borderRadius: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: K.borderCard },
   kreditStatusLabel: { fontSize: 12.5, color: K.muted3 },
   kreditStatusValue: { fontSize: 12.5, fontWeight: '600', color: K.amberText },
 
@@ -1567,31 +1611,31 @@ const styles = StyleSheet.create({
   pinReason: { fontSize: 12.5, color: K.muted3, marginTop: 3 },
   pinDot: { width: 44, height: 52, borderRadius: 9, backgroundColor: '#F7F8FA', borderWidth: 1, borderColor: K.border, alignItems: 'center', justifyContent: 'center' },
   pinDotText: { fontSize: 22, fontWeight: '600', color: K.text },
-  pinCancelBtn: { flex: 1, height: 52, borderRadius: 9, backgroundColor: '#F1F3F6', borderWidth: 1, borderColor: K.border, alignItems: 'center', justifyContent: 'center' },
+  pinCancelBtn: { flex: 1, minHeight: 52, borderRadius: 9, backgroundColor: '#F1F3F6', borderWidth: 1, borderColor: K.border, alignItems: 'center', justifyContent: 'center' },
   pinCancelText: { fontSize: 13, fontWeight: '600', color: K.dark2 },
   pinHint: { fontSize: 12, color: K.muted2 },
 
   numpadGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  numKeyBig: { width: '31.3%', height: 78, borderRadius: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: K.border, alignItems: 'center', justifyContent: 'center' },
-  numKeySmall: { width: '31.3%', height: 60, borderRadius: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: K.border, alignItems: 'center', justifyContent: 'center' },
+  numKeyBig: { width: '31.3%', minHeight: 78, borderRadius: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: K.border, alignItems: 'center', justifyContent: 'center' },
+  numKeySmall: { width: '31.3%', minHeight: 60, borderRadius: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: K.border, alignItems: 'center', justifyContent: 'center' },
   numKeyBack: { backgroundColor: '#EFF1F4' },
   numKeyTextBig: { fontSize: 26, fontWeight: '500', color: K.text },
   numKeyTextSmall: { fontSize: 19, fontWeight: '500', color: K.text },
 
   actionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  plainActionBtn: { position: 'relative', width: '31.3%', height: 52, borderRadius: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: K.border, alignItems: 'center', justifyContent: 'center' },
+  plainActionBtn: { position: 'relative', width: '31.3%', minHeight: 52, borderRadius: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: K.border, alignItems: 'center', justifyContent: 'center' },
   actionActiveTint: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 10, backgroundColor: K.primaryTint, borderWidth: 1.5, borderColor: K.primary },
   plainActionText: { fontSize: 13.5, fontWeight: '600', color: K.text },
   plainActionHint: { fontSize: 10.5, fontWeight: '500', color: K.muted2 },
   plainActionHintDanger: { fontSize: 10.5, fontWeight: '500', color: '#B08A88' },
 
-  payBtn: { height: 84, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  payBtn: { minHeight: 84, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   payBtnText: { fontSize: 21, fontWeight: '600', letterSpacing: 0.4, color: '#fff' },
   payBtnHint: { fontSize: 12, fontWeight: '500', color: 'rgba(255,255,255,0.75)' },
 
-  cancelPayBtn: { flex: 1, height: 84, borderRadius: 13, backgroundColor: '#fff', borderWidth: 1, borderColor: K.border, alignItems: 'center', justifyContent: 'center' },
+  cancelPayBtn: { flex: 1, minHeight: 84, borderRadius: 13, backgroundColor: '#fff', borderWidth: 1, borderColor: K.border, alignItems: 'center', justifyContent: 'center' },
   cancelPayText: { fontSize: 15, fontWeight: '600', color: K.dark2 },
-  finishBtn: { flex: 2, height: 84, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  finishBtn: { flex: 2, minHeight: 84, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   finishBtnText: { fontSize: 20, fontWeight: '600', letterSpacing: 0.4, color: '#fff' },
 
   // zIndex di atas overlay riwayat/printer (25) — tanpa ini toast dari dalam

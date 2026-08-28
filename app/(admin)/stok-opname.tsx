@@ -7,6 +7,7 @@ import {
   BackButton,
   Card,
   CardHead,
+  DataTable,
   EmptyState,
   ErrorBanner,
   Field,
@@ -251,18 +252,27 @@ export default function StokOpnameScreen() {
           </View>
 
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-            <KpiCard label="Opname berjalan" value={num(berjalanCount)} color={berjalanCount > 0 ? C.amber : C.text} sub="sedang dihitung" />
+            <KpiCard label="Opname berjalan" value={num(berjalanCount)} valueClass={berjalanCount > 0 ? C.amber : C.text} sub="sedang dihitung" />
             <KpiCard label="Opname selesai" value={num(selesaiCount)} sub="sudah terposting" />
-            <KpiCard label="Selisih ditemukan" value={num(selisihCount)} color={selisihCount > 0 ? C.amber : C.text} sub="item disesuaikan" />
+            <KpiCard label="Selisih ditemukan" value={num(selisihCount)} valueClass={selisihCount > 0 ? C.amber : C.text} sub="item disesuaikan" />
           </View>
 
-          <View style={styles.tableCard}>
-            <View style={styles.tableHeadRow}>
-              <Text style={[styles.thText, { flex: 1 }]}>RUANG & DOKUMEN</Text>
-              <Text style={[styles.thText, { width: 176 }]}>STATUS</Text>
-              <Text style={[styles.thText, { width: 150, textAlign: 'right' }]}>HASIL</Text>
-            </View>
-            <ScrollView style={{ flex: 1 }}>
+          <DataTable
+            minWidth={660}
+            head={
+              <View style={styles.tableHeadRow}>
+                <Text style={[styles.thText, { flex: 1 }]}>RUANG & DOKUMEN</Text>
+                <Text style={[styles.thText, { width: 176 }]}>STATUS</Text>
+                <Text style={[styles.thText, { width: 150, textAlign: 'right' }]}>HASIL</Text>
+              </View>
+            }
+            footer={
+              <PagingBar
+                label={filtered.length ? `${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, filtered.length)} dari ${filtered.length} · halaman ${currentPage}/${totalPage}` : '0 hasil'}
+                onPrev={() => setPage((p) => Math.max(1, p - 1))}
+                onNext={() => setPage((p) => Math.min(totalPage, p + 1))}
+              />
+            }>
               {slice.map((t) => {
                 const isDraft = t.status === 'draft';
                 const countedN = countedItems(t.items).length;
@@ -296,13 +306,7 @@ export default function StokOpnameScreen() {
                 );
               })}
               {slice.length === 0 && <EmptyState title="Tidak ada opname yang cocok" sub="Coba kata kunci lain atau ubah filter status." />}
-            </ScrollView>
-            <PagingBar
-              label={filtered.length ? `${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, filtered.length)} dari ${filtered.length} · halaman ${currentPage}/${totalPage}` : '0 hasil'}
-              onPrev={() => setPage((p) => Math.max(1, p - 1))}
-              onNext={() => setPage((p) => Math.min(totalPage, p + 1))}
-            />
-          </View>
+          </DataTable>
         </View>
       )}
 
@@ -318,7 +322,7 @@ export default function StokOpnameScreen() {
             <Text style={{ fontSize: 13.5, color: C.muted2 }}>Nomor final dibuat saat opname diposting</Text>
           </View>
 
-          <Card style={{ padding: 16, gap: 14, flexDirection: 'row', flexWrap: 'wrap' }}>
+          <Card className="flex-row flex-wrap gap-3.5 p-4">
             <View style={{ flex: 1, minWidth: 200 }}>
               <Field label="Ruang dihitung" hint={draft.fromId ? 'Terkunci — draft ini sudah berisi hitungan untuk ruang tersebut.' : undefined}>
                 {draft.fromId ? (
@@ -359,7 +363,7 @@ export default function StokOpnameScreen() {
               <Text style={{ width: 140, textAlign: 'right' }}>SELISIH</Text>
             </View>
             {wsRows.map(({ i, it, counted, sel }) => (
-              <View key={it.kode} style={[styles.wsRow, { backgroundColor: counted && sel !== 0 ? '#FDFBF6' : '#fff' }]}>
+              <View key={it.kode} style={[styles.wsRow, { backgroundColor: counted && sel !== 0 ? '#FDF8EC' : '#fff' }]}>
                 <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
                   <Text style={{ fontSize: 15.5, fontWeight: '500' }} numberOfLines={1}>{prodNama(it.kode)}</Text>
                   <Text style={{ fontSize: 12.5, color: C.muted, fontFamily: 'monospace' }}>{it.kode} · {prodUnit(it.kode)}</Text>
@@ -375,7 +379,7 @@ export default function StokOpnameScreen() {
                     />
                   </View>
                 </View>
-                <Text style={{ width: 140, textAlign: 'right', fontSize: 16, fontWeight: '700', color: !counted ? '#C4C9D0' : netColor(sel) }}>
+                <Text style={{ width: 140, textAlign: 'right', fontSize: 16, fontWeight: '700', color: !counted ? C.muted : netColor(sel) }}>
                   {!counted ? '—' : sel === 0 ? '0' : netLabel(sel)}
                 </Text>
               </View>
@@ -390,7 +394,7 @@ export default function StokOpnameScreen() {
             const net = netSelisih(draft.items);
             return (
               <View style={{ alignItems: 'flex-end' }}>
-                <Card style={{ width: 400, maxWidth: '100%', padding: 16, gap: 12 }}>
+                <Card className="w-[400px] max-w-full gap-3 p-4">
                   <View style={styles.summaryRow}>
                     <Text style={{ fontSize: 14.5, color: C.muted3 }}>Item dihitung</Text>
                     <Text style={{ fontSize: 22, fontWeight: '800' }}>{countedN} / {totalN}</Text>
@@ -432,10 +436,10 @@ export default function StokOpnameScreen() {
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
                   <KpiCard label="Ruang" value={ruangNama(current.ruang)} sub={`Dihitung oleh ${current.petugas}`} />
                   <KpiCard label="Tanggal opname" value={tanggal(current.tanggal)} sub={`${current.items.length} item dihitung`} />
-                  <KpiCard label="Item dengan selisih" value={num(nVar)} color={nVar ? C.amber : C.green} sub={`net ${netLabel(net)}`} />
+                  <KpiCard label="Item dengan selisih" value={num(nVar)} valueClass={nVar ? 'text-amber' : 'text-green'} sub={`net ${netLabel(net)}`} />
                 </View>
                 {!!current.catatan && (
-                  <Card style={{ padding: 14 }}>
+                  <Card className="p-3.5">
                     <Text style={{ fontSize: 12.5, color: C.muted2 }}>Catatan</Text>
                     <Text style={{ fontSize: 15, color: C.text, marginTop: 3, lineHeight: 20 }}>{current.catatan}</Text>
                   </Card>
@@ -451,7 +455,7 @@ export default function StokOpnameScreen() {
                   {current.items.map((it) => {
                     const sel = (it.fisik as number) - it.sistem;
                     return (
-                      <View key={it.kode} style={[styles.wsRow, { backgroundColor: sel === 0 ? '#fff' : '#FDFBF6' }]}>
+                      <View key={it.kode} style={[styles.wsRow, { backgroundColor: sel === 0 ? '#fff' : '#FDF8EC' }]}>
                         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
                           <Text style={{ fontSize: 15.5, fontWeight: '500' }} numberOfLines={1}>{prodNama(it.kode)}</Text>
                           <Text style={{ fontSize: 12.5, color: C.muted, fontFamily: 'monospace' }}>{it.kode} · {prodUnit(it.kode)}</Text>
@@ -478,10 +482,11 @@ const styles = StyleSheet.create({
   wrap: { flex: 1, padding: 18, gap: 12 },
   toolbar: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
   countLabel: { fontSize: 14, color: C.muted3 },
-  tableCard: { flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: C.borderCard, borderRadius: 12, overflow: 'hidden' },
-  tableHeadRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, height: 48, backgroundColor: C.tableHeaderBg, borderBottomWidth: 1, borderBottomColor: C.borderLight },
+  tableHeadRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: 20,
+    paddingRight: 36, height: 48, backgroundColor: C.tableHeaderBg, borderBottomWidth: 1, borderBottomColor: C.borderLight },
   thText: { fontSize: 12.5, fontWeight: '600', letterSpacing: 0.5, color: C.muted },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, minHeight: 74, borderBottomWidth: 1, borderBottomColor: C.borderLighter },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: 20,
+    paddingRight: 36, minHeight: 74, borderBottomWidth: 1, borderBottomColor: C.borderLighter },
   namaText: { fontSize: 16.5, fontWeight: '500' },
   metaText: { fontSize: 12.5, color: C.muted, fontFamily: 'monospace' },
   badge: { height: 26, paddingHorizontal: 11, borderRadius: 7, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
