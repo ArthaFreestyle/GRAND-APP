@@ -44,7 +44,9 @@ export function AdminShellProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const session = useSession();
-  const [navShown, setNavShown] = useState(true);
+  // The sidebar is an overlay drawer with a dimming backdrop, not a fixed rail —
+  // opening it by default puts it over the screen the user actually asked for.
+  const [navShown, setNavShown] = useState(false);
   const active = NAV_ITEMS.find((n) => n.href === pathname)?.key ?? null;
 
   const ctxValue = useMemo(() => ({ navShown, toggleNav: () => setNavShown((v) => !v) }), [navShown]);
