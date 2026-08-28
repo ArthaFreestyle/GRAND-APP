@@ -9,6 +9,7 @@ import {
   Card,
   CardHead,
   CheckBox,
+  DataTable,
   EmptyState,
   ErrorBanner,
   Field,
@@ -213,14 +214,23 @@ export default function SupplierScreen() {
             {canWrite && <PrimaryButton label="Supplier baru" onPress={() => { setDraft(EMPTY_DRAFT); setModalErr(''); setModal('new'); }} />}
           </View>
 
-          <View style={styles.tableCard}>
-            <View style={styles.tableHeadRow}>
-              <Text style={[styles.thText, { flex: 1 }]}>NAMA</Text>
-              <Text style={[styles.thText, { width: 128 }]}>TIPE</Text>
-              <Text style={[styles.thText, { width: 140, textAlign: 'right' }]}>HUTANG</Text>
-              <View style={{ width: 90 }} />
-            </View>
-            <ScrollView style={{ flex: 1 }}>
+          <DataTable
+            minWidth={700}
+            head={
+              <View style={styles.tableHeadRow}>
+                <Text style={[styles.thText, { flex: 1 }]}>NAMA</Text>
+                <Text style={[styles.thText, { width: 128 }]}>TIPE</Text>
+                <Text style={[styles.thText, { width: 140, textAlign: 'right' }]}>HUTANG</Text>
+                <View style={{ width: 90 }} />
+              </View>
+            }
+            footer={
+              <PagingBar
+                label={filtered.length ? `${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, filtered.length)} dari ${filtered.length} · halaman ${currentPage}/${totalPage}` : '0 hasil'}
+                onPrev={() => setPage((p) => Math.max(1, p - 1))}
+                onNext={() => setPage((p) => Math.min(totalPage, p + 1))}
+              />
+            }>
               {slice.map((r) => {
                 const meta = TIPE_META[r.tipe];
                 const hutang = hutangOf(r);
@@ -255,13 +265,7 @@ export default function SupplierScreen() {
                 );
               })}
               {slice.length === 0 && <EmptyState title="Tidak ada supplier yang cocok" sub="Coba kata kunci lain atau ubah filter tipe." />}
-            </ScrollView>
-            <PagingBar
-              label={filtered.length ? `${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, filtered.length)} dari ${filtered.length} · halaman ${currentPage}/${totalPage}` : '0 hasil'}
-              onPrev={() => setPage((p) => Math.max(1, p - 1))}
-              onNext={() => setPage((p) => Math.min(totalPage, p + 1))}
-            />
-          </View>
+          </DataTable>
         </View>
       )}
 
@@ -446,7 +450,6 @@ const styles = StyleSheet.create({
   listWrap: { flex: 1, padding: 18, gap: 12 },
   toolbar: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
   countLabel: { fontSize: 14, color: C.muted3 },
-  tableCard: { flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: C.borderCard, borderRadius: 12, overflow: 'hidden' },
   tableHeadRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, height: 48, backgroundColor: C.tableHeaderBg, borderBottomWidth: 1, borderBottomColor: C.borderLight },
   thText: { fontSize: 12.5, fontWeight: '600', letterSpacing: 0.5, color: C.muted },
   row: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: C.borderLighter, minHeight: 74 },

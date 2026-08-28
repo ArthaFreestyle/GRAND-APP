@@ -8,6 +8,7 @@ import {
   Card,
   CardHead,
   CheckBox,
+  DataTable,
   EmptyState,
   ErrorBanner,
   Field,
@@ -287,15 +288,24 @@ export default function PelangganScreen() {
             {canWrite && <PrimaryButton label="Pelanggan baru" onPress={openNew} />}
           </View>
 
-          <View style={styles.tableCard}>
-            <View style={styles.tableHeadRow}>
+          <DataTable
+            minWidth={720}
+            head={
+              <View style={styles.tableHeadRow}>
               <Text style={[styles.thText, { flex: 1 }]}>NAMA</Text>
               <Text style={[styles.thText, { width: 180 }]}>NPWP</Text>
               <Text style={[styles.thText, { width: 150, textAlign: 'right' }]}>PLAFON KREDIT</Text>
-              <View style={{ width: 90 }} />
-            </View>
-            <ScrollView style={{ flex: 1 }}>
-              {rows.map((r) => (
+                <View style={{ width: 90 }} />
+              </View>
+            }
+            footer={
+              <PagingBar
+                label={pagingLabel}
+                onPrev={() => setPage((p) => Math.max(1, p - 1))}
+                onNext={() => setPage((p) => Math.min(totalPage, p + 1))}
+              />
+            }>
+            {rows.map((r) => (
                 <View key={r.id} style={styles.row}>
                   <Pressable onPress={() => openDetail(r.id)} style={styles.rowMain}>
                     <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
@@ -345,13 +355,7 @@ export default function PelangganScreen() {
                   sub="Pencarian mencocokkan sebagian kode atau nama pelanggan."
                 />
               )}
-            </ScrollView>
-            <PagingBar
-              label={pagingLabel}
-              onPrev={() => setPage((p) => Math.max(1, p - 1))}
-              onNext={() => setPage((p) => Math.min(totalPage, p + 1))}
-            />
-          </View>
+          </DataTable>
         </View>
       )}
 
@@ -582,14 +586,6 @@ const styles = StyleSheet.create({
   listWrap: { flex: 1, padding: 18, gap: 12 },
   toolbar: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   countLabel: { fontSize: 14, color: C.muted3 },
-  tableCard: {
-    flex: 1,
-    backgroundColor: C.card,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: C.borderCard,
-    overflow: 'hidden',
-  },
   tableHeadRow: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -1,5 +1,13 @@
-import type { ReactNode } from 'react';
-import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useState, type ReactNode } from 'react';
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
 import { Colors as C } from '@/constants/theme-erp';
 
@@ -459,6 +467,27 @@ const styles = StyleSheet.create({
     backgroundColor: C.tableHeaderBg,
   },
   pagingLabel: { fontSize: 14, color: C.muted3 },
+  tableCard: {
+    flex: 1,
+    backgroundColor: C.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: C.borderCard,
+    overflow: 'hidden',
+  },
+  fade: { position: 'absolute' },
+  fadeRight: { top: 0, bottom: 0, right: 0, width: 18, flexDirection: 'row' },
+  fadeBottom: { left: 0, right: 0, bottom: 0, height: 14, flexDirection: 'column' },
+  scrollHint: {
+    position: 'absolute',
+    right: 22,
+    bottom: 10,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: 'rgba(16,18,22,0.72)',
+  },
+  scrollHintText: { fontSize: 11.5, fontWeight: '700', letterSpacing: 0.3, color: '#fff' },
   pageBtn: { height: 30, paddingHorizontal: 12, borderRadius: 7, borderWidth: 1, borderColor: C.border, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   pageBtnText: { fontSize: 13, fontWeight: '600', color: C.dark2 },
   emptyState: { padding: 44, alignItems: 'center' },
@@ -545,3 +574,93 @@ const styles = StyleSheet.create({
   pickerOptionText: { fontSize: 14, color: C.dark2 },
   pickerOptionTextActive: { color: C.primaryDark, fontWeight: '600' },
 });
+
+/**
+ * A table that can be scrolled in both directions, and says so.
+ *
+ * The columns are fixed-width by design, so on a narrow window their total
+ * outgrows the viewport and the right-hand ones simply disappeared off the
+ * edge — clipped by the card, with nothing to suggest they were there. Two
+ * things fix that: the body scrolls horizontally down to `minWidth`, and the
+ * edges fade wherever there is more content past them.
+ *
+ * The fades are the affordance that matters. Platform scroll bars only appear
+ * *while* a scroll is happening, which is no use to someone who does not know
+ * there is anything to scroll to; a fade is visible standing still.
+ */
+export function DataTable({
+  minWidth,
+  head,
+  footer,
+  children,
+}: {
+  /** Width below which the body scrolls horizontally instead of squeezing. */
+  minWidth: number;
+  /** Column header row — stays put while the body scrolls vertically. */
+  head: ReactNode;
+  /** Usually a `PagingBar`; kept outside both scroll axes. */
+  footer?: ReactNode;
+  children: ReactNode;
+}) {
+  // Viewport and content are tracked separately per axis: neither onScroll nor
+  // onContentSizeChange alone knows both, and the fades need the difference.
+  const [box, setBox] = useState({ hView: 0, hContent: 0, hOffset: 0, vView: 0, vContent: 0, vOffset: 0 });
+  const patch = (p: Partial<typeof box>) => setBox((b) => ({ ...b, ...p }));
+
+  const moreRight = box.hContent - (box.hOffset + box.hView) > 1;
+  const moreDown = box.vContent - (box.vOffset + box.vView) > 1;
+  const atStart = box.hOffset <= 1;
+
+  return (
+    <View style={styles.tableCard}>
+      <View style={{ flex: 1 }}>
+        <ScrollView
+          horizontal
+          persistentScrollbar
+          style={{ flex: 1 }}
+          contentContainerStyle={{ flexGrow: 1 }}
+          scrollEventThrottle={16}
+          onLayout={(e) => patch({ hView: e.nativeEvent.layout.width })}
+          onContentSizeChange={(w) => patch({ hContent: w })}
+          onScroll={(e) => patch({ hOffset: e.nativeEvent.contentOffset.x })}>
+          <View style={{ minWidth, flex: 1 }}>
+            {head}
+            <ScrollView
+              style={{ flex: 1 }}
+              persistentScrollbar
+              scrollEventThrottle={16}
+              onLayout={(e) => patch({ vView: e.nativeEvent.layout.height })}
+              onContentSizeChange={(_w, h) => patch({ vContent: h })}
+              onScroll={(e) => patch({ vOffset: e.nativeEvent.contentOffset.y })}>
+              {children}
+            </ScrollView>
+          </View>
+        </ScrollView>
+
+        {moreDown && <EdgeFade side="bottom" />}
+        {moreRight && <EdgeFade side="right" />}
+        {moreRight && atStart && (
+          <View pointerEvents="none" style={styles.scrollHint}>
+            <Text style={styles.scrollHintText}>geser →</Text>
+          </View>
+        )}
+      </View>
+      {footer}
+    </View>
+  );
+}
+
+/** A stepped fade — no gradient library, and none needed at this size. */
+function EdgeFade({ side }: { side: 'right' | 'bottom' }) {
+  const steps = [0.015, 0.03, 0.05, 0.08, 0.12];
+  const horizontal = side === 'right';
+  return (
+    <View
+      pointerEvents="none"
+      style={[styles.fade, horizontal ? styles.fadeRight : styles.fadeBottom]}>
+      {steps.map((opacity, i) => (
+        <View key={i} style={{ flex: 1, backgroundColor: `rgba(16,18,22,${opacity})` }} />
+      ))}
+    </View>
+  );
+}

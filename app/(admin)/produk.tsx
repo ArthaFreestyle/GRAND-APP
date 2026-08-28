@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { AppShell } from '@/components/shell/AppShell';
 import { HargaModal, ProductFormModal, SatuanModal, Toast } from '@/components/produk/modals';
+import { DataTable } from '@/components/shell/ui';
 import {
   ProdukColors as C,
   formatNumber,
@@ -470,7 +471,9 @@ export default function ProdukScreen() {
               )}
             </View>
 
-            <View style={styles.tableCard}>
+            <DataTable
+              minWidth={680}
+              head={
               <View style={styles.tableHeadRow}>
                 <Text style={[styles.thText, { width: 120 }]}>KODE BARANG</Text>
                 <Text style={[styles.thText, { flex: 1 }]}>NAMA</Text>
@@ -480,8 +483,26 @@ export default function ProdukScreen() {
                 </Text>
                 <View style={{ width: 90 }} />
               </View>
-
-              <ScrollView style={styles.tableBody}>
+              }
+              footer={
+              <View style={styles.pagingBar}>
+                <Text style={styles.pagingLabel}>{pagingLabel}</Text>
+                <View style={{ flexDirection: 'row', gap: 6 }}>
+                  <Pressable
+                    disabled={page <= 1 || listLoading}
+                    onPress={() => setPage((p) => Math.max(1, p - 1))}
+                    style={[styles.pageBtn, (page <= 1 || listLoading) && styles.pageBtnOff]}>
+                    <Text style={styles.pageBtnText}>Sebelumnya</Text>
+                  </Pressable>
+                  <Pressable
+                    disabled={page >= totalPage || listLoading}
+                    onPress={() => setPage((p) => Math.min(totalPage, p + 1))}
+                    style={[styles.pageBtn, (page >= totalPage || listLoading) && styles.pageBtnOff]}>
+                    <Text style={styles.pageBtnText}>Berikutnya</Text>
+                  </Pressable>
+                </View>
+              </View>
+              }>
                 {rows.map((r) => {
                   return (
                     <View key={r.id} style={styles.row}>
@@ -543,26 +564,7 @@ export default function ProdukScreen() {
                     <Text style={styles.emptySub}>Pencarian mencocokkan sebagian nama atau kode barang.</Text>
                   </View>
                 )}
-              </ScrollView>
-
-              <View style={styles.pagingBar}>
-                <Text style={styles.pagingLabel}>{pagingLabel}</Text>
-                <View style={{ flexDirection: 'row', gap: 6 }}>
-                  <Pressable
-                    disabled={page <= 1 || listLoading}
-                    onPress={() => setPage((p) => Math.max(1, p - 1))}
-                    style={[styles.pageBtn, (page <= 1 || listLoading) && styles.pageBtnOff]}>
-                    <Text style={styles.pageBtnText}>Sebelumnya</Text>
-                  </Pressable>
-                  <Pressable
-                    disabled={page >= totalPage || listLoading}
-                    onPress={() => setPage((p) => Math.min(totalPage, p + 1))}
-                    style={[styles.pageBtn, (page >= totalPage || listLoading) && styles.pageBtnOff]}>
-                    <Text style={styles.pageBtnText}>Berikutnya</Text>
-                  </Pressable>
-                </View>
-              </View>
-            </View>
+            </DataTable>
           </View>
         )}
 
@@ -845,7 +847,6 @@ const styles = StyleSheet.create({
   countLabel: { fontSize: 14, color: C.muted3 },
   newBtn: { height: 42, paddingHorizontal: 16, borderRadius: 9, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center' },
   newBtnText: { fontSize: 15, fontWeight: '600', color: '#fff' },
-  tableCard: { flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: C.borderCard, borderRadius: 12, overflow: 'hidden' },
   tableHeadRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -857,7 +858,6 @@ const styles = StyleSheet.create({
     borderBottomColor: C.borderLight,
   },
   thText: { fontSize: 12.5, fontWeight: '600', letterSpacing: 0.5, color: C.muted },
-  tableBody: { flex: 1 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -1,11 +1,12 @@
 import { useMemo, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { AppShell } from '@/components/shell/AppShell';
 import { useCanWrite } from '@/services/permissions';
 import {
   Badge,
   CheckBox,
+  DataTable,
   EmptyState,
   ErrorBanner,
   Field,
@@ -238,14 +239,23 @@ export default function UnitKerjaRuangScreen() {
         </View>
 
         {tab === 'unit' ? (
-          <View style={styles.tableCard}>
-            <View style={styles.tableHeadRow}>
-              <Text style={[styles.thText, { flex: 1 }]}>UNIT KERJA</Text>
-              <Text style={[styles.thText, { width: 140 }]}>TIPE</Text>
-              <Text style={[styles.thText, { width: 130, textAlign: 'right' }]}>RUANG</Text>
-              <View style={{ width: 210 }} />
-            </View>
-            <ScrollView style={{ flex: 1 }}>
+          <DataTable
+            minWidth={720}
+            head={
+              <View style={styles.tableHeadRow}>
+                <Text style={[styles.thText, { flex: 1 }]}>UNIT KERJA</Text>
+                <Text style={[styles.thText, { width: 140 }]}>TIPE</Text>
+                <Text style={[styles.thText, { width: 130, textAlign: 'right' }]}>RUANG</Text>
+                <View style={{ width: 210 }} />
+              </View>
+            }
+            footer={
+              <View style={styles.pagingBar}>
+                <Text style={styles.pagingLabel}>
+                  {filteredUnits.length ? `Menampilkan ${filteredUnits.length} dari ${units.length} unit kerja` : '0 hasil'}
+                </Text>
+              </View>
+            }>
               {filteredUnits.map((u) => {
                 const meta = UNIT_TIPE_META[u.tipe];
                 const uRooms = roomsOf(u.id);
@@ -274,23 +284,26 @@ export default function UnitKerjaRuangScreen() {
                 );
               })}
               {filteredUnits.length === 0 && <EmptyState title="Tidak ada unit kerja yang cocok" sub="Coba kata kunci lain." />}
-            </ScrollView>
-            <View style={styles.pagingBar}>
-              <Text style={styles.pagingLabel}>
-                {filteredUnits.length ? `Menampilkan ${filteredUnits.length} dari ${units.length} unit kerja` : '0 hasil'}
-              </Text>
-            </View>
-          </View>
+          </DataTable>
         ) : (
-          <View style={styles.tableCard}>
-            <View style={styles.tableHeadRow}>
-              <Text style={[styles.thText, { flex: 1 }]}>RUANG</Text>
-              <Text style={[styles.thText, { width: 200 }]}>UNIT KERJA</Text>
-              <Text style={[styles.thText, { width: 120 }]}>TIPE</Text>
-              <Text style={[styles.thText, { width: 90, textAlign: 'right' }]}>SKU</Text>
-              <View style={{ width: 90 }} />
-            </View>
-            <ScrollView style={{ flex: 1 }}>
+          <DataTable
+            minWidth={740}
+            head={
+              <View style={styles.tableHeadRow}>
+                <Text style={[styles.thText, { flex: 1 }]}>RUANG</Text>
+                <Text style={[styles.thText, { width: 200 }]}>UNIT KERJA</Text>
+                <Text style={[styles.thText, { width: 120 }]}>TIPE</Text>
+                <Text style={[styles.thText, { width: 90, textAlign: 'right' }]}>SKU</Text>
+                <View style={{ width: 90 }} />
+              </View>
+            }
+            footer={
+              <View style={styles.pagingBar}>
+                <Text style={styles.pagingLabel}>
+                  {filteredRooms.length ? `Menampilkan ${filteredRooms.length} dari ${rooms.length} ruang` : '0 hasil'}
+                </Text>
+              </View>
+            }>
               {filteredRooms.map((r) => {
                 const meta = RUANG_TIPE_META[r.tipe];
                 const u = unitOf(r.unitId);
@@ -315,13 +328,7 @@ export default function UnitKerjaRuangScreen() {
                 );
               })}
               {filteredRooms.length === 0 && <EmptyState title="Tidak ada ruang yang cocok" sub="Coba kata kunci lain atau ubah filter unit kerja." />}
-            </ScrollView>
-            <View style={styles.pagingBar}>
-              <Text style={styles.pagingLabel}>
-                {filteredRooms.length ? `Menampilkan ${filteredRooms.length} dari ${rooms.length} ruang` : '0 hasil'}
-              </Text>
-            </View>
-          </View>
+          </DataTable>
         )}
       </View>
 
@@ -414,7 +421,6 @@ const styles = StyleSheet.create({
   wrap: { flex: 1, padding: 18, gap: 14 },
   toolbar: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
   countLabel: { fontSize: 14, color: C.muted3 },
-  tableCard: { flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: C.borderCard, borderRadius: 12, overflow: 'hidden' },
   tableHeadRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, height: 48, backgroundColor: C.tableHeaderBg, borderBottomWidth: 1, borderBottomColor: C.borderLight },
   thText: { fontSize: 12.5, fontWeight: '600', letterSpacing: 0.5, color: C.muted },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, minHeight: 74, borderBottomWidth: 1, borderBottomColor: C.borderLighter },

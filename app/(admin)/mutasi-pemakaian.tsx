@@ -8,6 +8,7 @@ import {
   Badge,
   Card,
   CardHead,
+  DataTable,
   EmptyState,
   ErrorBanner,
   Field,
@@ -237,13 +238,22 @@ export default function MutasiPemakaianScreen() {
             <KpiCard label="Mutasi dalam perjalanan" value={num(transitCount)} color={transitCount > 0 ? C.amber : C.text} sub="menunggu diterima" />
           </View>
 
-          <View style={styles.tableCard}>
-            <View style={styles.tableHeadRow}>
-              <Text style={[styles.thText, { flex: 1 }]}>RUTE & DOKUMEN</Text>
-              <Text style={[styles.thText, { width: 176 }]}>STATUS</Text>
-              <Text style={[styles.thText, { width: 130, textAlign: 'right' }]}>ITEM</Text>
-            </View>
-            <ScrollView style={{ flex: 1 }}>
+          <DataTable
+            minWidth={660}
+            head={
+              <View style={styles.tableHeadRow}>
+                <Text style={[styles.thText, { flex: 1 }]}>RUTE & DOKUMEN</Text>
+                <Text style={[styles.thText, { width: 176 }]}>STATUS</Text>
+                <Text style={[styles.thText, { width: 130, textAlign: 'right' }]}>ITEM</Text>
+              </View>
+            }
+            footer={
+              <PagingBar
+                label={filtered.length ? `${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, filtered.length)} dari ${filtered.length} · halaman ${currentPage}/${totalPage}` : '0 hasil'}
+                onPrev={() => setPage((p) => Math.max(1, p - 1))}
+                onNext={() => setPage((p) => Math.min(totalPage, p + 1))}
+              />
+            }>
               {slice.map((t) => {
                 const jm = jenisMeta(t.jenis);
                 const st = statusMeta(t);
@@ -268,13 +278,7 @@ export default function MutasiPemakaianScreen() {
                 );
               })}
               {slice.length === 0 && <EmptyState title="Tidak ada transaksi yang cocok" sub="Coba kata kunci lain atau ubah filter jenis." />}
-            </ScrollView>
-            <PagingBar
-              label={filtered.length ? `${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, filtered.length)} dari ${filtered.length} · halaman ${currentPage}/${totalPage}` : '0 hasil'}
-              onPrev={() => setPage((p) => Math.max(1, p - 1))}
-              onNext={() => setPage((p) => Math.min(totalPage, p + 1))}
-            />
-          </View>
+          </DataTable>
         </View>
       )}
 
@@ -449,7 +453,6 @@ const styles = StyleSheet.create({
   wrap: { flex: 1, padding: 18, gap: 12 },
   toolbar: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
   countLabel: { fontSize: 14, color: C.muted3 },
-  tableCard: { flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: C.borderCard, borderRadius: 12, overflow: 'hidden' },
   tableHeadRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, height: 48, backgroundColor: C.tableHeaderBg, borderBottomWidth: 1, borderBottomColor: C.borderLight },
   thText: { fontSize: 12.5, fontWeight: '600', letterSpacing: 0.5, color: C.muted },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, minHeight: 74, borderBottomWidth: 1, borderBottomColor: C.borderLighter },
