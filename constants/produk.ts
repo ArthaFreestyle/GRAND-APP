@@ -32,7 +32,6 @@ export const ProdukColors = {
   toastBg: '#16181C',
 } as const;
 
-export type Role = 'SUPERADMIN' | 'ADMIN' | 'STAFF';
 
 export interface SatuanMasterItem {
   id: number;

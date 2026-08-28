@@ -6,6 +6,12 @@
 // app/produk.tsx): the design's own mock `catalog`/`tiles`/`pelangganList`
 // are kept inline instead of wiring to the real API.
 //
+// Beyond the design: the hamburger menu's "Transaksi hari ini" / "Pilih printer"
+// entries and their overlays are additions to this app (issue #1). Unlike the
+// rest of this screen the printer is NOT mocked — it talks to a real Bluetooth
+// Classic printer through services/bluetooth-printer.ts, which needs a dev
+// build (native module) and does nothing in Expo Go.
+//
 // Not ported: the design's `window` keydown listener (F2/F3/F4/F5/F6/F7/F8/F12
 // shortcuts, digit capture while "editing") — this is a touch-first tablet
 // screen in this app, not a desktop kiosk with a physical keyboard, so the
@@ -20,7 +26,14 @@ import * as ScreenOrientation from 'expo-screen-orientation';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { useRequireSession } from '@/hooks/use-require-session';
 import { rp } from '@/constants/theme-erp';
+import { logout } from '@/services/auth';
+import * as printer from '@/services/bluetooth-printer';
+import {
+  PAPER_LABEL, PAPER_OPTIONS, encodeReceipt, encodeTestReceipt, receiptDateTime,
+  type PaperColumns, type ReceiptData,
+} from '@/services/receipt';
 
 // ---- exact palette from POS Kasir.dc.html (kept separate from the shared
 // back-office `Colors` token set — this screen was designed standalone) ----
@@ -77,6 +90,7 @@ interface CartRow {
   note: string;
 }
 interface PelangganRef { id: number; nama: string; sub: string; piutang: number }
+type PrinterKind = 'bluetooth' | 'usb';
 interface ToastState { msg: string; undo: boolean }
 interface DoneState { label: string; amount: string; sub: string }
 interface FinishedTx {
@@ -117,6 +131,19 @@ interface KasirState {
   historyOpen: boolean;
   historyExpanded: string | null;
   history: FinishedTx[];
+  printerOpen: boolean;
+  printerTab: PrinterKind;
+  printerLoading: boolean;
+  /** Perangkat yang sudah di-pair lewat Pengaturan Android. */
+  printerPaired: printer.PrinterDevice[];
+  printerBusy: string | null;
+  /** Printer pilihan kasir — bertahan antar restart app. */
+  printer: printer.PrinterDevice | null;
+  /** Socket ke printer sedang terbuka; dijamin ulang tiap kali mencetak. */
+  printerLive: boolean;
+  printerError: string | null;
+  printerColumns: PaperColumns;
+  printerTesting: boolean;
 }
 
 // ---- demo props the design exposes as editable, hardcoded here (no host to pass them) ----
@@ -179,6 +206,8 @@ const PELANGGAN_LIST: PelangganRef[] = [
   { id: 5, nama: 'Ibu Sri (langganan)', sub: 'Tunai', piutang: 0 },
 ];
 
+const PRINTER_TAB_LABEL: Record<PrinterKind, string> = { bluetooth: 'Bluetooth', usb: 'USB / OTG' };
+
 function priced(p: Produk): boolean {
   return p.satuan.some((s) => s.harga !== null);
 }
@@ -221,10 +250,14 @@ const INITIAL_STATE: KasirState = {
   error: '', newId: null, seq: 1, notaSeq: 1, lastDeleted: null,
   pin: null, pinBuf: '', editing: false,
   menuOpen: false, historyOpen: false, historyExpanded: null, history: [],
+  printerOpen: false, printerTab: 'bluetooth', printerLoading: false, printerPaired: [],
+  printerBusy: null, printer: null, printerLive: false, printerError: null,
+  printerColumns: 32, printerTesting: false,
 };
 
 export default function KasirScreen() {
   const router = useRouter();
+  const allowed = useRequireSession();
   const [state, setState] = useState<KasirState>(INITIAL_STATE);
   const searchRef = useRef<TextInput>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -246,12 +279,117 @@ export default function KasirScreen() {
     };
   }, []);
 
+  // Printer pilihan kasir dipakai lagi tanpa harus dipilih ulang tiap buka
+  // app; koneksinya sendiri baru dibuka saat mencetak.
+  useEffect(() => {
+    let active = true;
+    printer.loadSavedPrinter().then((saved) => {
+      if (active && saved) setState((s) => (s.printer ? s : { ...s, printer: saved }));
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Printer bisa putus sendiri (mati, keluar jangkauan). Pilihannya tetap
+  // dipegang — yang hilang cuma socket-nya, dan itu dibuka lagi saat mencetak.
+  useEffect(() => {
+    const sub = printer.onDisconnected((address) => {
+      setState((s) => (s.printer && s.printer.address === address ? { ...s, printerLive: false } : s));
+    });
+    return () => sub.remove();
+  }, []);
+
   function patch(p: Partial<KasirState> | ((s: KasirState) => Partial<KasirState>)) {
     setState((prev) => ({ ...prev, ...(typeof p === 'function' ? p(prev) : p) }));
   }
   function focusSearch() {
     setTimeout(() => searchRef.current?.focus(), 0);
   }
+  function printerFail(e: unknown) {
+    patch({
+      printerError: e instanceof Error ? e.message : 'Printer bermasalah — coba lagi.',
+      printerLoading: false, printerBusy: null, printerTesting: false,
+    });
+  }
+
+  // Tidak ada scan/pairing di dalam app — lihat services/bluetooth-printer.ts.
+  // Yang ditampilkan hanya perangkat yang sudah di-pair lewat Pengaturan.
+  async function loadPrinters() {
+    patch({ printerLoading: true, printerError: null });
+    try {
+      await printer.ensureReady();
+      const paired = await printer.listBonded();
+      const chosen = state.printer;
+      patch({
+        printerPaired: paired,
+        printerLoading: false,
+        printerLive: chosen ? await printer.isConnected(chosen.address) : false,
+      });
+    } catch (e) {
+      printerFail(e);
+    }
+  }
+
+  function openPrinter() {
+    patch({ menuOpen: false, printerOpen: true });
+    if (!state.printerPaired.length && !state.printerLoading) loadPrinters();
+  }
+
+  function closePrinter() {
+    patch({ printerOpen: false, printerLoading: false });
+    focusSearch();
+  }
+
+  function selectPrinterTab(kind: PrinterKind) {
+    if (state.printerTab === kind) return;
+    patch({ printerTab: kind, printerError: null });
+  }
+
+  /** Jadikan perangkat ini printer struk kasir, lalu buktikan bisa tersambung. */
+  async function choosePrinter(dev: printer.PrinterDevice) {
+    if (state.printerBusy) return;
+    patch({ printerBusy: dev.address, printerError: null });
+    try {
+      if (state.printer && state.printer.address !== dev.address) {
+        await printer.disconnect(state.printer.address).catch(() => {});
+      }
+      await printer.ensureConnected(dev.address);
+      await printer.saveSelectedPrinter(dev);
+      patch({ printer: dev, printerLive: true, printerBusy: null });
+      showToast(`Printer tersambung · ${dev.name}`);
+    } catch (e) {
+      printerFail(e);
+    }
+  }
+
+  async function forgetPrinter() {
+    const prev = state.printer;
+    if (!prev) return;
+    patch({ printer: null, printerLive: false, printerBusy: null, printerError: null });
+    await printer.clearSavedPrinter();
+    try {
+      await printer.disconnect(prev.address);
+    } catch {
+      // Sudah putus dari sisi printer — status di layar sudah benar.
+    }
+    showToast(`${prev.name} tidak dipakai lagi`);
+  }
+
+  async function testPrint() {
+    const dev = state.printer;
+    if (!dev || state.printerTesting) return;
+    patch({ printerTesting: true, printerError: null });
+    try {
+      await printer.ensureConnected(dev.address);
+      await printer.write(dev.address, encodeTestReceipt(dev.name, state.printerColumns));
+      patch({ printerTesting: false, printerLive: true });
+      showToast('Tes cetak dikirim ke printer');
+    } catch (e) {
+      printerFail(e);
+    }
+  }
+
   function showToast(msg: string, undo = false) {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     patch({ toast: { msg, undo } });
@@ -392,15 +530,47 @@ export default function KasirScreen() {
     if (state.cart.length) patch({ mode: 'bayar', buffer: '', editing: false });
   }
 
+  // Cetak struk dari transaksi yang baru selesai. Sengaja tidak menahan
+  // finish(): kasir boleh lanjut ke transaksi berikutnya walau printer lambat,
+  // kegagalan dilaporkan lewat toast.
+  async function printReceipt(record: FinishedTx, t: ReturnType<typeof totals>, paid: number) {
+    const dev = state.printer;
+    if (!dev) return;
+    const data: ReceiptData = {
+      nota: record.nota,
+      datetime: receiptDateTime(),
+      kasir: CASHIER_NAME,
+      ruang: RUANG_NAME,
+      jenis: record.jenis,
+      pelanggan: record.pelanggan,
+      items: record.items,
+      sub: t.sub,
+      notaDisc: t.notaDisc,
+      bulat: t.bulat,
+      total: t.total,
+      paid: record.jenis === 'TUNAI' ? paid : 0,
+      change: record.jenis === 'TUNAI' ? Math.max(0, paid - t.total) : 0,
+    };
+    try {
+      await printer.ensureConnected(dev.address);
+      await printer.write(dev.address, encodeReceipt(data, state.printerColumns));
+      patch({ printerLive: true });
+    } catch (e) {
+      patch({ printerLive: false });
+      showToast(e instanceof Error ? e.message : 'Struk gagal dicetak');
+    }
+  }
+
   function finish() {
     const s = state;
     const t = totals();
     if (s.jenis === 'KREDIT' && !s.pelanggan) { patch({ custOpen: true }); showToast('Pilih pelanggan dulu untuk nota KREDIT'); return; }
     const paid = parseInt(s.buffer || '0', 10) || t.total;
     if (s.jenis === 'TUNAI' && paid < t.total) { showToast('Uang diterima kurang dari total'); return; }
+    const strukNote = s.printer ? 'struk dikirim ke printer' : 'struk tidak dicetak · printer belum dipilih';
     const doneState: DoneState = s.jenis === 'TUNAI'
-      ? { label: 'KEMBALIAN', amount: rp(Math.max(0, paid - t.total)), sub: `${notaNo(s.notaSeq)} · POSTED · LUNAS · struk tercetak` }
-      : { label: 'PIUTANG TERCATAT', amount: rp(t.total), sub: `${notaNo(s.notaSeq)} · POSTED · BELUM · ${s.pelanggan?.nama}` };
+      ? { label: 'KEMBALIAN', amount: rp(Math.max(0, paid - t.total)), sub: `${notaNo(s.notaSeq)} · POSTED · LUNAS · ${strukNote}` }
+      : { label: 'PIUTANG TERCATAT', amount: rp(t.total), sub: `${notaNo(s.notaSeq)} · POSTED · BELUM · ${s.pelanggan?.nama} · ${strukNote}` };
     const record: FinishedTx = {
       id: 'tx' + s.notaSeq,
       nota: notaNo(s.notaSeq),
@@ -416,6 +586,7 @@ export default function KasirScreen() {
       jenis: 'TUNAI', pelanggan: null, done: doneState, notaSeq: st.notaSeq + 1, history: [record, ...st.history],
     }));
     doneTimer.current = setTimeout(() => patch({ done: null }), 4500);
+    printReceipt(record, t, paid);
     focusSearch();
   }
 
@@ -461,6 +632,9 @@ export default function KasirScreen() {
   const paid = parseInt(state.buffer || '0', 10);
   const results = searchCatalog(state.query);
   const overlayEditing = state.editing;
+
+  // After every hook above, so the redirect never changes the hook order.
+  if (!allowed) return null;
 
   return (
     <View style={styles.root}>
@@ -509,7 +683,22 @@ export default function KasirScreen() {
             <Text style={styles.menuItemHint}>{state.history.length} transaksi · untuk cek retur</Text>
           </Pressable>
           <View style={styles.menuDivider} />
-          <Pressable onPress={() => { patch({ menuOpen: false }); router.replace('/'); }} style={styles.menuItem}>
+          <Pressable onPress={openPrinter} style={styles.menuItem}>
+            <Text style={styles.menuItemText}>Pilih printer</Text>
+            <Text style={styles.menuItemHint} numberOfLines={1}>
+              {state.printer ? `${state.printer.name} · siap cetak` : 'Belum ada printer · struk tidak dicetak'}
+            </Text>
+          </Pressable>
+          <View style={styles.menuDivider} />
+          <Pressable
+            onPress={() => {
+              // Drop the session before navigating: the login screen sends a
+              // live one straight back in. logout() finishes the revoke itself.
+              patch({ menuOpen: false });
+              void logout();
+              router.replace('/');
+            }}
+            style={styles.menuItem}>
             <Text style={[styles.menuItemText, { color: K.red }]}>Keluar</Text>
             <Text style={styles.menuItemHint}>Logout dari kasir ini</Text>
           </Pressable>
@@ -570,6 +759,140 @@ export default function KasirScreen() {
               })
             )}
           </ScrollView>
+        </View>
+      )}
+
+      {state.printerOpen && (
+        <View style={styles.historyOverlay}>
+          <View style={styles.historyHead}>
+            <Text style={styles.historyTitle}>Pilih printer</Text>
+            <Text style={styles.historyCount}>Printer struk kasir ini</Text>
+            <View style={{ flex: 1 }} />
+            <Pressable onPress={closePrinter}>
+              <Text style={styles.overlayCloseBtn}>Tutup</Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.printerStatus}>
+            <View style={[styles.printerStatusDot, state.printer ? styles.printerStatusDotOn : null]} />
+            <View style={{ minWidth: 0, flexShrink: 1 }}>
+              <Text style={styles.printerStatusText} numberOfLines={1}>
+                {state.printer ? state.printer.name : 'Belum ada printer dipilih'}
+              </Text>
+              <Text style={styles.printerStatusSub} numberOfLines={1}>
+                {state.printer
+                  ? `${state.printer.address} · ${state.printerLive ? 'tersambung' : 'akan disambungkan saat mencetak'}`
+                  : 'Struk tidak akan dicetak sampai printer dipilih'}
+              </Text>
+            </View>
+            <View style={{ flex: 1 }} />
+            {state.printer && (
+              <>
+                <Pressable onPress={testPrint} disabled={state.printerTesting} style={styles.printerTestBtn}>
+                  <Text style={[styles.printerTestText, state.printerTesting ? { color: K.muted } : null]}>
+                    {state.printerTesting ? 'Mengirim…' : 'Tes cetak'}
+                  </Text>
+                </Pressable>
+                <Pressable onPress={forgetPrinter} style={styles.printerDisconnectBtn}>
+                  <Text style={styles.printerDisconnectText}>Lupakan</Text>
+                </Pressable>
+              </>
+            )}
+          </View>
+
+          {!!state.printerError && (
+            <View style={styles.printerErrorBar}>
+              <Text style={styles.printerErrorText}>{state.printerError}</Text>
+            </View>
+          )}
+
+          <View style={styles.printerTabs}>
+            {(['bluetooth', 'usb'] as PrinterKind[]).map((kind) => (
+              <Pressable key={kind} onPress={() => selectPrinterTab(kind)} style={styles.printerTab}>
+                {state.printerTab === kind && <View style={styles.printerTabActiveTint} pointerEvents="none" />}
+                <Text style={[styles.printerTabText, state.printerTab === kind ? styles.printerTabTextActive : null]}>
+                  {PRINTER_TAB_LABEL[kind]}
+                </Text>
+              </Pressable>
+            ))}
+            <View style={{ flex: 1 }} />
+            <Text style={styles.printerPaperLabel}>Lebar kertas</Text>
+            {PAPER_OPTIONS.map((columns) => (
+              <Pressable key={columns} onPress={() => patch({ printerColumns: columns })} style={styles.printerTab}>
+                {state.printerColumns === columns && <View style={styles.printerTabActiveTint} pointerEvents="none" />}
+                <Text style={[styles.printerTabText, state.printerColumns === columns ? styles.printerTabTextActive : null]}>
+                  {PAPER_LABEL[columns]}
+                </Text>
+              </Pressable>
+            ))}
+            {state.printerTab === 'bluetooth' && (
+              <Pressable onPress={loadPrinters} disabled={state.printerLoading} style={styles.printerScanBtn}>
+                <Text style={[styles.printerScanText, state.printerLoading ? { color: K.muted } : null]}>
+                  {state.printerLoading ? 'Memuat…' : 'Muat ulang'}
+                </Text>
+              </Pressable>
+            )}
+          </View>
+
+          {state.printerTab === 'usb' ? (
+            <View style={{ flex: 1 }}>
+              <View style={styles.historyEmpty}>
+                <Text style={styles.historyEmptyTitle}>Printer USB belum didukung</Text>
+                <Text style={styles.historyEmptySub}>
+                  Build ini hanya memuat transport Bluetooth Classic (SPP/RFCOMM). USB/OTG butuh native module
+                  tersendiri — sementara pakai printer Bluetooth.
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <ScrollView style={{ flex: 1 }}>
+              {state.printerPaired.map((dev) => {
+                const chosen = state.printer?.address === dev.address;
+                const busy = state.printerBusy === dev.address;
+                return (
+                  <View key={dev.address} style={styles.printerRow}>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={styles.printerName} numberOfLines={1}>{dev.name}</Text>
+                      <Text style={styles.printerSub} numberOfLines={1}>{dev.address}</Text>
+                    </View>
+                    {chosen ? (
+                      <View style={styles.printerConnectedBadge}>
+                        <Text style={styles.printerConnectedText}>{state.printerLive ? 'Tersambung' : 'Dipakai'}</Text>
+                      </View>
+                    ) : (
+                      <Pressable
+                        onPress={() => choosePrinter(dev)}
+                        disabled={!!state.printerBusy}
+                        style={styles.printerConnectBtn}>
+                        <Text style={[styles.printerConnectText, state.printerBusy ? { color: K.muted } : null]}>
+                          {busy ? 'Menyambungkan…' : 'Pakai printer ini'}
+                        </Text>
+                      </Pressable>
+                    )}
+                  </View>
+                );
+              })}
+              {state.printerLoading && (
+                <Text style={styles.printerLoadingText}>Membaca daftar perangkat…</Text>
+              )}
+              {!state.printerLoading && state.printerPaired.length === 0 && (
+                <View style={styles.historyEmpty}>
+                  <Text style={styles.historyEmptyTitle}>Belum ada perangkat yang di-pair</Text>
+                  <Text style={styles.historyEmptySub}>
+                    Nyalakan printer, pair sekali lewat Pengaturan Bluetooth Android, lalu muat ulang daftar ini.
+                  </Text>
+                  <Pressable onPress={printer.openBluetoothSettings} style={styles.printerSettingsBtn}>
+                    <Text style={styles.printerSettingsText}>Buka Pengaturan Bluetooth</Text>
+                  </Pressable>
+                </View>
+              )}
+            </ScrollView>
+          )}
+
+          <Text style={styles.overlayFoot}>
+            Pairing printer dilakukan sekali di Pengaturan Bluetooth Android, bukan di sini — app cuma memakai
+            perangkat yang sudah terpasang. Printer terpilih dipakai otomatis begitu transaksi selesai.
+          </Text>
         </View>
       )}
 
@@ -1079,6 +1402,40 @@ const styles = StyleSheet.create({
   historyReturBtn: { marginTop: 6, height: 36, borderRadius: 8, borderWidth: 1, borderColor: K.border, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   historyReturText: { fontSize: 12.5, fontWeight: '600', color: K.primary },
 
+  // ---- pilih printer overlay (Bluetooth / USB) ----
+  printerStatus: {
+    flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 12,
+    backgroundColor: K.rowBg, borderBottomWidth: 1, borderBottomColor: K.borderLight,
+  },
+  printerStatusDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: K.muted },
+  printerStatusDotOn: { backgroundColor: K.primary },
+  printerStatusText: { fontSize: 14, fontWeight: '600', color: K.text },
+  printerStatusSub: { marginTop: 2, fontSize: 12.5, color: K.muted3 },
+  printerDisconnectBtn: { height: 32, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: K.border, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  printerDisconnectText: { fontSize: 12.5, fontWeight: '600', color: K.red },
+  printerTabs: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: K.borderLight },
+  printerTab: { position: 'relative', height: 34, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, borderColor: K.borderCard, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  printerTabActiveTint: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 8, backgroundColor: K.primaryTint, borderWidth: 1.5, borderColor: K.primary },
+  printerTabText: { fontSize: 13, fontWeight: '500', color: K.dark2 },
+  printerTabTextActive: { fontWeight: '600', color: K.primaryDark },
+  printerScanBtn: { height: 34, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, borderColor: K.border, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  printerScanText: { fontSize: 12.5, fontWeight: '600', color: K.primary },
+  printerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: K.borderLighter },
+  printerName: { fontSize: 14.5, fontWeight: '500', color: K.text },
+  printerSub: { marginTop: 2, fontFamily: 'monospace', fontSize: 12, color: K.muted3 },
+  printerConnectBtn: { height: 34, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, borderColor: K.border, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  printerConnectText: { fontSize: 12.5, fontWeight: '600', color: K.primary },
+  printerConnectedBadge: { height: 26, paddingHorizontal: 10, borderRadius: 6, backgroundColor: K.primaryTintSoft, alignItems: 'center', justifyContent: 'center' },
+  printerConnectedText: { fontSize: 11.5, fontWeight: '600', color: K.primaryDark },
+  printerLoadingText: { paddingHorizontal: 16, paddingVertical: 14, fontSize: 13, color: K.muted2 },
+  printerTestBtn: { height: 32, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: K.border, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  printerTestText: { fontSize: 12.5, fontWeight: '600', color: K.primary },
+  printerPaperLabel: { fontSize: 12, color: K.muted3 },
+  printerSettingsBtn: { marginTop: 16, height: 38, paddingHorizontal: 16, borderRadius: 9, borderWidth: 1, borderColor: K.border, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  printerSettingsText: { fontSize: 13, fontWeight: '600', color: K.primary },
+  printerErrorBar: { paddingHorizontal: 16, paddingVertical: 10, backgroundColor: K.redBg, borderBottomWidth: 1, borderBottomColor: K.borderLight },
+  printerErrorText: { fontSize: 12.5, color: K.red, lineHeight: 18 },
+
   main: { flex: 1, flexDirection: 'row', gap: 1, backgroundColor: K.borderCard },
   leftMiddleWrap: { flex: 1, flexDirection: 'row', gap: 1, position: 'relative' },
 
@@ -1237,7 +1594,9 @@ const styles = StyleSheet.create({
   finishBtn: { flex: 2, height: 84, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   finishBtnText: { fontSize: 20, fontWeight: '600', letterSpacing: 0.4, color: '#fff' },
 
-  toast: { position: 'absolute', left: 18, bottom: 18, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 11, backgroundColor: K.toastBg, maxWidth: 420 },
+  // zIndex di atas overlay riwayat/printer (25) — tanpa ini toast dari dalam
+  // overlay itu tertutup dan tidak pernah kelihatan.
+  toast: { position: 'absolute', left: 18, bottom: 18, zIndex: 40, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 11, backgroundColor: K.toastBg, maxWidth: 420 },
   toastText: { fontSize: 13.5, fontWeight: '500', color: '#fff' },
   toastUndo: { fontSize: 13, fontWeight: '600', color: '#8FB6E4' },
 });

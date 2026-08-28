@@ -1,7 +1,8 @@
 import { useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { AppShell, ROLE } from '@/components/shell/AppShell';
+import { AppShell } from '@/components/shell/AppShell';
+import { useCanWrite } from '@/services/permissions';
 import {
   Badge,
   CheckBox,
@@ -89,7 +90,8 @@ export default function UnitKerjaRuangScreen() {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const canWrite = ROLE !== 'STAFF';
+  const canWriteUnit = useCanWrite('unit-kerja');
+  const canWriteRuang = useCanWrite('ruang');
 
   function toast(msg: string) {
     if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -218,7 +220,7 @@ export default function UnitKerjaRuangScreen() {
           )}
           <View style={{ flex: 1 }} />
           <Text style={styles.countLabel}>{tab === 'unit' ? `${filteredUnits.length} unit` : `${filteredRooms.length} ruang`}</Text>
-          {canWrite && (
+          {(tab === 'unit' ? canWriteUnit : canWriteRuang) && (
             <PrimaryButton
               label={tab === 'unit' ? 'Unit kerja baru' : 'Ruang baru'}
               onPress={() => {
@@ -266,7 +268,7 @@ export default function UnitKerjaRuangScreen() {
                     </View>
                     <View style={{ width: 210, flexDirection: 'row', justifyContent: 'flex-end', gap: 8 }}>
                       <GhostButton label="Lihat ruang" onPress={() => { setTab('ruang'); setRuangUnit(String(u.id)); setQuery(''); }} />
-                      {canWrite && <GhostButton label="Ubah" onPress={() => openUnitEdit(u)} />}
+                      {canWriteUnit && <GhostButton label="Ubah" onPress={() => openUnitEdit(u)} />}
                     </View>
                   </View>
                 );
@@ -307,7 +309,7 @@ export default function UnitKerjaRuangScreen() {
                     </View>
                     <Text style={{ width: 90, textAlign: 'right', fontSize: 15 }}>{num(r.sku)}</Text>
                     <View style={{ width: 90, alignItems: 'flex-end' }}>
-                      {canWrite && <GhostButton label="Ubah" onPress={() => openRuangEdit(r)} />}
+                      {canWriteRuang && <GhostButton label="Ubah" onPress={() => openRuangEdit(r)} />}
                     </View>
                   </View>
                 );

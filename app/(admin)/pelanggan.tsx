@@ -1,7 +1,8 @@
 import { useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { AppShell, ROLE } from '@/components/shell/AppShell';
+import { AppShell } from '@/components/shell/AppShell';
+import { useCanWrite } from '@/services/permissions';
 import {
   BackButton,
   Badge,
@@ -118,7 +119,7 @@ export default function PelangganScreen() {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const canWrite = ROLE !== 'STAFF';
+  const canWrite = useCanWrite('pelanggan');
 
   function toast(msg: string) {
     if (toastTimer.current) clearTimeout(toastTimer.current);
