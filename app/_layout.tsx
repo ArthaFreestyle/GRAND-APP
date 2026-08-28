@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
 import '../global.css';
 
+import { GluestackUIProvider } from '@/components/ui/gluestack-ui-provider';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { hydrateSession } from '@/services/session';
 
@@ -30,10 +31,15 @@ export default function RootLayout() {
 
   if (!ready) return null;
 
+  // The back-office screens are a light-mode design port; forcing the mode here
+  // keeps a device in dark mode from half-inverting components that were never
+  // given a dark palette.
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack screenOptions={{ headerShown: false }} />
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <GluestackUIProvider mode="light">
+      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <Stack screenOptions={{ headerShown: false }} />
+        <StatusBar style="auto" />
+      </ThemeProvider>
+    </GluestackUIProvider>
   );
 }
