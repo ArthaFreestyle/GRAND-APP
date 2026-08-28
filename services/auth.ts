@@ -77,6 +77,29 @@ export async function switchContext(idUserRole: number): Promise<Session> {
 }
 
 /**
+ * Exchanges a refresh token for a fresh pair. The contract **rotates the token
+ * on every use** — the one sent is deleted atomically before anything else
+ * happens — so a replay is rejected exactly like an expired token. That is why
+ * only `services/client.ts` calls this, behind a single-flight guard.
+ *
+ * The old token's active context is re-read from the database rather than
+ * trusted from its claims, so the new token can come back **without an active
+ * context** if the grant was revoked or retired in the meantime. Callers must
+ * treat that like an ambiguous login, not like a failure.
+ */
+export async function refresh(refreshToken: string): Promise<Session> {
+  const result = await apiRequest<LoginResult>('/api/v1/auth/refresh', {
+    method: 'POST',
+    body: { refresh_token: refreshToken },
+  });
+  // Deliberately no `previous`: refresh always issues a new refresh token, and
+  // carrying the old one forward would keep a value the server just deleted.
+  const session = sessionFromLoginResult(result);
+  setSession(session);
+  return session;
+}
+
+/**
  * Revokes the refresh token and drops the session. The access token itself
  * cannot be revoked, so the local drop is what actually ends the session on this
  * device; a failed revoke must not strand the user on a screen they are trying

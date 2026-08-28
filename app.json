@@ -44,7 +44,8 @@
           }
         }
       ],
-      "with-rn-bluetooth-classic"
+      "with-rn-bluetooth-classic",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,

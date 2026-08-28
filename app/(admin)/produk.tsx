@@ -9,6 +9,8 @@ import {
   View,
 } from 'react-native';
 import { AppShell } from '@/components/shell/AppShell';
+import { useActiveRole, useCanWrite } from '@/services/permissions';
+import { useSession } from '@/services/session';
 import { HargaModal, ProductFormModal, SatuanModal, Toast } from '@/components/produk/modals';
 import {
   INITIAL_PRODUCTS,
@@ -17,7 +19,6 @@ import {
   ProductItem,
   ProductSatuanRow,
   RUANG_LIST,
-  Role,
   SATUAN_MASTER,
   formatNumber,
   formatRupiah,
@@ -27,8 +28,6 @@ import {
 } from '@/constants/produk';
 
 const PAGE_SIZE = 8;
-const CURRENT_USER = 'admin.rina';
-const ROLE: Role = 'ADMIN';
 
 type ModalKind = 'new' | 'edit' | null;
 
@@ -79,8 +78,11 @@ export default function ProdukScreen() {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const canWrite = ROLE !== 'STAFF';
-  const canDeleteHarga = ROLE === 'SUPERADMIN';
+  const canWrite = useCanWrite('produk');
+  // Retiring a price version rewrites history rather than adding to it, so it
+  // stays with SUPERADMIN even though the rest of the screen is INVENTARIS'.
+  const canDeleteHarga = useActiveRole() === 'SUPERADMIN';
+  const currentUser = useSession()?.user.username ?? '';
 
   function toast(msg: string) {
     if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -92,7 +94,7 @@ export default function ProdukScreen() {
     setProducts((list) =>
       list.map((p) =>
         p.id === id
-          ? { ...p, ...patch, updatedAt: nowLabel(), updatedBy: CURRENT_USER }
+          ? { ...p, ...patch, updatedAt: nowLabel(), updatedBy: currentUser }
           : p
       )
     );
@@ -159,7 +161,7 @@ export default function ProdukScreen() {
         stokMin,
         aktif: true,
         updatedAt: nowLabel(),
-        updatedBy: CURRENT_USER,
+        updatedBy: currentUser,
         satuan: [{ id: id * 10, idSatuan: idDasar, faktor: 1, def: true }],
         harga: [],
         stok,

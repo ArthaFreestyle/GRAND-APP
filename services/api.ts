@@ -33,6 +33,7 @@ const REQUEST_TIMEOUT_MS = 15_000;
 
 type ErrorEnvelope = components['responses']['ValidationError']['content']['application/json'];
 
+
 /** A request that reached the server and came back as a non-2xx envelope, or never got there at all. */
 export class ApiError extends Error {
   /** 0 when the request never reached the server (offline, DNS, TLS, timeout). */
@@ -59,12 +60,46 @@ export interface RequestOptions {
   token?: string | null;
 }
 
+/** `{ data, paging }` — list endpoints put `paging` beside `data`, not inside it. */
+export type PageMetadata = components['schemas']['PageMetadata'];
+
+export interface Paged<T> {
+  data: T[];
+  paging: PageMetadata;
+}
+
+/** The query parameters nearly every list endpoint in the contract accepts. */
+export interface ListQuery {
+  page?: number;
+  size?: number;
+  /** Partial match; what it matches against differs per endpoint. */
+  search?: string;
+  is_aktif?: boolean;
+}
+
 /**
- * Performs one API call and returns the `data` payload. Throws `ApiError` for
+ * Builds a query string, dropping keys that are `undefined` or `null` so
+ * callers can pass optional filters straight through without pruning first.
+ * Returns '' when nothing survives, keeping the caller's path unchanged.
+ */
+export function buildQuery(params: Record<string, string | number | boolean | null | undefined>) {
+  const parts: string[] = [];
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null) continue;
+    parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`);
+  }
+  return parts.length ? `?${parts.join('&')}` : '';
+}
+
+/**
+ * Performs one API call and returns the whole envelope. Throws `ApiError` for
  * anything else — never logs the request body or the token, both of which are
  * credentials.
  */
-export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+async function requestEnvelope<T>(
+  path: string,
+  options: RequestOptions = {}
+): Promise<ErrorEnvelope & { data?: T; paging?: PageMetadata }> {
   const { method = 'GET', body, token } = options;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -95,9 +130,9 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
   // A proxy or a wrong base URL can answer with HTML; treat unparseable bodies
   // as an empty envelope rather than letting the JSON error escape as-is.
-  let envelope: (ErrorEnvelope & { data?: T }) | null = null;
+  let envelope: (ErrorEnvelope & { data?: T; paging?: PageMetadata }) | null = null;
   try {
-    envelope = (await response.json()) as ErrorEnvelope & { data?: T };
+    envelope = (await response.json()) as ErrorEnvelope & { data?: T; paging?: PageMetadata };
   } catch {
     envelope = null;
   }
@@ -110,9 +145,34 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     );
   }
 
-  if (!envelope || envelope.data === undefined) {
+  if (!envelope) {
     throw new ApiError('Jawaban server tidak sesuai kontrak.', response.status);
   }
 
+  return envelope;
+}
+
+/** Performs one API call and returns the `data` payload. */
+export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const envelope = await requestEnvelope<T>(path, options);
+  if (envelope.data === undefined) {
+    throw new ApiError('Jawaban server tidak sesuai kontrak.', 200);
+  }
   return envelope.data;
+}
+
+/**
+ * Performs one list call and returns `data` together with `paging`. Using
+ * `apiRequest` for a list endpoint silently drops `paging`, which is the only
+ * place the total row count is reported.
+ */
+export async function apiRequestPaged<T>(
+  path: string,
+  options: RequestOptions = {}
+): Promise<Paged<T>> {
+  const envelope = await requestEnvelope<T[]>(path, options);
+  if (!Array.isArray(envelope.data)) {
+    throw new ApiError('Jawaban server tidak sesuai kontrak.', 200);
+  }
+  return { data: envelope.data, paging: envelope.paging ?? {} };
 }

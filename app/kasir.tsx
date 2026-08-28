@@ -26,6 +26,7 @@ import * as ScreenOrientation from 'expo-screen-orientation';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { useRequireSession } from '@/hooks/use-require-session';
 import { rp } from '@/constants/theme-erp';
 import { logout } from '@/services/auth';
 import * as printer from '@/services/bluetooth-printer';
@@ -256,6 +257,7 @@ const INITIAL_STATE: KasirState = {
 
 export default function KasirScreen() {
   const router = useRouter();
+  const allowed = useRequireSession();
   const [state, setState] = useState<KasirState>(INITIAL_STATE);
   const searchRef = useRef<TextInput>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -631,6 +633,9 @@ export default function KasirScreen() {
   const results = searchCatalog(state.query);
   const overlayEditing = state.editing;
 
+  // After every hook above, so the redirect never changes the hook order.
+  if (!allowed) return null;
+
   return (
     <View style={styles.root}>
       <View style={styles.header}>
@@ -686,12 +691,12 @@ export default function KasirScreen() {
           </Pressable>
           <View style={styles.menuDivider} />
           <Pressable
-            onPress={async () => {
-              // Leave first, then revoke: the session is already dropped locally
-              // and the round trip must not hold the screen open.
+            onPress={() => {
+              // Drop the session before navigating: the login screen sends a
+              // live one straight back in. logout() finishes the revoke itself.
               patch({ menuOpen: false });
+              void logout();
               router.replace('/');
-              await logout();
             }}
             style={styles.menuItem}>
             <Text style={[styles.menuItemText, { color: K.red }]}>Keluar</Text>

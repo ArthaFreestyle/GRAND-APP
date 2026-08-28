@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { FC } from 'react';
 import {
   KeyboardAvoidingView,
@@ -24,7 +24,7 @@ import RoleSupervisorSvg from '@/assets/images/login/role-supervisor.svg';
 import { Colors as C } from '@/constants/theme-erp';
 import { ApiError } from '@/services/api';
 import { login, switchContext } from '@/services/auth';
-import { clearSession, type Grant, type Session } from '@/services/session';
+import { clearSession, getSession, hasActiveContext, type Grant, type Session } from '@/services/session';
 
 type RoleId = 'admin' | 'kasir' | 'gudang' | 'pembelian' | 'supervisor' | 'owner';
 
@@ -123,6 +123,24 @@ export default function LoginScreen() {
   const [grants, setGrants] = useState<Grant[]>([]);
 
   const active = ROLES.find((r) => r.id === roleId) ?? ROLES[0];
+
+  // Arriving here with a session already in hand means one of two things: a
+  // restored session is ready to go, or a refresh came back without an active
+  // context because the grant was revoked or retired. The second case is a
+  // choice to make, not an error — show the picker rather than the login form.
+  useEffect(() => {
+    const session = getSession();
+    if (!session) return;
+    if (hasActiveContext(session)) {
+      router.replace(homeRouteFor(session) as never);
+      return;
+    }
+    if (session.grants.length > 0) {
+      setUsername(session.user.username ?? '');
+      setGrants(session.grants);
+      setView('context');
+    }
+  }, [router]);
 
   const pickRole = (r: RoleDef) => {
     setRoleId(r.id);

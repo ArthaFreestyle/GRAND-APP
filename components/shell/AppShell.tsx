@@ -29,13 +29,6 @@ const NAV_ITEMS: { key: NavKey; label: string; href: string }[] = [
   { key: 'unit-ruang', label: 'Unit Kerja & Ruang', href: '/unit-kerja-ruang' },
 ];
 
-// Placeholder identity for the screens that still gate their own controls on a
-// hardcoded role — those are local-state-only and wired to the API separately.
-// The sidebar user card below reads the real session instead.
-export const CURRENT_USER = 'admin.rina';
-export type Role = 'SUPERADMIN' | 'ADMIN' | 'STAFF';
-export const ROLE: Role = 'ADMIN';
-
 // ---- shell chrome lives here, mounted once by app/(admin)/_layout.tsx, so it
 // survives navigation between admin pages instead of remounting (and
 // page-transition-animating) on every sidebar click ----
@@ -102,18 +95,19 @@ export function AdminShellProvider({ children }: { children: ReactNode }) {
             </ScrollView>
             <View style={styles.asideFoot}>
               <Pressable
-                onPress={async () => {
-                  // Send the user away first: revoking the refresh token is a
-                  // network round trip, and the local session is already gone.
+                onPress={() => {
+                  // Drop the session first — the login screen sends a live one
+                  // straight back in. Revoking the refresh token is a network
+                  // round trip that logout() finishes on its own.
+                  void logout();
                   router.replace('/');
-                  await logout();
                 }}
                 accessibilityRole="button"
                 accessibilityLabel="Keluar"
                 style={({ pressed }) => [styles.userCard, pressed && styles.userCardPressed]}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.userName} numberOfLines={1}>
-                    {session?.user.username ?? CURRENT_USER}
+                    {session?.user.username ?? '—'}
                   </Text>
                   <Text style={styles.userUnit} numberOfLines={1}>
                     {session?.grants.find(
@@ -122,7 +116,7 @@ export function AdminShellProvider({ children }: { children: ReactNode }) {
                   </Text>
                 </View>
                 <View style={{ alignItems: 'flex-end', gap: 3 }}>
-                  <Text style={styles.userRole}>{session?.active?.role ?? ROLE}</Text>
+                  <Text style={styles.userRole}>{session?.active?.role ?? '—'}</Text>
                   <Text style={styles.userLogoutHint}>Keluar</Text>
                 </View>
               </Pressable>

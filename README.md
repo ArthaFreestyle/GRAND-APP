@@ -62,6 +62,26 @@ the contract's dev server (`http://127.0.0.1:3000`) when unset. Expo inlines
 Plain `http://` is accepted in dev builds only — a release build aimed at a
 non-HTTPS base URL fails on startup instead of sending credentials in the clear.
 
+On a physical device `127.0.0.1` is the *device's* own loopback, not your
+machine — use the LAN IP of the host running the API (or `10.0.2.2` on an
+Android emulator).
+
+### Sessions
+
+The signed-in session survives restarts: the access and refresh tokens go to
+`expo-secure-store` (Keystore/Keychain), and the non-secret half — user and
+grants — to `AsyncStorage`, because SecureStore values are capped near 2 KB on
+Android. Both halves are cleared together on logout.
+
+Access tokens expire after ~60 minutes and cannot be revoked, so `services/client.ts`
+renews them from the refresh token — before expiry, and once more on a 401.
+Refresh tokens are **rotated and deleted on first use**, so renewals are
+single-flighted: two concurrent requests must not both spend the same one.
+
+`expo-secure-store` ships native code. After pulling this change, run
+`npx expo prebuild --platform android` and rebuild the app — a JS reload is not
+enough, and until then the session silently falls back to memory-only.
+
 ### Android native build
 
 `npx expo run:android` needs an Android SDK on your machine with `ANDROID_HOME` (or `android/local.properties` → `sdk.dir`) pointing at it.
@@ -107,8 +127,10 @@ contracts/
   openapi.yaml        # GRAND-ERP API contract (source of truth for the backend)
 services/
   api.ts              # fetch wrapper + { data | errors } envelope unwrapping
-  auth.ts             # auth/login, auth/switch-context, auth/logout
-  session.ts          # the one signed-in session (in memory only)
+  client.ts           # authenticated requests: bearer token + auto-refresh
+  auth.ts             # auth/login, auth/switch-context, auth/refresh, auth/logout
+  session.ts          # the one signed-in session + its persistence
+  permissions.ts      # what the active grant's role may write
   bluetooth-printer.ts # Bluetooth Classic transport (bonded list/connect/write)
   receipt.ts          # ESC/POS receipt + test-print encoder
 types/
