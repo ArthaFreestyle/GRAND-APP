@@ -108,13 +108,13 @@ function prodUnit(kode: string) { return prod(kode)?.unit ?? ''; }
 function totalQty(t: Trx) { return t.items.reduce((s, it) => s + it.qty, 0); }
 function jenisMeta(j: Jenis) {
   return j === 'mutasi'
-    ? { label: 'Mutasi', color: C.primaryDark, bg: C.primaryTintBg, border: C.primaryTintBorder }
-    : { label: 'Pemakaian', color: C.amber, bg: C.amberBg, border: C.amberBorder };
+    ? { label: 'Mutasi', tone: 'primary' as const }
+    : { label: 'Pemakaian', tone: 'amber' as const };
 }
 function statusMeta(t: Trx) {
-  if (t.jenis === 'pemakaian') return { label: 'Tercatat', color: C.green, bg: C.greenBg, border: C.greenBorder };
-  if (t.status === 'transit') return { label: 'Dalam perjalanan', color: C.amber, bg: C.amberBg, border: C.amberBorder };
-  return { label: 'Diterima', color: C.green, bg: C.greenBg, border: C.greenBorder };
+  if (t.jenis === 'pemakaian') return { label: 'Tercatat', tone: 'green' as const };
+  if (t.status === 'transit') return { label: 'Dalam perjalanan', tone: 'amber' as const };
+  return { label: 'Diterima', tone: 'green' as const };
 }
 
 export default function MutasiPemakaianScreen() {
@@ -235,7 +235,7 @@ export default function MutasiPemakaianScreen() {
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
             <KpiCard label="Mutasi antar ruang" value={num(mutasiCount)} sub="transaksi tercatat" />
             <KpiCard label="Pemakaian internal" value={num(pemakaianCount)} sub="transaksi tercatat" />
-            <KpiCard label="Mutasi dalam perjalanan" value={num(transitCount)} color={transitCount > 0 ? C.amber : C.text} sub="menunggu diterima" />
+            <KpiCard label="Mutasi dalam perjalanan" value={num(transitCount)} valueClass={transitCount > 0 ? C.amber : C.text} sub="menunggu diterima" />
           </View>
 
           <DataTable
@@ -262,13 +262,13 @@ export default function MutasiPemakaianScreen() {
                   <Pressable key={t.id} onPress={() => { setView('detail'); setOpenId(t.id); }} style={styles.row}>
                     <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
-                        <Badge label={jm.label} color={jm.color} bg={jm.bg} border={jm.border} small />
+                        <Badge label={jm.label} tone={jm.tone} small />
                         <Text style={styles.namaText} numberOfLines={1}>{rute}</Text>
                       </View>
                       <Text style={styles.metaText} numberOfLines={1}>{t.no} · {tanggal(t.tanggal)}</Text>
                     </View>
                     <View style={{ width: 176 }}>
-                      <Badge label={st.label} color={st.color} bg={st.bg} border={st.border} small />
+                      <Badge label={st.label} tone={st.tone} small />
                     </View>
                     <View style={{ width: 130, alignItems: 'flex-end', gap: 2 }}>
                       <Text style={{ fontSize: 16, fontWeight: '600' }}>{t.items.length} item</Text>
@@ -294,8 +294,8 @@ export default function MutasiPemakaianScreen() {
                 <View style={styles.detailHead}>
                   <BackButton onPress={() => { setView('list'); setOpenId(null); }} />
                   <Text style={styles.detailNo}>{current.no}</Text>
-                  <Badge label={jm.label} color={jm.color} bg={jm.bg} border={jm.border} />
-                  <Badge label={st.label} color={st.color} bg={st.bg} border={st.border} />
+                  <Badge label={jm.label} tone={jm.tone} />
+                  <Badge label={st.label} tone={st.tone} />
                   <View style={{ flex: 1 }} />
                   {canReceive && <PrimaryButton label="Terima di tujuan" onPress={() => receive(current)} />}
                 </View>
@@ -304,13 +304,13 @@ export default function MutasiPemakaianScreen() {
                   <KpiCard
                     label={isMutasi ? 'Ke ruang' : 'Unit pemakai'}
                     value={isMutasi ? ruangNama(current.ke ?? 0) : unitNama(current.unit ?? 0)}
-                    color={isMutasi ? C.text : C.amber}
+                    valueClass={isMutasi ? 'text-foreground' : 'text-amber'}
                     sub={isMutasi ? (current.status === 'transit' ? 'stok belum ditambahkan' : 'stok bertambah di sini') : 'stok keluar / dikonsumsi'}
                   />
                   <KpiCard label="Tanggal" value={tanggal(current.tanggal)} sub={`${current.items.length} jenis · ${num(totalQty(current))} unit`} />
                 </View>
                 {!!current.catatan && (
-                  <Card style={{ padding: 14 }}>
+                  <Card className="p-3.5">
                     <Text style={{ fontSize: 12.5, color: C.muted2 }}>Catatan</Text>
                     <Text style={{ fontSize: 15, color: C.text, marginTop: 3, lineHeight: 20 }}>{current.catatan}</Text>
                   </Card>
@@ -346,7 +346,7 @@ export default function MutasiPemakaianScreen() {
             <Text style={{ fontSize: 13.5, color: C.muted2 }}>Nomor dokumen dibuat otomatis saat disimpan</Text>
           </View>
 
-          <Card style={{ padding: 16, gap: 14 }}>
+          <Card className="gap-3.5 p-4">
             <View style={{ flexDirection: 'row', gap: 8 }}>
               {(['mutasi', 'pemakaian'] as Jenis[]).map((j) => {
                 const on = draft.jenis === j;
@@ -424,7 +424,7 @@ export default function MutasiPemakaianScreen() {
           </Card>
 
           <View style={{ alignItems: 'flex-end' }}>
-            <Card style={{ width: 380, maxWidth: '100%', padding: 16, gap: 12 }}>
+            <Card className="w-[380px] max-w-full gap-3 p-4">
               <View style={styles.summaryRow}>
                 <Text style={{ fontSize: 14.5, color: C.muted3 }}>Total baris item</Text>
                 <Text style={{ fontSize: 22, fontWeight: '800' }}>{draft.items.length}</Text>

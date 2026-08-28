@@ -1,44 +1,89 @@
 import { vars } from 'nativewind';
 
-// Raw color values - update these and they sync everywhere
+/**
+ * gluestack's semantic tokens, pointed at the GRAND-ERP palette.
+ *
+ * This is the seam where the component library adopts the ported design rather
+ * than the other way round. Every gluestack component styles itself from these
+ * names — `bg-primary`, `border-border`, `text-muted-foreground` — so setting
+ * them here makes `<Button>` come out the right blue without a single override
+ * at the call site.
+ *
+ * Values are space-separated `R G B` because NativeWind wraps them in
+ * `rgb(var(--token) / <alpha>)`, which is what makes `bg-primary/70` work.
+ * A hex here would break every opacity modifier.
+ *
+ * The source of truth for the colours is `constants/theme-erp.ts`; the extra
+ * shades that have no semantic equivalent here (green, amber, the border
+ * ladder) live in `tailwind.config.js` instead. Keep the three in step.
+ *
+ * Only a light theme is filled in: the back-office screens are a light-mode
+ * design port, and the provider is mounted with `mode="light"`. The dark block
+ * mirrors it so a stray `dark:` class cannot produce an unreadable pairing.
+ */
+const palette = {
+  /** primary #17457E */
+  primary: '23 69 126',
+  /** text on primary */
+  primaryForeground: '255 255 255',
+  /** card #fff */
+  card: '255 255 255',
+  /** page background #EDEFF2 */
+  background: '237 239 242',
+  /** text #16181C */
+  foreground: '22 24 28',
+  /** badge / subtle fill #F1F3F6 */
+  subtle: '241 243 246',
+  /** dark2 #3A3F47 — text on a subtle fill */
+  subtleForeground: '58 63 71',
+  /** muted3 #6B7280 — secondary text */
+  mutedForeground: '107 114 128',
+  /** border #D6DAE0 */
+  border: '214 218 224',
+  /** borderLighter #F2F3F5 */
+  accent: '242 243 245',
+  /** red #C8322B */
+  destructive: '200 50 43',
+};
+
 export const colors = {
   light: {
-    '--primary': '23 23 23',
-    '--primary-foreground': '250 250 250',
-    '--card': '255 255 255',
-    '--secondary': '245 245 245',
-    '--secondary-foreground': '23 23 23',
-    '--background': '255 255 255',
-    '--popover': '255 255 255',
-    '--popover-foreground': '10 10 10',
-    '--muted': '245 245 245',
-    '--muted-foreground': '115 115 115',
-    '--destructive': '231 0 11',
-    '--foreground': '10 10 10',
-    '--border': '229 229 229',
-    '--input': '229 229 229',
-    '--ring': '212 212 212',
-    '--accent': '247 247 247',
-    '--accent-foreground': '52 52 52',
+    '--primary': palette.primary,
+    '--primary-foreground': palette.primaryForeground,
+    '--card': palette.card,
+    '--secondary': palette.subtle,
+    '--secondary-foreground': palette.subtleForeground,
+    '--background': palette.background,
+    '--popover': palette.card,
+    '--popover-foreground': palette.foreground,
+    '--muted': palette.subtle,
+    '--muted-foreground': palette.mutedForeground,
+    '--destructive': palette.destructive,
+    '--foreground': palette.foreground,
+    '--border': palette.border,
+    '--input': palette.border,
+    '--ring': palette.primary,
+    '--accent': palette.accent,
+    '--accent-foreground': palette.subtleForeground,
   },
   dark: {
-    '--primary-foreground': '23 23 23',
-    '--primary': '255 245 245',
-    '--card': '23 23 23',
-    '--secondary': '38 38 38',
-    '--secondary-foreground': '250 250 250',
-    '--background': '10 10 10',
-    '--popover': '23 23 23',
-    '--popover-foreground': '250 250 250',
-    '--muted': '38 38 38',
-    '--muted-foreground': '161 161 161',
-    '--destructive': '255 100 103',
-    '--foreground': '250 250 250',
-    '--border': '46 46 46',
-    '--input': '46 46 46',
-    '--accent': '38 38 38',
-    '--accent-foreground': '250 250 250',
-    '--ring': '115 115 115',
+    '--primary': palette.primary,
+    '--primary-foreground': palette.primaryForeground,
+    '--card': palette.card,
+    '--secondary': palette.subtle,
+    '--secondary-foreground': palette.subtleForeground,
+    '--background': palette.background,
+    '--popover': palette.card,
+    '--popover-foreground': palette.foreground,
+    '--muted': palette.subtle,
+    '--muted-foreground': palette.mutedForeground,
+    '--destructive': palette.destructive,
+    '--foreground': palette.foreground,
+    '--border': palette.border,
+    '--input': palette.border,
+    '--ring': palette.primary,
+    '--accent': palette.accent,
+    '--accent-foreground': palette.subtleForeground,
   },
 };
 

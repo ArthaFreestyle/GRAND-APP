@@ -385,7 +385,7 @@ export default function PelangganScreen() {
                 <SecondaryButton label="Ubah pelanggan" onPress={() => openEdit(current)} />
                 <SecondaryButton
                   label={current.aktif ? 'Nonaktifkan' : 'Aktifkan kembali'}
-                  color={current.aktif ? C.red : C.primary}
+                  tone={current.aktif ? 'text-danger' : 'text-primary'}
                   onPress={toggleAktif}
                 />
               </View>
@@ -396,7 +396,7 @@ export default function PelangganScreen() {
             <StatTile
               label="Piutang berjalan"
               value={rp(piutangJalan)}
-              color={piutangJalan <= 0 ? C.text : nearLimit ? C.red : C.text}
+              valueClass={piutangJalan <= 0 ? 'text-foreground' : nearLimit ? 'text-danger' : 'text-foreground'}
               sub={
                 piutangJalan <= 0
                   ? 'Tidak ada tagihan berjalan'
@@ -404,7 +404,7 @@ export default function PelangganScreen() {
                     ? 'Mendekati / melewati plafon'
                     : 'Ada tagihan berjalan'
               }
-              subColor={nearLimit ? C.red : C.muted}
+              subClass={nearLimit ? 'text-danger' : 'text-faint'}
             />
             <StatTile
               label="Plafon kredit"
@@ -420,13 +420,13 @@ export default function PelangganScreen() {
             <StatTile
               label="Sisa plafon"
               value={sisaLimit === null ? '—' : rp(Math.max(0, sisaLimit))}
-              color={sisaLimit !== null && sisaLimit < 0 ? C.red : C.text}
+              valueClass={sisaLimit !== null && sisaLimit < 0 ? 'text-danger' : 'text-foreground'}
               sub={plafonAngka === null ? 'tanpa batas' : `dari ${rp(plafonAngka)}`}
             />
             <StatTile
               label="Nota belum lunas"
               value={num(piutang.length)}
-              color={piutang.length > 0 ? C.red : C.text}
+              valueClass={piutang.length > 0 ? C.red : C.text}
               sub={piutangTotal > piutang.length ? `dari ${piutangTotal} nota` : 'seluruhnya'}
             />
           </View>

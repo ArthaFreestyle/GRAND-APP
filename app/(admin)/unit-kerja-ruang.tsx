@@ -22,24 +22,25 @@ import {
   TabSwitch,
   TextField,
   Toast,
+  type ToneName,
 } from '@/components/shell/ui';
 import { Colors as C, num } from '@/constants/theme-erp';
 
 type UnitTipe = 'toko' | 'gudang' | 'kantor' | 'cabang';
 type RuangTipe = 'etalase' | 'gudang' | 'kelas' | 'kantor' | 'lab';
 
-const UNIT_TIPE_META: Record<UnitTipe, { label: string; color: string; bg: string; border: string }> = {
-  toko: { label: 'Toko', color: C.primaryDark, bg: C.primaryTintBg, border: C.primaryTintBorder },
-  gudang: { label: 'Gudang', color: C.amber, bg: C.amberBg, border: C.amberBorder },
-  kantor: { label: 'Kantor', color: C.muted3, bg: C.badgeBg, border: C.borderCard },
-  cabang: { label: 'Cabang', color: C.green, bg: C.greenBg, border: C.greenBorder },
+const UNIT_TIPE_META: Record<UnitTipe, { label: string; tone: ToneName }> = {
+  toko: { label: 'Toko', tone: 'primary' as const },
+  gudang: { label: 'Gudang', tone: 'amber' as const },
+  kantor: { label: 'Kantor', tone: 'neutral' as const },
+  cabang: { label: 'Cabang', tone: 'green' as const },
 };
-const RUANG_TIPE_META: Record<RuangTipe, { label: string; color: string; bg: string; border: string }> = {
-  etalase: { label: 'Etalase', color: C.primaryDark, bg: C.primaryTintBg, border: C.primaryTintBorder },
-  gudang: { label: 'Gudang', color: C.amber, bg: C.amberBg, border: C.amberBorder },
-  kelas: { label: 'Kelas', color: C.green, bg: C.greenBg, border: C.greenBorder },
-  kantor: { label: 'Kantor', color: C.muted3, bg: C.badgeBg, border: C.borderCard },
-  lab: { label: 'Lab', color: C.muted3, bg: C.badgeBg, border: C.borderCard },
+const RUANG_TIPE_META: Record<RuangTipe, { label: string; tone: ToneName }> = {
+  etalase: { label: 'Etalase', tone: 'primary' as const },
+  gudang: { label: 'Gudang', tone: 'amber' as const },
+  kelas: { label: 'Kelas', tone: 'green' as const },
+  kantor: { label: 'Kantor', tone: 'neutral' as const },
+  lab: { label: 'Lab', tone: 'neutral' as const },
 };
 
 interface UnitKerja { id: number; kode: string; nama: string; tipe: UnitTipe; pj: string; telepon: string; aktif: boolean }
@@ -191,12 +192,12 @@ export default function UnitKerjaRuangScreen() {
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
           <KpiCard label="Unit kerja" value={num(units.length)} sub={`${units.filter((u) => u.aktif).length} aktif`} />
           <KpiCard label="Ruang / lokasi" value={num(rooms.length)} sub={`${rooms.filter((r) => r.aktif).length} aktif`} />
-          <KpiCard label="SKU tersimpan" value={num(totalSku)} sub="akumulasi seluruh ruang" color={C.primaryDark} />
+          <KpiCard label="SKU tersimpan" value={num(totalSku)} sub="akumulasi seluruh ruang" valueClass={'text-primary-dark'} />
           <KpiCard
             label="Unit nonaktif"
             value={num(units.filter((u) => !u.aktif).length)}
             sub="disembunyikan dari transaksi"
-            color={units.some((u) => !u.aktif) ? C.amber : C.green}
+            valueClass={units.some((u) => !u.aktif) ? C.amber : C.green}
           />
         </View>
 
@@ -270,7 +271,7 @@ export default function UnitKerjaRuangScreen() {
                       <Text style={styles.metaText} numberOfLines={1}>{u.kode} · PJ {u.pj || '—'}</Text>
                     </View>
                     <View style={{ width: 140 }}>
-                      <Badge label={meta.label} color={meta.color} bg={meta.bg} border={meta.border} small />
+                      <Badge label={meta.label} tone={meta.tone} small />
                     </View>
                     <View style={{ width: 130, alignItems: 'flex-end', gap: 2 }}>
                       <Text style={{ fontSize: 16, fontWeight: '600' }}>{uRooms.length} ruang</Text>
@@ -318,7 +319,7 @@ export default function UnitKerjaRuangScreen() {
                     </View>
                     <Text style={{ width: 200, fontSize: 14, color: C.dark2 }} numberOfLines={1}>{u ? u.nama : '—'}</Text>
                     <View style={{ width: 120 }}>
-                      <Badge label={meta.label} color={meta.color} bg={meta.bg} border={meta.border} small />
+                      <Badge label={meta.label} tone={meta.tone} small />
                     </View>
                     <Text style={{ width: 90, textAlign: 'right', fontSize: 15 }}>{num(r.sku)}</Text>
                     <View style={{ width: 90, alignItems: 'flex-end' }}>

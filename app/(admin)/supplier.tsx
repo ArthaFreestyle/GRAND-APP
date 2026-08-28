@@ -26,16 +26,17 @@ import {
   StatTile,
   TextField,
   Toast,
+  type ToneName,
 } from '@/components/shell/ui';
 import { Colors as C, num, rp, rpShort, tanggal, todayISO } from '@/constants/theme-erp';
 
 const PAGE_SIZE = 8;
 
 type Tipe = 'distributor' | 'pabrik' | 'perorangan';
-const TIPE_META: Record<Tipe, { label: string; color: string; bg: string; border: string }> = {
-  distributor: { label: 'Distributor', color: C.primaryDark, bg: C.primaryTintBg, border: C.primaryTintBorder },
-  pabrik: { label: 'Pabrik', color: C.green, bg: C.greenBg, border: C.greenBorder },
-  perorangan: { label: 'Perorangan', color: C.muted3, bg: C.badgeBg, border: C.borderCard },
+const TIPE_META: Record<Tipe, { label: string; tone: ToneName }> = {
+  distributor: { label: 'Distributor', tone: 'primary' as const },
+  pabrik: { label: 'Pabrik', tone: 'green' as const },
+  perorangan: { label: 'Perorangan', tone: 'neutral' as const },
 };
 
 interface Faktur {
@@ -249,7 +250,7 @@ export default function SupplierScreen() {
                         </Text>
                       </View>
                       <View style={{ width: 128 }}>
-                        <Badge label={meta.label} color={meta.color} bg={meta.bg} border={meta.border} small />
+                        <Badge label={meta.label} tone={meta.tone} small />
                       </View>
                       <View style={{ width: 140, alignItems: 'flex-end', gap: 2 }}>
                         <Text style={{ fontSize: 16, fontWeight: '600', color: hutang <= 0 ? C.muted : jatuhTempo ? C.red : C.text }}>
@@ -284,7 +285,7 @@ export default function SupplierScreen() {
                 <SecondaryButton label="Ubah supplier" onPress={() => openEdit(current)} />
                 <SecondaryButton
                   label={current.aktif ? 'Nonaktifkan' : 'Aktifkan kembali'}
-                  color={current.aktif ? C.red : C.primary}
+                  tone={current.aktif ? 'text-danger' : 'text-primary'}
                   onPress={() => {
                     patch(current.id, { aktif: !current.aktif });
                     toast(current.aktif ? 'Supplier dinonaktifkan' : 'Supplier diaktifkan kembali');
@@ -300,12 +301,12 @@ export default function SupplierScreen() {
             const belum = belumLunasOf(current);
             return (
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-                <StatTile label="Hutang berjalan" value={rp(hutang)} color={hutang <= 0 ? C.text : jatuhTempo ? C.red : C.text}
+                <StatTile label="Hutang berjalan" value={rp(hutang)} valueClass={hutang <= 0 ? 'text-foreground' : jatuhTempo ? 'text-danger' : 'text-foreground'}
                   sub={hutang <= 0 ? 'Tidak ada hutang berjalan' : jatuhTempo ? 'Ada faktur lewat jatuh tempo' : 'Ada hutang berjalan'}
-                  subColor={jatuhTempo ? C.red : C.muted} />
+                  subClass={jatuhTempo ? 'text-danger' : 'text-faint'} />
                 <StatTile label="Tempo bayar" value={current.tempo > 0 ? `${current.tempo} hari` : 'Tunai'} sub={current.tempo > 0 ? 'sejak tanggal faktur' : 'bayar di tempat'} />
                 <StatTile label="Nilai pembelian" value={rp(totalBeliOf(current))} sub={`akumulasi ${current.faktur.length} faktur`} />
-                <StatTile label="Faktur belum lunas" value={num(belum)} color={belum > 0 ? C.red : C.text} sub={`dari ${current.faktur.length} faktur`} />
+                <StatTile label="Faktur belum lunas" value={num(belum)} valueClass={belum > 0 ? C.red : C.text} sub={`dari ${current.faktur.length} faktur`} />
               </View>
             );
           })()}
@@ -329,10 +330,10 @@ export default function SupplierScreen() {
             ) : (
               current.faktur.map((h) => {
                 const status = h.sisa <= 0
-                  ? { label: 'Lunas', color: C.green, bg: C.greenBg, border: C.greenBorder }
+                  ? { label: 'Lunas', tone: 'green' as const }
                   : h.jatuh && h.jatuh < TODAY
-                  ? { label: 'Jatuh tempo', color: C.red, bg: C.redBg, border: C.redBorder }
-                  : { label: 'Belum jatuh tempo', color: C.amber, bg: C.amberBg, border: C.amberBorder };
+                  ? { label: 'Jatuh tempo', tone: 'red' as const }
+                  : { label: 'Belum jatuh tempo', tone: 'amber' as const };
                 return (
                   <View key={h.no} style={styles.notaRow}>
                     <Text style={{ width: 110, fontSize: 14, color: C.dark2 }}>{tanggal(h.tanggal)}</Text>

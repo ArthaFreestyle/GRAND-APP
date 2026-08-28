@@ -252,9 +252,9 @@ export default function StokOpnameScreen() {
           </View>
 
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-            <KpiCard label="Opname berjalan" value={num(berjalanCount)} color={berjalanCount > 0 ? C.amber : C.text} sub="sedang dihitung" />
+            <KpiCard label="Opname berjalan" value={num(berjalanCount)} valueClass={berjalanCount > 0 ? C.amber : C.text} sub="sedang dihitung" />
             <KpiCard label="Opname selesai" value={num(selesaiCount)} sub="sudah terposting" />
-            <KpiCard label="Selisih ditemukan" value={num(selisihCount)} color={selisihCount > 0 ? C.amber : C.text} sub="item disesuaikan" />
+            <KpiCard label="Selisih ditemukan" value={num(selisihCount)} valueClass={selisihCount > 0 ? C.amber : C.text} sub="item disesuaikan" />
           </View>
 
           <DataTable
@@ -322,7 +322,7 @@ export default function StokOpnameScreen() {
             <Text style={{ fontSize: 13.5, color: C.muted2 }}>Nomor final dibuat saat opname diposting</Text>
           </View>
 
-          <Card style={{ padding: 16, gap: 14, flexDirection: 'row', flexWrap: 'wrap' }}>
+          <Card className="flex-row flex-wrap gap-3.5 p-4">
             <View style={{ flex: 1, minWidth: 200 }}>
               <Field label="Ruang dihitung" hint={draft.fromId ? 'Terkunci — draft ini sudah berisi hitungan untuk ruang tersebut.' : undefined}>
                 {draft.fromId ? (
@@ -394,7 +394,7 @@ export default function StokOpnameScreen() {
             const net = netSelisih(draft.items);
             return (
               <View style={{ alignItems: 'flex-end' }}>
-                <Card style={{ width: 400, maxWidth: '100%', padding: 16, gap: 12 }}>
+                <Card className="w-[400px] max-w-full gap-3 p-4">
                   <View style={styles.summaryRow}>
                     <Text style={{ fontSize: 14.5, color: C.muted3 }}>Item dihitung</Text>
                     <Text style={{ fontSize: 22, fontWeight: '800' }}>{countedN} / {totalN}</Text>
@@ -436,10 +436,10 @@ export default function StokOpnameScreen() {
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
                   <KpiCard label="Ruang" value={ruangNama(current.ruang)} sub={`Dihitung oleh ${current.petugas}`} />
                   <KpiCard label="Tanggal opname" value={tanggal(current.tanggal)} sub={`${current.items.length} item dihitung`} />
-                  <KpiCard label="Item dengan selisih" value={num(nVar)} color={nVar ? C.amber : C.green} sub={`net ${netLabel(net)}`} />
+                  <KpiCard label="Item dengan selisih" value={num(nVar)} valueClass={nVar ? 'text-amber' : 'text-green'} sub={`net ${netLabel(net)}`} />
                 </View>
                 {!!current.catatan && (
-                  <Card style={{ padding: 14 }}>
+                  <Card className="p-3.5">
                     <Text style={{ fontSize: 12.5, color: C.muted2 }}>Catatan</Text>
                     <Text style={{ fontSize: 15, color: C.text, marginTop: 3, lineHeight: 20 }}>{current.catatan}</Text>
                   </Card>

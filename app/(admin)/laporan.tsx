@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AppShell } from '@/components/shell/AppShell';
-import { Card, KpiCard, OptionPicker, SecondaryButton, TabSwitch, Toast } from '@/components/shell/ui';
+import { Badge, Card, KpiCard, OptionPicker, SecondaryButton, TabSwitch, Toast } from '@/components/shell/ui';
 import { Colors as C, rp, rpShort } from '@/constants/theme-erp';
 
 type ReportKey = 'ringkasan' | 'penjualan' | 'pembelian' | 'persediaan';
@@ -177,13 +177,13 @@ export default function LaporanScreen() {
 
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
           {kpiCards.map((k) => (
-            <KpiCard key={k.label} label={k.label} value={k.value} sub={k.sub} color={k.color} />
+            <KpiCard key={k.label} label={k.label} value={k.value} sub={k.sub} valueClass={k.color} />
           ))}
         </View>
 
         {report === 'ringkasan' && (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14 }}>
-            <Card style={{ flex: 2, minWidth: 340, padding: 18, gap: 14 }}>
+            <Card className="flex-[2] min-w-[340px] gap-3.5 p-[18px]">
               <View style={styles.chartHead}>
                 <Text style={styles.cardHeadTextLocal}>Penjualan vs Pembelian</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
@@ -206,7 +206,7 @@ export default function LaporanScreen() {
                 })}
               </View>
             </Card>
-            <Card style={{ flex: 1, minWidth: 280, padding: 18, gap: 12 }}>
+            <Card className="flex-1 min-w-[280px] gap-3 p-[18px]">
               <Text style={styles.cardHeadTextLocal}>Produk terlaris</Text>
               <View style={{ gap: 14 }}>
                 {topSorted.map((x) => (
@@ -299,10 +299,10 @@ export default function LaporanScreen() {
             </View>
             {stockSorted.map((p) => {
               const st = p.stok <= 0
-                ? { label: 'Habis', color: C.red, bg: C.redBg, border: C.redBorder }
+                ? { label: 'Habis', tone: 'red' as const }
                 : p.stok <= p.min
-                ? { label: 'Menipis', color: C.amber, bg: C.amberBg, border: C.amberBorder }
-                : { label: 'Aman', color: C.green, bg: C.greenBg, border: C.greenBorder };
+                ? { label: 'Menipis', tone: 'amber' as const }
+                : { label: 'Aman', tone: 'green' as const };
               return (
                 <View key={p.kode} style={styles.dataRow}>
                   <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
@@ -311,9 +311,7 @@ export default function LaporanScreen() {
                   </View>
                   <Text style={{ width: 130, textAlign: 'right', fontSize: 15 }}>{p.stok.toLocaleString('id-ID')} {p.satuan}</Text>
                   <View style={{ width: 120 }}>
-                    <View style={[styles.badge, { backgroundColor: st.bg, borderColor: st.border }]}>
-                      <Text style={{ fontSize: 12.5, fontWeight: '600', color: st.color }}>{st.label}</Text>
-                    </View>
+                    <Badge label={st.label} tone={st.tone} small />
                   </View>
                   <Text style={{ width: 150, textAlign: 'right', fontSize: 15, fontWeight: '600' }}>{rp(p.stok * p.hargaBeli)}</Text>
                   <Text style={{ width: 150, textAlign: 'right', fontSize: 15, color: C.dark2 }}>{rp(p.stok * p.hargaJual)}</Text>

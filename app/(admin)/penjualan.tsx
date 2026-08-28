@@ -90,11 +90,11 @@ function totalOf(f: Nota) { return f.items.reduce((s, it) => s + it.qty * it.har
 function jatuhOf(f: Nota) { const c = cust(f.custId); return c && c.tempo > 0 ? addDays(f.tanggal, c.tempo) : null; }
 function statusOf(f: Nota) {
   const sisa = totalOf(f) - f.dibayar;
-  if (sisa <= 0) return { key: 'lunas', label: 'Lunas', color: C.green, bg: C.greenBg, border: C.greenBorder };
+  if (sisa <= 0) return { key: 'lunas', label: 'Lunas', tone: 'green' as const };
   const j = jatuhOf(f);
-  if (j && j < TODAY) return { key: 'telat', label: 'Jatuh tempo', color: C.red, bg: C.redBg, border: C.redBorder };
-  if (f.dibayar > 0) return { key: 'sebagian', label: 'Bayar sebagian', color: C.primaryDark, bg: C.primaryTintBg, border: C.primaryTintBorder };
-  return { key: 'belum', label: 'Belum dibayar', color: C.amber, bg: C.amberBg, border: C.amberBorder };
+  if (j && j < TODAY) return { key: 'telat', label: 'Jatuh tempo', tone: 'red' as const };
+  if (f.dibayar > 0) return { key: 'sebagian', label: 'Bayar sebagian', tone: 'primary' as const };
+  return { key: 'belum', label: 'Belum dibayar', tone: 'amber' as const };
 }
 
 export default function PenjualanScreen() {
@@ -213,8 +213,8 @@ export default function PenjualanScreen() {
           </View>
 
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-            <StatTile label="Total piutang berjalan" value={rp(sumPiutang)} color={C.red} sub={`${openList.length} nota belum lunas`} />
-            <StatTile label="Jatuh tempo terlewat" value={rp(sumOverdue)} color={sumOverdue > 0 ? C.red : C.text} sub={`${overdueList.length} nota lewat tempo`} />
+            <StatTile label="Total piutang berjalan" value={rp(sumPiutang)} valueClass={'text-danger'} sub={`${openList.length} nota belum lunas`} />
+            <StatTile label="Jatuh tempo terlewat" value={rp(sumOverdue)} valueClass={sumOverdue > 0 ? C.red : C.text} sub={`${overdueList.length} nota lewat tempo`} />
             <StatTile label="Nilai penjualan tercatat" value={rp(sumTotal)} sub={`${nota.length} nota`} />
           </View>
 
@@ -246,7 +246,7 @@ export default function PenjualanScreen() {
                       <Text style={styles.metaText} numberOfLines={1}>{f.no} · {tanggal(f.tanggal)} · {f.items.length} item</Text>
                     </View>
                     <View style={{ width: 150 }}>
-                      <Badge label={st.label} color={st.color} bg={st.bg} border={st.border} small />
+                      <Badge label={st.label} tone={st.tone} small />
                     </View>
                     <View style={{ width: 150, alignItems: 'flex-end', gap: 2 }}>
                       <Text style={{ fontSize: 16, fontWeight: '600' }}>{rp(total)}</Text>
@@ -276,16 +276,16 @@ export default function PenjualanScreen() {
                 <View style={styles.detailHead}>
                   <BackButton onPress={() => { setView('list'); setOpenId(null); }} />
                   <Text style={styles.detailNo}>{current.no}</Text>
-                  <Badge label={st.label} color={st.color} bg={st.bg} border={st.border} />
+                  <Badge label={st.label} tone={st.tone} />
                   <View style={{ flex: 1 }} />
                   {canWrite && sisa > 0 && <PrimaryButton label="Terima pelunasan" onPress={() => payFull(current)} />}
                 </View>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
                   <StatTile label="Total nota" value={rp(total)} sub={`${current.items.length} jenis item`} />
-                  <StatTile label="Sudah diterima" value={rp(current.dibayar)} color={C.green} sub={current.dibayar <= 0 ? 'Belum ada pembayaran' : current.dibayar >= total ? 'Nota lunas' : 'Sebagian dari total'} />
-                  <StatTile label="Sisa piutang" value={rp(sisa)} color={sisa <= 0 ? C.text : overdue ? C.red : C.text}
+                  <StatTile label="Sudah diterima" value={rp(current.dibayar)} valueClass={'text-green'} sub={current.dibayar <= 0 ? 'Belum ada pembayaran' : current.dibayar >= total ? 'Nota lunas' : 'Sebagian dari total'} />
+                  <StatTile label="Sisa piutang" value={rp(sisa)} valueClass={sisa <= 0 ? 'text-foreground' : overdue ? 'text-danger' : 'text-foreground'}
                     sub={sisa <= 0 ? 'Tidak ada piutang' : j ? (overdue ? `Lewat tempo ${tanggal(j)}` : `Jatuh tempo ${tanggal(j)}`) : 'Tunai — bayar di tempat'}
-                    subColor={overdue ? C.red : C.muted} />
+                    subClass={overdue ? 'text-danger' : 'text-faint'} />
                 </View>
                 <Card>
                   <CardHead title={c ? c.nama : '—'} right={<Text style={{ fontSize: 13.5, color: C.muted3 }}>Nota {tanggal(current.tanggal)} · tempo {c && c.tempo > 0 ? `${c.tempo} hari` : 'tunai'}</Text>} />
@@ -326,7 +326,7 @@ export default function PenjualanScreen() {
             <Text style={{ fontSize: 13.5, color: C.muted2 }}>Nomor nota dibuat otomatis saat disimpan</Text>
           </View>
 
-          <Card style={{ padding: 16, gap: 14, flexDirection: 'row', flexWrap: 'wrap' }}>
+          <Card className="flex-row flex-wrap gap-3.5 p-4">
             <View style={{ flex: 2, minWidth: 240 }}>
               <Field label="Pelanggan">
                 <OptionPicker options={CUSTOMERS.map((c) => ({ value: String(c.id), label: c.id === 0 ? c.nama : `${c.kode} · ${c.nama}` }))} value={draft.custId || null} onChange={(v) => setDraft({ ...draft, custId: v, err: '' })} />
@@ -422,7 +422,7 @@ export default function PenjualanScreen() {
             const sisa = total - dibayarNum;
             return (
               <View style={{ alignItems: 'flex-end' }}>
-                <Card style={{ width: 380, maxWidth: '100%', padding: 16, gap: 12 }}>
+                <Card className="w-[380px] max-w-full gap-3 p-4">
                   <View style={styles.summaryRow}>
                     <Text style={{ fontSize: 14.5, color: C.muted3 }}>Total nota</Text>
                     <Text style={{ fontSize: 22, fontWeight: '800' }}>{rp(total)}</Text>
