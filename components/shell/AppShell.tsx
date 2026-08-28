@@ -3,6 +3,8 @@ import { createContext, useContext, useMemo, useState, type ReactNode } from 're
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Colors as C } from '@/constants/theme-erp';
+import { logout } from '@/services/auth';
+import { useSession } from '@/services/session';
 
 export type NavKey =
   | 'produk'
@@ -27,6 +29,9 @@ const NAV_ITEMS: { key: NavKey; label: string; href: string }[] = [
   { key: 'unit-ruang', label: 'Unit Kerja & Ruang', href: '/unit-kerja-ruang' },
 ];
 
+// Placeholder identity for the screens that still gate their own controls on a
+// hardcoded role — those are local-state-only and wired to the API separately.
+// The sidebar user card below reads the real session instead.
 export const CURRENT_USER = 'admin.rina';
 export type Role = 'SUPERADMIN' | 'ADMIN' | 'STAFF';
 export const ROLE: Role = 'ADMIN';
@@ -45,6 +50,7 @@ function useAdminNav() {
 export function AdminShellProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  const session = useSession();
   const [navShown, setNavShown] = useState(true);
   const active = NAV_ITEMS.find((n) => n.href === pathname)?.key ?? null;
 
@@ -95,13 +101,31 @@ export function AdminShellProvider({ children }: { children: ReactNode }) {
               })}
             </ScrollView>
             <View style={styles.asideFoot}>
-              <View style={styles.userCard}>
-                <View>
-                  <Text style={styles.userName}>{CURRENT_USER}</Text>
-                  <Text style={styles.userUnit}>Ruang Toko Depan</Text>
+              <Pressable
+                onPress={async () => {
+                  // Send the user away first: revoking the refresh token is a
+                  // network round trip, and the local session is already gone.
+                  router.replace('/');
+                  await logout();
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Keluar"
+                style={({ pressed }) => [styles.userCard, pressed && styles.userCardPressed]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.userName} numberOfLines={1}>
+                    {session?.user.username ?? CURRENT_USER}
+                  </Text>
+                  <Text style={styles.userUnit} numberOfLines={1}>
+                    {session?.grants.find(
+                      (g) => g.id_user_role === session.active?.id_user_role
+                    )?.nama_unit_kerja ?? 'Semua unit kerja'}
+                  </Text>
                 </View>
-                <Text style={styles.userRole}>{ROLE}</Text>
-              </View>
+                <View style={{ alignItems: 'flex-end', gap: 3 }}>
+                  <Text style={styles.userRole}>{session?.active?.role ?? ROLE}</Text>
+                  <Text style={styles.userLogoutHint}>Keluar</Text>
+                </View>
+              </Pressable>
             </View>
           </View>
         )}
@@ -195,9 +219,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.borderCard,
   },
+  userCardPressed: { backgroundColor: C.redBg, borderColor: C.redBorder },
   userName: { fontSize: 14, fontWeight: '600', color: C.text },
   userUnit: { fontSize: 12.5, color: C.muted2 },
   userRole: { fontSize: 12, fontWeight: '600', letterSpacing: 0.5, color: C.dark2 },
+  userLogoutHint: { fontSize: 11, fontWeight: '600', color: C.red },
   main: { flex: 1, minWidth: 0 },
   header: {
     height: 64,

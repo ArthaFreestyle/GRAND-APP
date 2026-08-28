@@ -52,6 +52,16 @@ All screens currently run on **local component state with inline mock data** —
 
 There is no test runner configured yet.
 
+### API server
+
+The login screen talks to a real GRAND-ERP backend. Copy `.env.example` to
+`.env.local` and point `EXPO_PUBLIC_API_BASE_URL` at your API; it defaults to
+the contract's dev server (`http://127.0.0.1:3000`) when unset. Expo inlines
+`EXPO_PUBLIC_*` at build time, so restart the dev server after changing it.
+
+Plain `http://` is accepted in dev builds only — a release build aimed at a
+non-HTTPS base URL fails on startup instead of sending credentials in the clear.
+
 ### Android native build
 
 `npx expo run:android` needs an Android SDK on your machine with `ANDROID_HOME` (or `android/local.properties` → `sdk.dir`) pointing at it.
@@ -96,6 +106,9 @@ constants/
 contracts/
   openapi.yaml        # GRAND-ERP API contract (source of truth for the backend)
 services/
+  api.ts              # fetch wrapper + { data | errors } envelope unwrapping
+  auth.ts             # auth/login, auth/switch-context, auth/logout
+  session.ts          # the one signed-in session (in memory only)
   bluetooth-printer.ts # Bluetooth Classic transport (bonded list/connect/write)
   receipt.ts          # ESC/POS receipt + test-print encoder
 types/

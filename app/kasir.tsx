@@ -27,6 +27,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { rp } from '@/constants/theme-erp';
+import { logout } from '@/services/auth';
 import * as printer from '@/services/bluetooth-printer';
 import {
   PAPER_LABEL, PAPER_OPTIONS, encodeReceipt, encodeTestReceipt, receiptDateTime,
@@ -684,7 +685,15 @@ export default function KasirScreen() {
             </Text>
           </Pressable>
           <View style={styles.menuDivider} />
-          <Pressable onPress={() => { patch({ menuOpen: false }); router.replace('/'); }} style={styles.menuItem}>
+          <Pressable
+            onPress={async () => {
+              // Leave first, then revoke: the session is already dropped locally
+              // and the round trip must not hold the screen open.
+              patch({ menuOpen: false });
+              router.replace('/');
+              await logout();
+            }}
+            style={styles.menuItem}>
             <Text style={[styles.menuItemText, { color: K.red }]}>Keluar</Text>
             <Text style={styles.menuItemHint}>Logout dari kasir ini</Text>
           </Pressable>
