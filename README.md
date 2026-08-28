@@ -12,14 +12,15 @@ universal for Android/iOS/web).
 - [Expo Router](https://docs.expo.dev/router/introduction/) v6 (file-based routing), typed routes
 - TypeScript (strict), New Architecture, React Compiler enabled
 - `react-native-svg` for vector illustrations/icons
+- Receipt printing: `react-native-bluetooth-classic` (SPP/RFCOMM transport, config plugin `with-rn-bluetooth-classic`) + `@point-of-sale/receipt-printer-encoder` (ESC/POS bytes) + `base64-js`
 
 ## Screens
 
 - `app/index.tsx` — role picker + login.
-- `app/kasir.tsx` — POS checkout screen (cart, barcode/search, keypad, payment). Locks to landscape while open; shows today's completed transactions from the header menu.
+- `app/kasir.tsx` — POS checkout screen (cart, barcode/search, keypad, payment). Locks to landscape while open; the header menu holds today's completed transactions and the Bluetooth receipt-printer picker.
 - `app/(admin)/` — back-office screens sharing a persistent floating sidebar shell (`components/shell/AppShell.tsx`): Produk, Pelanggan, Supplier, Pembelian, Penjualan, Mutasi & Pemakaian, Stok Opname, Laporan, Unit Kerja & Ruang.
 
-All screens currently run on **local component state with inline mock data** — none are wired to a backend yet. `contracts/openapi.yaml` is the GRAND-ERP API contract; `types/api.ts` is generated from it (see below) for when screens are wired up for real.
+All screens currently run on **local component state with inline mock data** — none are wired to a backend yet. The one exception is receipt printing on the Kasir screen, which talks to a real Bluetooth printer (see below). `contracts/openapi.yaml` is the GRAND-ERP API contract; `types/api.ts` is generated from it (see below) for when screens are wired up for real.
 
 ## Get started
 
@@ -55,6 +56,20 @@ There is no test runner configured yet.
 
 `npx expo run:android` needs an Android SDK on your machine with `ANDROID_HOME` (or `android/local.properties` → `sdk.dir`) pointing at it.
 
+### Receipt printer
+
+The Kasir screen prints to Bluetooth Classic (SPP) thermal printers. This is a native module, so it only
+works in a dev build or a release build — in Expo Go the printer screen reports the module as unavailable.
+
+- Bluetooth permissions come from the `with-rn-bluetooth-classic` config plugin (`app.json`), so run
+  `npx expo prebuild --platform android` after changing plugins, then rebuild the app.
+- Pair the printer once in Android's Bluetooth settings — the app deliberately does no scanning or
+  pairing of its own (pairing cheap printers over the API hangs and their PINs vary), it only lists
+  already-bonded devices. The chosen printer is remembered across restarts via AsyncStorage.
+- Paper width (58 mm / 80 mm) is chosen in the picker — it sets the encoder's column count. Receipts
+  end with a paper feed instead of a cut command, since most 58 mm printers have no auto-cutter.
+- USB/OTG printers are not supported; that needs a separate native module.
+
 ## Project structure
 
 ```
@@ -80,6 +95,9 @@ constants/
   produk.ts           # Produk screen's mock data + types
 contracts/
   openapi.yaml        # GRAND-ERP API contract (source of truth for the backend)
+services/
+  bluetooth-printer.ts # Bluetooth Classic transport (bonded list/connect/write)
+  receipt.ts          # ESC/POS receipt + test-print encoder
 types/
   api.ts              # types generated from contracts/openapi.yaml
 ```

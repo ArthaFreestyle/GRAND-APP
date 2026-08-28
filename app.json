@@ -20,7 +20,11 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": true,
-      "package": "com.arthapasta.GRANDAPP"
+      "package": "com.arthapasta.GRANDAPP",
+      "blockedPermissions": [
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.BLUETOOTH_ADVERTISE"
+      ]
     },
     "web": {
       "output": "static",
@@ -39,7 +43,8 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "with-rn-bluetooth-classic"
     ],
     "experiments": {
       "typedRoutes": true,
