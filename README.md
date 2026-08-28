@@ -129,6 +129,8 @@ services/
   api.ts              # fetch wrapper + { data | errors } envelope unwrapping
   client.ts           # authenticated requests: bearer token + auto-refresh
   produk.ts           # /api/v1/product + /api/v1/satuan, mapped for the screen
+  pelanggan.ts        # /api/v1/pelanggan + its piutang query
+  decimal.ts          # the money decimal-string boundary, both directions
   auth.ts             # auth/login, auth/switch-context, auth/refresh, auth/logout
   session.ts          # the one signed-in session + its persistence
   permissions.ts      # what the active grant's role may write

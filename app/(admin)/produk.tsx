@@ -19,6 +19,7 @@ import {
   todayISO,
 } from '@/constants/produk';
 import { ApiError } from '@/services/api';
+import { rupiahToDecimal } from '@/services/decimal';
 import { useActiveRole, useCanWrite } from '@/services/permissions';
 import {
   addHarga,
@@ -387,9 +388,7 @@ export default function ProdukScreen() {
     if (!digits || parseInt(digits, 10) <= 0) {
       return setHargaForm({ ...hargaForm, err: 'Harga wajib diisi.' });
     }
-    // The contract takes a decimal string; building it here keeps the value out
-    // of a float on the way to a NUMERIC(20,2) column.
-    const harga = `${digits}.00`;
+    const harga = rupiahToDecimal(digits);
 
     setSaving(true);
     try {
