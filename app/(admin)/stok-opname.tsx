@@ -363,7 +363,7 @@ export default function StokOpnameScreen() {
               <Text style={{ width: 140, textAlign: 'right' }}>SELISIH</Text>
             </View>
             {wsRows.map(({ i, it, counted, sel }) => (
-              <View key={it.kode} style={[styles.wsRow, { backgroundColor: counted && sel !== 0 ? '#FDFBF6' : '#fff' }]}>
+              <View key={it.kode} style={[styles.wsRow, { backgroundColor: counted && sel !== 0 ? '#FDF8EC' : '#fff' }]}>
                 <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
                   <Text style={{ fontSize: 15.5, fontWeight: '500' }} numberOfLines={1}>{prodNama(it.kode)}</Text>
                   <Text style={{ fontSize: 12.5, color: C.muted, fontFamily: 'monospace' }}>{it.kode} · {prodUnit(it.kode)}</Text>
@@ -379,7 +379,7 @@ export default function StokOpnameScreen() {
                     />
                   </View>
                 </View>
-                <Text style={{ width: 140, textAlign: 'right', fontSize: 16, fontWeight: '700', color: !counted ? '#C4C9D0' : netColor(sel) }}>
+                <Text style={{ width: 140, textAlign: 'right', fontSize: 16, fontWeight: '700', color: !counted ? C.muted : netColor(sel) }}>
                   {!counted ? '—' : sel === 0 ? '0' : netLabel(sel)}
                 </Text>
               </View>
@@ -455,7 +455,7 @@ export default function StokOpnameScreen() {
                   {current.items.map((it) => {
                     const sel = (it.fisik as number) - it.sistem;
                     return (
-                      <View key={it.kode} style={[styles.wsRow, { backgroundColor: sel === 0 ? '#fff' : '#FDFBF6' }]}>
+                      <View key={it.kode} style={[styles.wsRow, { backgroundColor: sel === 0 ? '#fff' : '#FDF8EC' }]}>
                         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
                           <Text style={{ fontSize: 15.5, fontWeight: '500' }} numberOfLines={1}>{prodNama(it.kode)}</Text>
                           <Text style={{ fontSize: 12.5, color: C.muted, fontFamily: 'monospace' }}>{it.kode} · {prodUnit(it.kode)}</Text>

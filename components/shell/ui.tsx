@@ -635,7 +635,7 @@ function EdgeFade({ side }: { side: 'right' | 'bottom' }) {
           : 'absolute bottom-0 left-0 right-0 h-3.5 flex-col'
       }>
       {steps.map((opacity, i) => (
-        <View key={i} style={{ flex: 1, backgroundColor: `rgba(16,18,22,${opacity})` }} />
+        <View key={i} style={{ flex: 1, backgroundColor: `rgba(14,36,51,${opacity})` }} />
       ))}
     </Box>
   );

@@ -22,26 +22,26 @@ import { vars } from 'nativewind';
  * mirrors it so a stray `dark:` class cannot produce an unreadable pairing.
  */
 const palette = {
-  /** primary #17457E */
-  primary: '23 69 126',
+  /** primary #007CB9 */
+  primary: '0 124 185',
   /** text on primary */
   primaryForeground: '255 255 255',
   /** card #fff */
   card: '255 255 255',
-  /** page background #EDEFF2 */
-  background: '237 239 242',
-  /** text #16181C */
-  foreground: '22 24 28',
-  /** badge / subtle fill #F1F3F6 */
-  subtle: '241 243 246',
-  /** dark2 #3A3F47 — text on a subtle fill */
-  subtleForeground: '58 63 71',
-  /** muted3 #6B7280 — secondary text */
-  mutedForeground: '107 114 128',
-  /** border #D6DAE0 */
-  border: '214 218 224',
-  /** borderLighter #F2F3F5 */
-  accent: '242 243 245',
+  /** page background #F1F8FD */
+  background: '241 248 253',
+  /** text #0E2433 */
+  foreground: '14 36 51',
+  /** subtle fill #E9F2F9 */
+  subtle: '233 242 249',
+  /** dark2 #2E4557 — text on a subtle fill */
+  subtleForeground: '46 69 87',
+  /** muted3 #5A7387 — secondary text */
+  mutedForeground: '90 115 135',
+  /** border #C7DBEA */
+  border: '199 219 234',
+  /** borderLighter #EDF5FB */
+  accent: '237 245 251',
   /** red #C8322B */
   destructive: '200 50 43',
 };

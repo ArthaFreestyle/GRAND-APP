@@ -89,7 +89,9 @@ export function AdminShellProvider({ children }: { children: ReactNode }) {
             <Pressable
               onPress={() => router.push('/kasir' as never)}
               className="mx-3 mb-1.5 mt-3 h-[60px] flex-row items-center gap-3 rounded-[11px] bg-primary px-3.5 data-[active=true]:bg-primary-dark">
-              <Box className="h-[9px] w-[9px] rounded-full bg-primary-tintline" />
+              {/* The palette's gold, against the primary blue — the one place
+                  the accent carries weight rather than tinting a warning. */}
+              <Box className="h-[9px] w-[9px] rounded-full bg-gold" />
               <Box>
                 <Text className="text-base font-semibold text-white">Buka Kasir</Text>
                 <Text className="text-[12.5px] text-white opacity-80">Layar penjualan</Text>
@@ -190,5 +192,5 @@ export function AppShell({
 
 const styles = StyleSheet.create({
   // Three 2px bars: too small for a class to read more clearly than this.
-  hamburgerBar: { width: 17, height: 2, borderRadius: 2, backgroundColor: '#3A3F47' },
+  hamburgerBar: { width: 17, height: 2, borderRadius: 2, backgroundColor: '#2E4557' },
 });

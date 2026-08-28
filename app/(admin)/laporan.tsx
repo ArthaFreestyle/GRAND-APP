@@ -346,7 +346,7 @@ const styles = StyleSheet.create({
   chartCol: { flex: 1, alignItems: 'center', gap: 8, minWidth: 0 },
   chartBars: { flex: 1, width: '100%', flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', gap: 5 },
   bar: { width: 16, borderRadius: 4 },
-  barTrack: { height: 8, borderRadius: 5, backgroundColor: '#EEF1F5', overflow: 'hidden' },
+  barTrack: { height: 8, borderRadius: 5, backgroundColor: '#E4EFF8', overflow: 'hidden' },
   barFill: { height: '100%', borderRadius: 5, backgroundColor: C.primary },
   tableHeadRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, height: 46, backgroundColor: C.tableHeaderBg, borderBottomWidth: 1, borderBottomColor: C.borderLight },
   dataRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, minHeight: 62, borderBottomWidth: 1, borderBottomColor: C.borderLighter },

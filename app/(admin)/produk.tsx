@@ -479,7 +479,7 @@ export default function ProdukScreen() {
                 <Text style={[styles.thText, { flex: 1 }]}>NAMA</Text>
                 <Text style={[styles.thText, { width: 150, textAlign: 'right' }]}>
                   STOK MINIMUM{'\n'}
-                  <Text style={{ color: '#B4BAC2', fontWeight: '500' }}>ambang pesan ulang</Text>
+                  <Text style={{ color: C.muted, fontWeight: '500' }}>ambang pesan ulang</Text>
                 </Text>
                 <View style={{ width: 90 }} />
               </View>

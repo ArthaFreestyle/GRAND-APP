@@ -358,7 +358,7 @@ export default function MutasiPemakaianScreen() {
                     <Text style={{ fontSize: 15.5, fontWeight: '600', color: on ? C.primaryDark : C.dark2 }}>
                       {j === 'mutasi' ? 'Mutasi antar ruang' : 'Pemakaian internal'}
                     </Text>
-                    <Text style={{ fontSize: 12.5, color: on ? '#4C6591' : C.muted }}>
+                    <Text style={{ fontSize: 12.5, color: on ? C.primaryDark : C.muted }}>
                       {j === 'mutasi' ? 'Pindah stok antar lokasi' : 'Konsumsi oleh unit kerja'}
                     </Text>
                   </Pressable>

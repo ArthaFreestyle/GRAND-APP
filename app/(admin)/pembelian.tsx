@@ -443,7 +443,7 @@ const styles = StyleSheet.create({
   itemsHeadRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, height: 40, backgroundColor: C.tableHeaderBg, borderBottomWidth: 1, borderBottomColor: C.borderLight },
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, minHeight: 56, borderBottomWidth: 1, borderBottomColor: C.borderLighter },
   itemsFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 20, padding: 14, backgroundColor: C.tableHeaderBg, borderTopWidth: 1, borderTopColor: C.borderLight },
-  readout: { height: 44, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 9, borderWidth: 1, borderColor: C.borderLight, backgroundColor: '#F7F8FA' },
+  readout: { height: 44, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 9, borderWidth: 1, borderColor: C.borderLight, backgroundColor: '#F7FBFE' },
   readoutText: { fontSize: 13.5, color: C.dark2 },
   addRow: { flexDirection: 'row', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', padding: 16, backgroundColor: C.tableHeaderBg, borderBottomWidth: 1, borderBottomColor: C.borderLight },
   summaryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
