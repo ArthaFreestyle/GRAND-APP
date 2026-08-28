@@ -1,6 +1,7 @@
 import { usePathname, useRouter } from 'expo-router';
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Box } from '@/components/ui/box';
 import { Pressable } from '@/components/ui/pressable';
@@ -46,6 +47,12 @@ export function AdminShellProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const session = useSession();
+  // Every screen here runs with `headerShown: false`, so nothing is holding the
+  // content off the status bar / notch / gesture bar. Padding the shell (rather
+  // than each screen) also covers the drawer and the toasts: absolutely
+  // positioned children sit inside the padding box, so their `top-0`/`bottom-0`
+  // already mean "below the status bar" / "above the gesture bar".
+  const insets = useSafeAreaInsets();
   // The sidebar is an overlay drawer with a dimming backdrop, not a fixed rail —
   // opening it by default puts it over the screen the user actually asked for.
   const [navShown, setNavShown] = useState(false);
@@ -62,7 +69,14 @@ export function AdminShellProvider({ children }: { children: ReactNode }) {
 
   return (
     <AdminNavContext.Provider value={ctxValue}>
-      <Box className="flex-1 bg-background">
+      <Box
+        style={{
+          paddingTop: insets.top,
+          paddingBottom: insets.bottom,
+          paddingLeft: insets.left,
+          paddingRight: insets.right,
+        }}
+        className="flex-1 bg-background">
         <Box className="min-w-0 flex-1">{children}</Box>
 
         {navShown && (
