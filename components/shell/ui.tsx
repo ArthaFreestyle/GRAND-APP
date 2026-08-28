@@ -640,3 +640,42 @@ function EdgeFade({ side }: { side: 'right' | 'bottom' }) {
     </Box>
   );
 }
+
+/**
+ * The chrome every back-office screen repeats: page padding, the toolbar above
+ * a table, the table's header row and its cells, a data row, the detail header.
+ *
+ * These were nine near-identical StyleSheet entries copied into each of the nine
+ * screens, drifting a pixel here and a colour there. As class strings they are
+ * written once and read at the point of use, which is the whole reason to be on
+ * NativeWind rather than StyleSheet.
+ */
+export const cx = {
+  /** Page body: fills the shell below the header. */
+  screen: 'flex-1 gap-3 p-[18px]',
+  /** Search + filters + primary action, above a table. */
+  toolbar: 'flex-row items-center gap-3',
+  /** "N produk" beside the toolbar. */
+  countLabel: 'text-sm text-muted-foreground',
+  /**
+   * A table's column header. Rows carry more padding on the right than the left
+   * so the last column clears `DataTable`'s fade instead of sitting under it.
+   */
+  tableHead:
+    'h-12 flex-row items-center gap-3 border-b border-line-light bg-thead pl-[18px] pr-[34px]',
+  /** A column heading inside `tableHead`. */
+  th: 'text-[11.5px] font-bold tracking-wider text-faint',
+  /** One data row. */
+  row: 'flex-row items-center border-b border-line-lighter pl-[18px] pr-[34px]',
+  /** The pressable part of a row, left of its action buttons. */
+  rowMain: 'flex-1 flex-row items-center gap-3 py-3',
+  /** A row's primary label. */
+  nameText: 'text-[15.5px] font-semibold',
+  /** The second line under it. */
+  metaText: 'text-[13px] text-faint-2',
+  /** Back button + title + actions, at the top of a detail view. */
+  detailHead: 'flex-row items-center gap-3.5',
+  detailTitle: 'text-[22px] font-bold tracking-tight text-foreground',
+  /** A centred block for a spinner, an error, or an empty message. */
+  centerBox: 'items-center gap-3 p-10',
+} as const;

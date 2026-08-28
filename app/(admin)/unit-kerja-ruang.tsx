@@ -1,5 +1,4 @@
 import { useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
 
 import { AppShell } from '@/components/shell/AppShell';
 import { useCanWrite } from '@/services/permissions';
@@ -24,6 +23,8 @@ import {
   Toast,
   type ToneName,
 } from '@/components/shell/ui';
+import { Box } from '@/components/ui/box';
+import { Text } from '@/components/ui/text';
 import { Colors as C, num } from '@/constants/theme-erp';
 
 type UnitTipe = 'toko' | 'gudang' | 'kantor' | 'cabang';
@@ -188,8 +189,8 @@ export default function UnitKerjaRuangScreen() {
 
   return (
     <AppShell title="Unit Kerja & Ruang">
-      <View style={styles.wrap}>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+      <Box className="flex-1 gap-3.5 p-[18px]">
+        <Box style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
           <KpiCard label="Unit kerja" value={num(units.length)} sub={`${units.filter((u) => u.aktif).length} aktif`} />
           <KpiCard label="Ruang / lokasi" value={num(rooms.length)} sub={`${rooms.filter((r) => r.aktif).length} aktif`} />
           <KpiCard label="SKU tersimpan" value={num(totalSku)} sub="akumulasi seluruh ruang" valueClass={'text-primary-dark'} />
@@ -199,9 +200,9 @@ export default function UnitKerjaRuangScreen() {
             sub="disembunyikan dari transaksi"
             valueClass={units.some((u) => !u.aktif) ? C.amber : C.green}
           />
-        </View>
+        </Box>
 
-        <View style={styles.toolbar}>
+        <Box className="flex-row flex-wrap items-center gap-3">
           <TabSwitch
             options={[{ key: 'unit', label: 'Unit Kerja' }, { key: 'ruang', label: 'Ruang' }]}
             active={tab}
@@ -220,8 +221,8 @@ export default function UnitKerjaRuangScreen() {
               onChange={setRuangUnit}
             />
           )}
-          <View style={{ flex: 1 }} />
-          <Text style={styles.countLabel}>{tab === 'unit' ? `${filteredUnits.length} unit` : `${filteredRooms.length} ruang`}</Text>
+          <Box style={{ flex: 1 }} />
+          <Text className="text-sm text-muted-foreground">{tab === 'unit' ? `${filteredUnits.length} unit` : `${filteredRooms.length} ruang`}</Text>
           {(tab === 'unit' ? canWriteUnit : canWriteRuang) && (
             <PrimaryButton
               label={tab === 'unit' ? 'Unit kerja baru' : 'Ruang baru'}
@@ -237,51 +238,51 @@ export default function UnitKerjaRuangScreen() {
               }}
             />
           )}
-        </View>
+        </Box>
 
         {tab === 'unit' ? (
           <DataTable
             minWidth={720}
             head={
-              <View style={styles.tableHeadRow}>
-                <Text style={[styles.thText, { flex: 1 }]}>UNIT KERJA</Text>
-                <Text style={[styles.thText, { width: 140 }]}>TIPE</Text>
-                <Text style={[styles.thText, { width: 130, textAlign: 'right' }]}>RUANG</Text>
-                <View style={{ width: 210 }} />
-              </View>
+              <Box className="h-12 flex-row items-center gap-3 border-b border-line-light bg-thead pl-5 pr-9">
+                <Text className="flex-1 text-[12.5px] font-semibold tracking-wide text-faint">UNIT KERJA</Text>
+                <Text className="w-[140px] text-[12.5px] font-semibold tracking-wide text-faint">TIPE</Text>
+                <Text className="w-[130px] text-right text-[12.5px] font-semibold tracking-wide text-faint">RUANG</Text>
+                <Box style={{ width: 210 }} />
+              </Box>
             }
             footer={
-              <View style={styles.pagingBar}>
-                <Text style={styles.pagingLabel}>
+              <Box className="h-12 flex-row items-center border-t border-line-light bg-thead px-5">
+                <Text className="text-sm text-muted-foreground">
                   {filteredUnits.length ? `Menampilkan ${filteredUnits.length} dari ${units.length} unit kerja` : '0 hasil'}
                 </Text>
-              </View>
+              </Box>
             }>
               {filteredUnits.map((u) => {
                 const meta = UNIT_TIPE_META[u.tipe];
                 const uRooms = roomsOf(u.id);
                 const sku = uRooms.reduce((a, r) => a + r.sku, 0);
                 return (
-                  <View key={u.id} style={styles.row}>
-                    <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
-                        <Text style={[styles.namaText, { color: u.aktif ? C.text : C.muted2 }]} numberOfLines={1}>{u.nama}</Text>
+                  <Box key={u.id} className="min-h-[74px] flex-row items-center gap-3 border-b border-line-lighter pl-5 pr-9">
+                    <Box style={{ flex: 1, minWidth: 0, gap: 3 }}>
+                      <Box style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
+                        <Text className={`text-[17px] font-medium ${u.aktif ? 'text-foreground' : 'text-faint-2'}`} numberOfLines={1}>{u.nama}</Text>
                         {!u.aktif && <NeutralBadge />}
-                      </View>
-                      <Text style={styles.metaText} numberOfLines={1}>{u.kode} · PJ {u.pj || '—'}</Text>
-                    </View>
-                    <View style={{ width: 140 }}>
+                      </Box>
+                      <Text className="text-[12.5px] text-faint" numberOfLines={1}>{u.kode} · PJ {u.pj || '—'}</Text>
+                    </Box>
+                    <Box style={{ width: 140 }}>
                       <Badge label={meta.label} tone={meta.tone} small />
-                    </View>
-                    <View style={{ width: 130, alignItems: 'flex-end', gap: 2 }}>
+                    </Box>
+                    <Box style={{ width: 130, alignItems: 'flex-end', gap: 2 }}>
                       <Text style={{ fontSize: 16, fontWeight: '600' }}>{uRooms.length} ruang</Text>
                       <Text style={{ fontSize: 12, color: C.muted }}>{num(sku)} SKU</Text>
-                    </View>
-                    <View style={{ width: 210, flexDirection: 'row', justifyContent: 'flex-end', gap: 8 }}>
+                    </Box>
+                    <Box style={{ width: 210, flexDirection: 'row', justifyContent: 'flex-end', gap: 8 }}>
                       <GhostButton label="Lihat ruang" onPress={() => { setTab('ruang'); setRuangUnit(String(u.id)); setQuery(''); }} />
                       {canWriteUnit && <GhostButton label="Ubah" onPress={() => openUnitEdit(u)} />}
-                    </View>
-                  </View>
+                    </Box>
+                  </Box>
                 );
               })}
               {filteredUnits.length === 0 && <EmptyState title="Tidak ada unit kerja yang cocok" sub="Coba kata kunci lain." />}
@@ -290,48 +291,48 @@ export default function UnitKerjaRuangScreen() {
           <DataTable
             minWidth={740}
             head={
-              <View style={styles.tableHeadRow}>
-                <Text style={[styles.thText, { flex: 1 }]}>RUANG</Text>
-                <Text style={[styles.thText, { width: 200 }]}>UNIT KERJA</Text>
-                <Text style={[styles.thText, { width: 120 }]}>TIPE</Text>
-                <Text style={[styles.thText, { width: 90, textAlign: 'right' }]}>SKU</Text>
-                <View style={{ width: 90 }} />
-              </View>
+              <Box className="h-12 flex-row items-center gap-3 border-b border-line-light bg-thead pl-5 pr-9">
+                <Text className="flex-1 text-[12.5px] font-semibold tracking-wide text-faint">RUANG</Text>
+                <Text className="w-[200px] text-[12.5px] font-semibold tracking-wide text-faint">UNIT KERJA</Text>
+                <Text className="w-[120px] text-[12.5px] font-semibold tracking-wide text-faint">TIPE</Text>
+                <Text className="w-[90px] text-right text-[12.5px] font-semibold tracking-wide text-faint">SKU</Text>
+                <Box style={{ width: 90 }} />
+              </Box>
             }
             footer={
-              <View style={styles.pagingBar}>
-                <Text style={styles.pagingLabel}>
+              <Box className="h-12 flex-row items-center border-t border-line-light bg-thead px-5">
+                <Text className="text-sm text-muted-foreground">
                   {filteredRooms.length ? `Menampilkan ${filteredRooms.length} dari ${rooms.length} ruang` : '0 hasil'}
                 </Text>
-              </View>
+              </Box>
             }>
               {filteredRooms.map((r) => {
                 const meta = RUANG_TIPE_META[r.tipe];
                 const u = unitOf(r.unitId);
                 return (
-                  <View key={r.id} style={styles.row}>
-                    <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
-                        <Text style={[styles.namaText, { fontSize: 16, color: r.aktif ? C.text : C.muted2 }]} numberOfLines={1}>{r.nama}</Text>
+                  <Box key={r.id} className="min-h-[74px] flex-row items-center gap-3 border-b border-line-lighter pl-5 pr-9">
+                    <Box style={{ flex: 1, minWidth: 0, gap: 3 }}>
+                      <Box style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
+                        <Text className={`text-base font-medium ${r.aktif ? 'text-foreground' : 'text-faint-2'}`} numberOfLines={1}>{r.nama}</Text>
                         {!r.aktif && <NeutralBadge />}
-                      </View>
-                      <Text style={[styles.metaText, { fontFamily: 'monospace' }]}>{r.kode}</Text>
-                    </View>
+                      </Box>
+                      <Text className="font-mono text-[12.5px] text-faint">{r.kode}</Text>
+                    </Box>
                     <Text style={{ width: 200, fontSize: 14, color: C.dark2 }} numberOfLines={1}>{u ? u.nama : '—'}</Text>
-                    <View style={{ width: 120 }}>
+                    <Box style={{ width: 120 }}>
                       <Badge label={meta.label} tone={meta.tone} small />
-                    </View>
+                    </Box>
                     <Text style={{ width: 90, textAlign: 'right', fontSize: 15 }}>{num(r.sku)}</Text>
-                    <View style={{ width: 90, alignItems: 'flex-end' }}>
+                    <Box style={{ width: 90, alignItems: 'flex-end' }}>
                       {canWriteRuang && <GhostButton label="Ubah" onPress={() => openRuangEdit(r)} />}
-                    </View>
-                  </View>
+                    </Box>
+                  </Box>
                 );
               })}
               {filteredRooms.length === 0 && <EmptyState title="Tidak ada ruang yang cocok" sub="Coba kata kunci lain atau ubah filter unit kerja." />}
           </DataTable>
         )}
-      </View>
+      </Box>
 
       <ModalShell visible={!!modal} width={540} onRequestClose={closeModal}>
         <ModalHead
@@ -340,23 +341,23 @@ export default function UnitKerjaRuangScreen() {
           }
           sub={isUnitModal ? 'Unit kerja mengelompokkan ruang penyimpanan dan pemakaian stok.' : 'Ruang adalah lokasi fisik penyimpanan stok di dalam sebuah unit kerja.'}
         />
-        <View style={{ padding: 20, gap: 14 }}>
+        <Box style={{ padding: 20, gap: 14 }}>
           {isUnitModal && (
             <>
-              <View style={{ flexDirection: 'row', gap: 12 }}>
-                <View style={{ flex: 1 }}>
+              <Box style={{ flexDirection: 'row', gap: 12 }}>
+                <Box style={{ flex: 1 }}>
                   <Field label="Kode unit">
                     <TextField value={unitDraft.kode} onChangeText={(v) => { setUnitDraft((d) => ({ ...d, kode: v })); setModalErr(''); }} editable={!isEdit} mono placeholder="UK-006" />
                   </Field>
-                </View>
-                <View style={{ flex: 1 }}>
+                </Box>
+                <Box style={{ flex: 1 }}>
                   <Field label="Nama">
                     <TextField value={unitDraft.nama} onChangeText={(v) => { setUnitDraft((d) => ({ ...d, nama: v })); setModalErr(''); }} placeholder="Gudang Cabang Depok" />
                   </Field>
-                </View>
-              </View>
-              <View style={{ flexDirection: 'row', gap: 12 }}>
-                <View style={{ flex: 1 }}>
+                </Box>
+              </Box>
+              <Box style={{ flexDirection: 'row', gap: 12 }}>
+                <Box style={{ flex: 1 }}>
                   <Field label="Tipe">
                     <OptionPicker
                       options={(['toko', 'gudang', 'kantor', 'cabang'] as UnitTipe[]).map((t) => ({ value: t, label: UNIT_TIPE_META[t].label }))}
@@ -364,13 +365,13 @@ export default function UnitKerjaRuangScreen() {
                       onChange={(v) => setUnitDraft((d) => ({ ...d, tipe: v as UnitTipe }))}
                     />
                   </Field>
-                </View>
-                <View style={{ flex: 1 }}>
+                </Box>
+                <Box style={{ flex: 1 }}>
                   <Field label="Telepon">
                     <TextField value={unitDraft.telepon} onChangeText={(v) => setUnitDraft((d) => ({ ...d, telepon: v }))} placeholder="021-5567-8890" />
                   </Field>
-                </View>
-              </View>
+                </Box>
+              </Box>
               <Field label="Penanggung jawab">
                 <TextField value={unitDraft.pj} onChangeText={(v) => setUnitDraft((d) => ({ ...d, pj: v }))} placeholder="Nama PIC unit" />
               </Field>
@@ -381,18 +382,18 @@ export default function UnitKerjaRuangScreen() {
           )}
           {isRuangModal && (
             <>
-              <View style={{ flexDirection: 'row', gap: 12 }}>
-                <View style={{ flex: 1 }}>
+              <Box style={{ flexDirection: 'row', gap: 12 }}>
+                <Box style={{ flex: 1 }}>
                   <Field label="Kode ruang">
                     <TextField value={ruangDraft.kode} onChangeText={(v) => { setRuangDraft((d) => ({ ...d, kode: v })); setModalErr(''); }} editable={!isEdit} mono placeholder="RG-011" />
                   </Field>
-                </View>
-                <View style={{ flex: 1 }}>
+                </Box>
+                <Box style={{ flex: 1 }}>
                   <Field label="Nama">
                     <TextField value={ruangDraft.nama} onChangeText={(v) => { setRuangDraft((d) => ({ ...d, nama: v })); setModalErr(''); }} placeholder="Gudang Lantai 2" />
                   </Field>
-                </View>
-              </View>
+                </Box>
+              </Box>
               <Field label="Unit kerja">
                 <OptionPicker options={units.map((u) => ({ value: String(u.id), label: `${u.kode} · ${u.nama}` }))} value={ruangDraft.unitId || null} onChange={(v) => { setRuangDraft((d) => ({ ...d, unitId: v })); setModalErr(''); }} />
               </Field>
@@ -409,7 +410,7 @@ export default function UnitKerjaRuangScreen() {
             </>
           )}
           <ErrorBanner message={modalErr} />
-        </View>
+        </Box>
         <ModalFooter onCancel={closeModal} onSave={save} saveLabel={isEdit ? 'Simpan perubahan' : 'Simpan'} />
       </ModalShell>
 
@@ -418,17 +419,3 @@ export default function UnitKerjaRuangScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { flex: 1, padding: 18, gap: 14 },
-  toolbar: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
-  countLabel: { fontSize: 14, color: C.muted3 },
-  tableHeadRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: 20,
-    paddingRight: 36, height: 48, backgroundColor: C.tableHeaderBg, borderBottomWidth: 1, borderBottomColor: C.borderLight },
-  thText: { fontSize: 12.5, fontWeight: '600', letterSpacing: 0.5, color: C.muted },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: 20,
-    paddingRight: 36, minHeight: 74, borderBottomWidth: 1, borderBottomColor: C.borderLighter },
-  namaText: { fontSize: 17, fontWeight: '500' },
-  metaText: { fontSize: 12.5, color: C.muted },
-  pagingBar: { height: 48, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, borderTopWidth: 1, borderTopColor: C.borderLight, backgroundColor: C.tableHeaderBg },
-  pagingLabel: { fontSize: 14, color: C.muted3 },
-});
