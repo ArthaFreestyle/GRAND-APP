@@ -42,7 +42,13 @@ Three layers that only make sense together:
 
 ## Screen architecture
 
-- `app/(admin)/_layout.tsx` uses `Slot`, not a `Stack`, so switching back-office screens is an instant content swap and `AppShell`'s sidebar state survives. Do not turn it into a navigator.
+- `app/(admin)/_layout.tsx` mounts `AdminShellProvider` **above** a `Stack`, so the sidebar drawer and the safe-area padding survive every navigation below them while the navigator supplies the depth. Its `screenOptions` are `animation: 'none'` — a sidebar switch is a swap, not a journey — and only the depth routes named in that file (`produk/[id]`, `produk/baru`, …) slide in.
+- **A detail view or a create form is a route, not a `view` branch.** Push it (`router.push({ pathname: '/produk/[id]', params: { id } })`) and let `router.back()` return. Every branch faked with `useState` was an Android back button that exited the section instead of going back, a record with no URL to deep link, and a scroll position restored by hand. Reach for `Slot` only where a layout genuinely has to mount chrome without adding a level of history.
+- **Section layout: `<section>/index.tsx` + `[id].tsx` + `baru.tsx`**, flat under the one admin `Stack` — no per-section `_layout.tsx`, because a nested navigator would buy nothing the shell does not already provide. Conventions the nine screens now share:
+  - Editing stays a **dialog on the detail** (the record is already on screen); the list's "Ubah" action pushes `[id]` with `?ubah=1`. Creating is the `baru` route, and it lands on the new record with `router.replace` + `?baru=1`, so back goes to the list and the detail does the announcing. Both parameters are read **once** into a ref on the way in — they seed the screen, they do not drive it.
+  - Every detail and form has `goBack()` = `router.canGoBack() ? back() : replace('/<section>')`. A deep-linked route has nothing to pop, and `back()` there leaves the app.
+  - A detail reached cold must render a **failure page**, not toast over a list that may not be behind it.
+- Cross-route state has exactly two shapes. `hooks/use-record-bus.ts` carries writes from a detail back to the list that is still mounted underneath it (`saved` patches one row, `reload` re-reads page one); each API-backed section declares its bus next to its row type (`produkBus`, `pelangganBus`). `hooks/use-local-store.ts` + `stores/*` hold the seeded datasets for the five sections with no endpoint yet — they used to be a screen's `useState`, which two routes cannot share. Neither is a query cache, and neither should grow into one: when an endpoint lands, its `stores/` file is deleted, not extended.
 - `app/kasir.tsx` is standalone: its own palette (`const K`), its own landscape lock, no `AppShell`. It also shadows RN's `Text` with a wrapper applying a size-derived `maxFontSizeMultiplier` — dense POS chrome cannot absorb a blanket 1.4× cap, so the cap goes *down* as the text gets bigger. Keep using that local `Text`.
 - `app/index.tsx` is the login and role picker, and drives its own fluid sizing via a local `useFluid()` (a CSS `clamp()` equivalent).
 
@@ -56,17 +62,17 @@ Prefer `minHeight` over `height` on anything wrapping text, so a raised system f
 
 ## Migration in progress — three overlapping conversions
 
-The repo is mid-flight on all three at once. Check which state a screen is in before editing it.
+The repo is mid-flight on all three at once. Check which state a screen is in before editing it. (A fourth, `view` state machines → `Stack` routes, landed with issue #18; what it settled is under Screen architecture above.)
 
-**1. StyleSheet → gluestack + NativeWind.** `components/ui/*` is vendored gluestack; `components/shell/ui.tsx` holds the shared building blocks styled with NativeWind classes from `tailwind.config.js`. Only `unit-kerja-ruang.tsx` is fully converted (via the shared components); the other eight still carry a local `StyleSheet.create`. `cx` is exported from `ui.tsx` for the repeated page chrome but **has no consumer yet** — it is scaffolding for the remaining conversions, not an established pattern.
+**1. StyleSheet → gluestack + NativeWind.** `components/ui/*` is vendored gluestack; `components/shell/ui.tsx` holds the shared building blocks styled with NativeWind classes from `tailwind.config.js`. Only `unit-kerja-ruang.tsx` is fully converted (via the shared components); every other section still carries a local `StyleSheet.create` in each of its route files. `cx` is exported from `ui.tsx` for the repeated page chrome but **has no consumer yet** — it is scaffolding for the remaining conversions, not an established pattern.
 
 Colours resolve at build time, so a runtime-computed hex has to fall back to inline styles and drifts off the palette. Pass a `className` the caller picks instead. `constants/theme-erp.ts`, `tailwind.config.js`, and `components/ui/gluestack-ui-provider/config.ts` hold the same palette three times — keep them in step.
 
 **2. `DataTable` → `RecordList`.** `components/shell/record-list.tsx` is the responsive replacement: one row layout that stacks fields on a phone and ranges them right on a tablet, never scrolling horizontally. Actions are gestures — tap opens, swipe-left runs `quick` actions, long-press starts multi-select, the ⋮ menu holds everything. Actions marked `danger` are excluded from swipe by design; anything reversible runs immediately and offers `UndoBar` instead of a confirmation. Per-row actions live on the `RecordItem` so the array stays referentially stable for the row's `memo`.
 
-Only `produk.tsx` uses it. Seven screens still call `DataTable` (which stays in `ui.tsx` for them).
+Only `produk/index.tsx` uses it. Seven section lists still call `DataTable` (which stays in `ui.tsx` for them).
 
-**3. Paging buttons → infinite scroll.** The API stays paginated; the UI does not. `produk.tsx` is the reference: `PAGE_SIZE` 20, `onEndReached` guarded by an in-flight flag (it fires repeatedly — the threshold is not a guard), a failed page halting the loop behind a "Coba lagi" button rather than a spinner that never ends, and scroll offset parked in a ref so returning from a detail view does not snap to the top.
+**3. Paging buttons → infinite scroll.** The API stays paginated; the UI does not. `produk/index.tsx` is the reference: `PAGE_SIZE` 20, `onEndReached` guarded by an in-flight flag (it fires repeatedly — the threshold is not a guard), and a failed page halting the loop behind a "Coba lagi" button rather than a spinner that never ends. Nothing saves a scroll offset any more: the list stays mounted under the pushed detail and keeps its own.
 
 **Convention for all three:** convert one screen fully as the reference before rolling out, and translate each screen from its own values rather than forcing a shared set — the nine screens genuinely disagree on padding and font sizes, and flattening them silently redesigns things.
 

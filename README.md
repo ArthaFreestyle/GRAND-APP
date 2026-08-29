@@ -106,23 +106,31 @@ works in a dev build or a release build — in Expo Go the printer screen report
 app/
   index.tsx           # login / role picker
   kasir.tsx           # POS Kasir (landscape)
-  (admin)/            # back-office screens, persistent shell layout
-    _layout.tsx
-    produk.tsx
-    pelanggan.tsx
-    supplier.tsx
-    pembelian.tsx
-    penjualan.tsx
-    mutasi-pemakaian.tsx
-    stok-opname.tsx
-    laporan.tsx
+  (admin)/            # back-office screens: persistent shell + a Stack navigator
+    _layout.tsx       # AdminShellProvider above the Stack; detail/create animate
+    produk/           # index (daftar) / [id] (detail) / baru (form) — one folder
+      index.tsx       #   per section, so every record has a URL and a back button
+      [id].tsx
+      baru.tsx
+    pelanggan/        # index / [id] / baru
+    supplier/         # index / [id] / baru
+    pembelian/        # index / [id] / baru
+    penjualan/        # index / [id] / baru
+    mutasi-pemakaian/ # index / [id] / baru
+    stok-opname/      # index / [id] (draft = lembar hitung, selesai = hasil) / baru
+    laporan.tsx       # no detail view, so still a single file
     unit-kerja-ruang.tsx
 components/
   shell/              # AppShell (admin sidebar/header) + shared ui primitives
-  produk/             # Produk-screen-specific modals
+  produk/             # Produk form fields + its dialogs
+  pelanggan/          # Pelanggan form fields + its dialog
+  supplier/           # Supplier form fields + its dialog
+  opname/             # the counting sheet, shared by stok-opname/[id] and /baru
 constants/
   theme-erp.ts        # shared color tokens + rp() currency formatter
   produk.ts           # Produk screen's mock data + types
+stores/               # in-memory datasets for the sections with no endpoint yet;
+                      # module-level so a list and its detail routes share them
 contracts/
   openapi.yaml        # GRAND-ERP API contract (source of truth for the backend)
 services/

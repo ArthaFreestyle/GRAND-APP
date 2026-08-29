@@ -52,6 +52,21 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * The message to show for a failed call.
+ *
+ * The server writes its own errors in Indonesian and names the actual cause —
+ * a duplicate `kode_barang`, an overlapping price period — so its wording beats
+ * anything a screen could invent. The fallback only covers something thrown
+ * that never reached the API layer.
+ *
+ * Screens used to keep a private copy of this each; it lives with `ApiError`
+ * now because every one of them needs exactly the same three lines.
+ */
+export function messageOf(e: unknown, fallback: string): string {
+  return e instanceof ApiError ? e.message : fallback;
+}
+
 export interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   /** Serialized as JSON. */

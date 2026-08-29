@@ -56,7 +56,12 @@ export function AdminShellProvider({ children }: { children: ReactNode }) {
   // The sidebar is an overlay drawer with a dimming backdrop, not a fixed rail —
   // opening it by default puts it over the screen the user actually asked for.
   const [navShown, setNavShown] = useState(false);
-  const active = NAV_ITEMS.find((n) => n.href === pathname)?.key ?? null;
+  // Prefix, not equality: `/produk/12` and `/produk/baru` are still Produk, and
+  // an exact match would let the sidebar go dark the moment anything is pushed.
+  // The trailing slash matters — a bare `startsWith` would light Produk up on a
+  // hypothetical `/produk-lama`.
+  const active =
+    NAV_ITEMS.find((n) => pathname === n.href || pathname.startsWith(`${n.href}/`))?.key ?? null;
 
   const ctxValue = useMemo(
     () => ({ navShown, toggleNav: () => setNavShown((v) => !v) }),
@@ -120,6 +125,15 @@ export function AdminShellProvider({ children }: { children: ReactNode }) {
                     key={n.key}
                     onPress={() => {
                       setNavShown(false);
+                      // Whatever detail or form is stacked on the section being
+                      // left goes with it. Replacing the top of the stack alone
+                      // would leave the old section's list underneath the new
+                      // one, so back from Pelanggan would walk into Produk —
+                      // history assembled out of sidebar clicks, which nobody
+                      // asked to keep. Popping first also gives the current
+                      // section's own entry something to do: it returns to that
+                      // section's list.
+                      if (router.canDismiss()) router.dismissAll();
                       if (!isActive) router.replace(n.href as never);
                     }}
                     className={`h-[52px] justify-center rounded-[10px] px-3.5 ${
