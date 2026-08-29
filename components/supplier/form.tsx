@@ -1,12 +1,22 @@
 /**
  * The supplier form, and the dialog that wraps it when editing.
  *
- * Creating a supplier is a route now (`supplier/baru`) and editing one is a
- * dialog on the detail, so the fields belong to neither and live here. `kode`
- * is only editable while creating — it is the code every old document names the
- * supplier by.
+ * Creating a supplier is a route (`supplier/baru`) and editing one is a dialog
+ * on the detail, so the fields belong to neither and live here.
+ *
+ * The form lost five fields when the screen was wired to `/api/v1/supplier`,
+ * because the contract stores none of them — `tipe`, `narahubung`, `email`,
+ * `kota`, and `tempo`. The reasoning is written out in `services/supplier.ts`;
+ * what matters here is that the seven-row form collapsed to four, so it now fits
+ * a dialog without an inner scroll view.
+ *
+ * `kode` stayed editable in both modes. The mock froze it after creation on the
+ * theory that old documents name the supplier by it, but nothing does: a
+ * pembelian references `id_supplier`, and the `KODE` inside a document number is
+ * the unit kerja's, not the supplier's. `PATCH /supplier/{id}` accepts `kode`,
+ * so a typo stays fixable.
  */
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { View } from 'react-native';
 
 import {
   CheckBox,
@@ -17,45 +27,37 @@ import {
   ModalShell,
   TextField,
 } from '@/components/shell/ui';
-import { Colors as C } from '@/constants/theme-erp';
-import { TIPE_META, type Tipe } from '@/stores/supplier';
 
 export interface SupplierFormValues {
   kode: string;
   nama: string;
-  tipe: Tipe;
-  narahubung: string;
   telepon: string;
-  email: string;
-  npwp: string;
-  kota: string;
   alamat: string;
-  /** Days, as typed. 0 means the purchase is paid on the spot. */
-  tempo: string;
+  npwp: string;
   aktif: boolean;
 }
 
 export const EMPTY_SUPPLIER: SupplierFormValues = {
   kode: '',
   nama: '',
-  tipe: 'distributor',
-  narahubung: '',
   telepon: '',
-  email: '',
-  npwp: '',
-  kota: '',
   alamat: '',
-  tempo: '30',
+  npwp: '',
   aktif: true,
 };
 
-export const SUPPLIER_NEW_NOTE =
-  'Isi data supplier. Tempo 0 berarti pembelian dibayar tunai di tempat.';
-export const SUPPLIER_EDIT_NOTE = 'Perbarui data kontak dan tempo pembayaran supplier ini.';
+/**
+ * Says what the server keeps, worded once for both the dialog and the create
+ * page. It names the missing fields on purpose: a reader who used to type a PIC
+ * and a payment term needs to be told where they went, not left to notice.
+ */
+export const SUPPLIER_NOTE =
+  'Yang tersimpan hanya kode, nama, telepon, alamat, dan NPWP. Tempo bayar, narahubung, dan tipe supplier tidak punya kolom di server — tulis kota dan nama PIC di dalam alamat.';
 
 export interface SupplierFormFieldsProps {
   isNew: boolean;
   values: SupplierFormValues;
+  /** Patch, not a callback per field: the form has six and one owner. */
   onChange: (patch: Partial<SupplierFormValues>) => void;
   error: string;
 }
@@ -65,23 +67,24 @@ export function SupplierFormFields({ isNew, values, onChange, error }: SupplierF
     <View style={{ padding: 20, gap: 14 }}>
       <View style={{ flexDirection: 'row', gap: 12 }}>
         <View style={{ flex: 1 }}>
-          <Field label="Kode supplier">
+          {/* Optional, and unique case-insensitively — several suppliers may
+              share the empty one, which is why this is not a required field. */}
+          <Field label="Kode supplier (opsional)">
             <TextField
               value={values.kode}
               onChangeText={(v) => onChange({ kode: v })}
-              editable={isNew}
               mono
               placeholder="SUP-009"
             />
           </Field>
         </View>
         <View style={{ flex: 1 }}>
-          <Field label="Tipe">
-            <SelectPill<Tipe>
-              value={values.tipe}
-              options={['distributor', 'pabrik', 'perorangan']}
-              labels={TIPE_META}
-              onChange={(v) => onChange({ tipe: v })}
+          <Field label="NPWP">
+            <TextField
+              value={values.npwp}
+              onChangeText={(v) => onChange({ npwp: v })}
+              mono
+              placeholder="00.000.000.0-000.000"
             />
           </Field>
         </View>
@@ -93,71 +96,21 @@ export function SupplierFormFields({ isNew, values, onChange, error }: SupplierF
           placeholder="PT Sinar Dunia Distribusi"
         />
       </Field>
-      <Field label="Narahubung">
+      <Field label="Telepon">
         <TextField
-          value={values.narahubung}
-          onChangeText={(v) => onChange({ narahubung: v })}
-          placeholder="Nama sales / PIC"
+          value={values.telepon}
+          onChangeText={(v) => onChange({ telepon: v })}
+          placeholder="021-5567-8890"
         />
       </Field>
-      <View style={{ flexDirection: 'row', gap: 12 }}>
-        <View style={{ flex: 1 }}>
-          <Field label="Telepon">
-            <TextField
-              value={values.telepon}
-              onChangeText={(v) => onChange({ telepon: v })}
-              placeholder="021-5567-8890"
-            />
-          </Field>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Field label="Email">
-            <TextField
-              value={values.email}
-              onChangeText={(v) => onChange({ email: v })}
-              placeholder="sales@supplier.co.id"
-            />
-          </Field>
-        </View>
-      </View>
       <Field label="Alamat">
         <TextField
           value={values.alamat}
           onChangeText={(v) => onChange({ alamat: v })}
-          placeholder="Jl. ..."
+          placeholder="Jl. Industri Raya No. 12, Kemayoran, Jakarta Pusat"
           multiline
         />
       </Field>
-      <View style={{ flexDirection: 'row', gap: 12 }}>
-        <View style={{ flex: 1 }}>
-          <Field label="Kota">
-            <TextField
-              value={values.kota}
-              onChangeText={(v) => onChange({ kota: v })}
-              placeholder="Jakarta Pusat"
-            />
-          </Field>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Field label="NPWP">
-            <TextField
-              value={values.npwp}
-              onChangeText={(v) => onChange({ npwp: v })}
-              placeholder="00.000.000.0-000.000"
-            />
-          </Field>
-        </View>
-        <View style={{ width: 120 }}>
-          <Field label="Tempo (hari)">
-            <TextField
-              value={values.tempo}
-              onChangeText={(v) => onChange({ tempo: v })}
-              keyboardType="numeric"
-              placeholder="30"
-            />
-          </Field>
-        </View>
-      </View>
       {!isNew && (
         <CheckBox
           checked={values.aktif}
@@ -180,59 +133,9 @@ export interface SupplierFormModalProps extends Omit<SupplierFormFieldsProps, 'i
 export function SupplierFormModal(p: SupplierFormModalProps) {
   return (
     <ModalShell visible={p.visible} width={580} onRequestClose={p.onCancel}>
-      <ModalHead title="Ubah supplier" sub={SUPPLIER_EDIT_NOTE} />
-      {/* The form is taller than a phone dialog can be; on the create route it
-          is the page and scrolls with it instead. */}
-      <ScrollView style={{ maxHeight: 480 }}>
-        <SupplierFormFields isNew={false} values={p.values} onChange={p.onChange} error={p.error} />
-      </ScrollView>
+      <ModalHead title="Ubah supplier" sub={SUPPLIER_NOTE} />
+      <SupplierFormFields isNew={false} values={p.values} onChange={p.onChange} error={p.error} />
       <ModalFooter onCancel={p.onCancel} onSave={p.onSave} saveLabel="Simpan perubahan" />
     </ModalShell>
   );
 }
-
-function SelectPill<T extends string>({
-  value,
-  options,
-  labels,
-  onChange,
-}: {
-  value: T;
-  options: T[];
-  labels: Record<T, { label: string }>;
-  onChange: (v: T) => void;
-}) {
-  return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-      {options.map((o) => {
-        const active = o === value;
-        return (
-          <Pressable
-            key={o}
-            onPress={() => onChange(o)}
-            style={[styles.selectPill, active && styles.selectPillActive]}>
-            <Text style={[styles.selectPillText, active && styles.selectPillTextActive]}>
-              {labels[o].label}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  selectPill: {
-    height: 44,
-    paddingHorizontal: 14,
-    borderRadius: 9,
-    borderWidth: 1,
-    borderColor: C.border,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  selectPillActive: { backgroundColor: C.primaryTintBg, borderColor: C.primaryTintBorder },
-  selectPillText: { fontSize: 14, color: C.dark2 },
-  selectPillTextActive: { color: C.primaryDark, fontWeight: '600' },
-});
