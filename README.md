@@ -129,8 +129,9 @@ components/
 constants/
   theme-erp.ts        # shared color tokens + rp() currency formatter
   produk.ts           # Produk screen's mock data + types
-stores/               # in-memory datasets for the sections with no endpoint yet;
-                      # module-level so a list and its detail routes share them
+stores/               # in-memory datasets for the four sections with no endpoint
+                      # yet; module-level so a list and its detail routes share
+                      # them. Deleted per section as its endpoint is wired.
 contracts/
   openapi.yaml        # GRAND-ERP API contract (source of truth for the backend)
 services/
@@ -138,6 +139,8 @@ services/
   client.ts           # authenticated requests: bearer token + auto-refresh
   produk.ts           # /api/v1/product + /api/v1/satuan, mapped for the screen
   pelanggan.ts        # /api/v1/pelanggan + its piutang query
+  supplier.ts         # /api/v1/supplier + its utang query
+  pembelian.ts        # /api/v1/pembelian, the list read only (isu #8 owns the rest)
   decimal.ts          # the money decimal-string boundary, both directions
   auth.ts             # auth/login, auth/switch-context, auth/refresh, auth/logout
   session.ts          # the one signed-in session + its persistence
