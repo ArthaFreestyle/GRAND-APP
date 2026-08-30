@@ -12,27 +12,28 @@
  *
  * Neither ever scrolls horizontally.
  *
- * Row actions are gestures rather than buttons, because a button per row costs
- * width on the axis that is already short and invites the mis-taps that make a
- * list feel fragile:
+ * A row does exactly two things:
  *
- *   tap          the primary action, always the same one - open the record
- *   swipe left   the quick actions, `quick: true`
+ *   tap          open the record
  *   long-press   selection mode, for acting on several at once
- *   the menu     every action, for anyone who never discovers the swipe
  *
- * Destructive actions are deliberately not swipeable - `quick` is ignored on an
- * action marked `danger`, which keeps them behind the menu where they stay
- * deliberate. Anything reversible runs immediately and offers `UndoBar` instead
- * of asking first.
+ * There is no per-row menu and no swipe drawer. A row is a summary of a record,
+ * and what you can do to a record lives *on* the record - the detail's header
+ * bar carries its actions. A `⋮` on every row was a second, dimmer copy of that
+ * menu: it costs width on the axis that is already short, it invites the
+ * mis-taps that make a list feel fragile, and it answers a question ("what can I
+ * do with this?") that is better answered by the screen that shows the whole
+ * record.
+ *
+ * Selection mode is the exception and stays, because acting on eight records at
+ * once is the one thing no single detail screen can do. It runs immediately and
+ * offers `UndoBar` rather than asking first.
  */
 import * as Haptics from 'expo-haptics';
-import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, FlatList } from 'react-native';
-import ReanimatedSwipeable, {
-  type SwipeableMethods,
-} from 'react-native-gesture-handler/ReanimatedSwipeable';
+import { memo, useCallback, useEffect, useState, type ReactNode } from 'react';
+import { ActivityIndicator, FlatList, TextInput } from 'react-native';
 
+import { TONES, type ToneName } from '@/components/shell/ui';
 import { Box } from '@/components/ui/box';
 import { Pressable } from '@/components/ui/pressable';
 import { Text } from '@/components/ui/text';
@@ -54,45 +55,131 @@ export interface RecordItem {
   title: string;
   /** Sits beside the title, e.g. "Nonaktif". */
   badge?: string;
+  /**
+   * The badge's tint. Left out it is neutral, which is right for "Nonaktif" —
+   * a fact about the record. A document's *status* is not a fact but a position
+   * in a flow, and the palette already says which is which: DRAFT reads amber,
+   * POSTED green, BATAL red. Scanning a list of thirty documents for the two
+   * still sitting in draft is the whole job, so the tone travels with the item.
+   */
+  badgeTone?: ToneName;
   /** The line under the title - a code, a date, whatever identifies it. */
   meta: string;
   fields: RecordField[];
   /** Dims the row. For records that are archived rather than missing. */
   dimmed?: boolean;
-  /**
-   * Overrides the list's `actions` for this record - "Arsipkan" and "Aktifkan"
-   * are the same action pointing opposite ways, and only the record knows which.
-   * It lives on the item rather than behind a `(item) => actions` callback so it
-   * is built once with the item and stays referentially stable for `memo`.
-   */
-  actions?: RecordAction[];
 }
 
+/** One entry in the selection bar - the only actions a list still offers. */
 export interface RecordAction {
   key: string;
   label: string;
-  /** Offer it in the swipe drawer. Ignored when `danger` is set. */
-  quick?: boolean;
-  /** Keeps it out of the swipe drawer and colours it in the menu. */
+  /** Colours it as destructive in the selection bar. */
   danger?: boolean;
 }
 
 const FIELD_GAP = 14;
 
 /**
- * One shared empty array for both action defaults. `= []` in the parameter list
- * allocates a new one on every render, which changes `renderItem`'s identity and
- * fails the row comparator's `actions === actions` check - defeating the whole
- * point of memoising the row.
+ * One shared empty array for the `bulkActions` default. `= []` in the parameter
+ * list allocates a new one on every render, which changes `renderItem`'s
+ * identity and re-renders every row - defeating the point of memoising it.
  */
 const NO_ACTIONS: RecordAction[] = [];
+
+// ---- the list's own chrome ----
+
+/**
+ * The band above the rows: search, then whatever chips the section filters by.
+ *
+ * It goes in `header`, which is *inside* the list card and pinned above the
+ * scroll, so on a long list it stays the way back out. Every section drew this
+ * itself before, from its own `StyleSheet`, which is how nine screens ended up
+ * with four different paddings and three different search fields.
+ */
+export function ListHeader({ children }: { children: ReactNode }) {
+  return <Box className="gap-2.5 border-b border-line-light p-3.5">{children}</Box>;
+}
+
+/**
+ * The search field, sized for a thumb rather than a mouse: 52pt tall and 16.5px
+ * type, which is also the size iOS stops zooming the page to reach.
+ *
+ * The magnifier is two `Box`es - a ring and a rotated stem - rather than an icon
+ * font or an SVG. It is the only glyph the list needs, and it costs nothing.
+ */
+export function ListSearch({
+  value,
+  onChangeText,
+  placeholder,
+  editable = true,
+}: {
+  value: string;
+  onChangeText: (v: string) => void;
+  placeholder: string;
+  /** A filter that the search cannot narrow disables it rather than lying. */
+  editable?: boolean;
+}) {
+  return (
+    <Box className="relative justify-center">
+      <Box
+        pointerEvents="none"
+        className="absolute left-[13px] z-10 h-3.5 w-3.5 rounded-full border-2 border-faint"
+      />
+      <Box
+        pointerEvents="none"
+        className="absolute left-6 top-[25px] z-10 h-0.5 w-2 bg-faint"
+        style={{ transform: [{ rotate: '45deg' }] }}
+      />
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        editable={editable}
+        placeholder={placeholder}
+        className={`min-h-[52px] rounded-[10px] border border-border pl-[42px] pr-3.5 text-[16.5px] ${
+          editable ? 'bg-card text-foreground' : 'bg-thead text-faint-2'
+        }`}
+      />
+    </Box>
+  );
+}
+
+/**
+ * "Add one" as the list's first row rather than a button in a toolbar.
+ *
+ * A toolbar button competes for the horizontal axis that is already short on a
+ * phone, and it is the one action that is always available - so it reads better
+ * as the top of the list it adds to. It scrolls away with the rows on purpose:
+ * someone hunting through page four is not looking for it.
+ *
+ * One line. It used to carry a second one explaining what a new record is for,
+ * which is a sentence nobody needs twice a day above a list they already know.
+ */
+export function NewRecordRow({ title, onPress }: { title: string; onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      className="min-h-[52px] flex-row items-center gap-3 border-b border-line-lighter bg-thead px-[18px]">
+      <Box className="min-h-[28px] min-w-[28px] items-center justify-center rounded-full bg-primary">
+        <Text className="text-[18px] font-semibold leading-[21px] text-white">+</Text>
+      </Box>
+      <Text className="flex-1 text-[15.5px] font-semibold text-primary-dark">{title}</Text>
+    </Pressable>
+  );
+}
 
 // ---- row ----
 
 function FieldValue({ field, dimmed }: { field: RecordField; dimmed?: boolean }) {
   return (
+    // Two lines and no more: most values are a number or a date, but an address
+    // is a field too, and one long enough to wrap four times turns every other
+    // row in the list into a different height. `shrink` is what lets it wrap
+    // inside its own column instead of shoving the label off the phone layout.
     <Text
-      className={`text-[14.5px] font-semibold ${
+      numberOfLines={2}
+      className={`shrink text-right text-[14.5px] font-semibold ${
         field.danger ? 'text-danger' : dimmed ? 'text-faint-2' : 'text-foreground'
       }`}>
       {field.value}
@@ -105,12 +192,9 @@ interface RowProps {
   wide: boolean;
   selecting: boolean;
   selected: boolean;
-  actions: RecordAction[];
   onOpen: (id: number) => void;
   onToggle: (id: number) => void;
   onLongPress: (id: number) => void;
-  onAction: (key: string, item: RecordItem) => void;
-  onMenu: (id: number) => void;
 }
 
 function sameFields(a: RecordField[], b: RecordField[]) {
@@ -139,15 +223,12 @@ function areRowPropsEqual(a: RowProps, b: RowProps) {
     a.onOpen === b.onOpen &&
     a.onToggle === b.onToggle &&
     a.onLongPress === b.onLongPress &&
-    a.onAction === b.onAction &&
-    a.onMenu === b.onMenu &&
-    a.actions === b.actions &&
     a.item.id === b.item.id &&
     a.item.title === b.item.title &&
     a.item.meta === b.item.meta &&
     a.item.badge === b.item.badge &&
+    a.item.badgeTone === b.item.badgeTone &&
     a.item.dimmed === b.item.dimmed &&
-    a.item.actions === b.item.actions &&
     sameFields(a.item.fields, b.item.fields)
   );
 }
@@ -162,17 +243,10 @@ const RecordRow = memo(function RowBody({
   wide,
   selecting,
   selected,
-  actions,
   onOpen,
   onToggle,
   onLongPress,
-  onAction,
-  onMenu,
 }: RowProps) {
-  const swipeRef = useRef<SwipeableMethods>(null);
-  const rowActions = item.actions ?? actions;
-  const quick = rowActions.filter((a) => a.quick && !a.danger);
-
   const identity = (
     <Box className="min-w-0 flex-1 gap-1">
       <Box className="flex-row items-center gap-2.5">
@@ -184,8 +258,16 @@ const RecordRow = memo(function RowBody({
           {item.title}
         </Text>
         {!!item.badge && (
-          <Box className="rounded-md border border-line-card bg-muted px-2 py-0.5">
-            <Text className="text-[11.5px] font-semibold text-muted-foreground">{item.badge}</Text>
+          <Box
+            className={`rounded-md border px-2 py-0.5 ${
+              item.badgeTone ? TONES[item.badgeTone].box : 'border-line-card bg-muted'
+            }`}>
+            <Text
+              className={`text-[11.5px] font-semibold ${
+                item.badgeTone ? TONES[item.badgeTone].text : 'text-muted-foreground'
+              }`}>
+              {item.badge}
+            </Text>
           </Box>
         )}
       </Box>
@@ -195,9 +277,9 @@ const RecordRow = memo(function RowBody({
     </Box>
   );
 
-  const row = (
+  return (
     <Box
-      className={`flex-row items-center border-b border-line-lighter pl-[18px] pr-1.5 ${
+      className={`flex-row items-center border-b border-line-lighter px-[18px] ${
         selected ? 'bg-primary-tint' : 'bg-card'
       }`}>
       {selecting && (
@@ -242,45 +324,7 @@ const RecordRow = memo(function RowBody({
           </Box>
         )}
       </Pressable>
-      {!selecting && rowActions.length > 0 && (
-        <Pressable
-          onPress={() => onMenu(item.id)}
-          // 44pt of touch target around a glyph that is a few points wide.
-          className="h-11 w-9 items-center justify-center"
-          accessibilityLabel={`Aksi untuk ${item.title}`}>
-          <Text className="text-[19px] leading-[19px] text-faint">&#8942;</Text>
-        </Pressable>
-      )}
     </Box>
-  );
-
-  // Selection mode owns the horizontal axis - a swipe there would fight the
-  // multi-select gesture and open a drawer nobody asked for.
-  if (selecting || quick.length === 0) return row;
-
-  return (
-    <ReanimatedSwipeable
-      ref={swipeRef}
-      friction={2}
-      rightThreshold={40}
-      overshootRight={false}
-      renderRightActions={() => (
-        <Box className="flex-row">
-          {quick.map((a) => (
-            <Pressable
-              key={a.key}
-              onPress={() => {
-                swipeRef.current?.close();
-                onAction(a.key, item);
-              }}
-              className="w-[104px] items-center justify-center bg-primary px-2">
-              <Text className="text-center text-[13px] font-semibold text-white">{a.label}</Text>
-            </Pressable>
-          ))}
-        </Box>
-      )}>
-      {row}
-    </ReanimatedSwipeable>
   );
 },
 areRowPropsEqual);
@@ -465,10 +509,8 @@ export function RecordList({
   loading,
   error,
   filtered,
-  actions = NO_ACTIONS,
   bulkActions = NO_ACTIONS,
   onOpen,
-  onAction,
   onBulkAction,
   onRetry,
   onClearFilter,
@@ -489,13 +531,10 @@ export function RecordList({
   error: string;
   /** A search or a filter chip is active - changes which empty state shows. */
   filtered: boolean;
-  actions?: RecordAction[];
   /** Offered in the selection bar. Empty disables long-press entirely. */
   bulkActions?: RecordAction[];
+  /** Tap. The only thing a row does, and always the same thing: open it. */
   onOpen: (id: number) => void;
-  /** Receives the item, not just its id, so callers need no lookup - and so a
-   *  handler never has to depend on the items array to find one. */
-  onAction?: (key: string, item: RecordItem) => void;
   onBulkAction?: (key: string, ids: number[]) => void;
   onRetry?: () => void;
   onClearFilter?: () => void;
@@ -525,7 +564,6 @@ export function RecordList({
 }) {
   const wide = atLeast(useBreakpoint(), 'tablet');
   const [selected, setSelected] = useState<number[]>([]);
-  const [menuFor, setMenuFor] = useState<number | null>(null);
   const selecting = selected.length > 0;
 
   // Drop only what is genuinely gone - a filter change replaces the rows and a
@@ -553,14 +591,6 @@ export function RecordList({
     [bulkActions.length]
   );
 
-  const runAction = useCallback(
-    (key: string, item: RecordItem) => {
-      setMenuFor(null);
-      onAction?.(key, item);
-    },
-    [onAction]
-  );
-
   const renderItem = useCallback(
     ({ item }: { item: RecordItem }) => (
       <RecordRow
@@ -568,18 +598,13 @@ export function RecordList({
         wide={wide}
         selecting={selecting}
         selected={selected.includes(item.id)}
-        actions={actions}
         onOpen={onOpen}
         onToggle={toggle}
         onLongPress={longPress}
-        onAction={runAction}
-        onMenu={setMenuFor}
       />
     ),
-    [wide, selecting, selected, actions, onOpen, toggle, longPress, runAction]
+    [wide, selecting, selected, onOpen, toggle, longPress]
   );
-
-  const menuItem = menuFor === null ? null : (items.find((i) => i.id === menuFor) ?? null);
 
   return (
     <Box className="flex-1 overflow-hidden rounded-[14px] border border-line-card bg-card">
@@ -639,42 +664,13 @@ export function RecordList({
           // stack on a phone grows with the field count, and any row wraps when
           // the system font size is turned up. A wrong one breaks scrolling
           // worse than its absence costs. `removeClippedSubviews` is left off
-          // for the same reason: on Android it blanks rows that own a gesture,
-          // and virtualisation already keeps the rendered count small.
+          // too: virtualisation already keeps the rendered count small, and on
+          // Android it has a long history of blanking rows it should not.
         />
       )}
 
       {footer}
 
-      {/* The menu - the discoverable route to everything the swipe hides. */}
-      {menuItem && (
-        <>
-          <Pressable
-            className="absolute bottom-0 left-0 right-0 top-0 bg-toast/20"
-            onPress={() => setMenuFor(null)}
-          />
-          <Box className="absolute bottom-0 left-0 right-0 gap-1 rounded-t-2xl border-t border-line-card bg-card p-2 pb-5 shadow-lg">
-            <Text
-              numberOfLines={1}
-              className="px-3 pb-1 pt-2 text-[13px] font-semibold text-muted-foreground">
-              {menuItem.title}
-            </Text>
-            {(menuItem.actions ?? actions).map((a) => (
-              <Pressable
-                key={a.key}
-                onPress={() => runAction(a.key, menuItem)}
-                className="rounded-lg px-3 py-3">
-                <Text
-                  className={`text-[15px] font-semibold ${
-                    a.danger ? 'text-danger' : 'text-foreground'
-                  }`}>
-                  {a.label}
-                </Text>
-              </Pressable>
-            ))}
-          </Box>
-        </>
-      )}
     </Box>
   );
 }

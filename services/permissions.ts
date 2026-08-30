@@ -10,13 +10,45 @@
  * Only the *entry* permission for each screen lives here. Which buttons a
  * document shows at which status (ajukan / posting / batal are split between
  * `INVENTARIS` and `SUPERADMIN` on purpose, so posting takes a second person)
- * belongs with each screen's own wiring issue.
+ * belongs with each document module: see `AKSI` in `services/pembelian.ts`,
+ * which pairs every transition with the status it starts from and the roles the
+ * server accepts, and is the shape the remaining document modules should copy.
  */
 import { useSession } from '@/services/session';
 
 export type RoleName = 'SUPERADMIN' | 'INVENTARIS' | 'CASHIER';
 
 const ROLE_NAMES: readonly string[] = ['SUPERADMIN', 'INVENTARIS', 'CASHIER'];
+
+/**
+ * What each role is called in the UI. The contract's names are database
+ * constants in English shouting case; every other string the user reads is
+ * Indonesian sentence case, and the role is now on screen permanently rather
+ * than once at login, so it has to read like the rest of the chrome.
+ */
+export const ROLE_LABEL: Record<RoleName, string> = {
+  SUPERADMIN: 'Superadmin',
+  INVENTARIS: 'Inventaris',
+  CASHIER: 'Kasir',
+};
+
+/** Whatever the server sent, in a form fit to show — an unknown role is shown as-is rather than hidden. */
+export function roleLabel(role: string | undefined | null): string {
+  const known = asRoleName(role);
+  return known ? ROLE_LABEL[known] : (role ?? '—');
+}
+
+/**
+ * Where a session lands once it has an active context.
+ *
+ * A cashier's work is the POS screen and everything else is an errand; for the
+ * other two roles it is the reverse. This is keyed off the role the *server*
+ * activated, which is the only one that means anything — the old login screen
+ * guessed from a card the user tapped before authenticating.
+ */
+export function homeRouteFor(role: string | undefined | null): '/kasir' | '/produk' {
+  return asRoleName(role) === 'CASHIER' ? '/kasir' : '/produk';
+}
 
 /** The areas the app has screens for today. */
 export type WriteArea =

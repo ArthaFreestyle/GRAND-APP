@@ -22,19 +22,18 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { BAYAR_META, DOKUMEN_META } from '@/components/pembelian/status';
 import { AppShell } from '@/components/shell/AppShell';
 import {
-  BackButton,
   Badge,
   Card,
   CardHead,
   EmptyState,
   GhostButton,
+  IconAction,
   NeutralBadge,
-  SecondaryButton,
   StatTile,
   Toast,
-  type ToneName,
 } from '@/components/shell/ui';
 import {
   EMPTY_SUPPLIER,
@@ -44,12 +43,7 @@ import {
 import { Colors as C, num, rp, tanggal } from '@/constants/theme-erp';
 import { messageOf } from '@/services/api';
 import { decimalToNumber } from '@/services/decimal';
-import {
-  listPembelian,
-  type PembelianRow,
-  type StatusDokumen,
-  type StatusPembayaran,
-} from '@/services/pembelian';
+import { listPembelian, type PembelianRow } from '@/services/pembelian';
 import { useCanWrite } from '@/services/permissions';
 import {
   getSupplier,
@@ -70,19 +64,6 @@ const UTANG_SIZE = 50;
 
 /** Recent history, not an archive — the full ledger belongs to layar Pembelian (#8). */
 const RIWAYAT_SIZE = 15;
-
-const BAYAR_META: Record<StatusPembayaran, { label: string; tone: ToneName }> = {
-  BELUM: { label: 'Belum dibayar', tone: 'red' },
-  SEBAGIAN: { label: 'Dibayar sebagian', tone: 'amber' },
-  LUNAS: { label: 'Lunas', tone: 'green' },
-};
-
-const DOKUMEN_META: Record<StatusDokumen, { label: string; tone: ToneName }> = {
-  DRAFT: { label: 'Draft', tone: 'neutral' },
-  DIAJUKAN: { label: 'Diajukan', tone: 'amber' },
-  POSTED: { label: 'Posted', tone: 'green' },
-  BATAL: { label: 'Batal', tone: 'red' },
-};
 
 /** The dialog only ever fills itself from a supplier that is already loaded. */
 function draftOf(s: Supplier): SupplierFormValues {
@@ -248,8 +229,11 @@ export default function SupplierDetailScreen() {
   }, []);
 
   const goBack = useCallback(() => {
-    // Nothing to pop when this was a deep link, and `back()` would leave the app.
-    if (router.canGoBack()) router.back();
+    // `dismiss()` targets the closest Stack — this section's own. `back()` is
+    // offered to the drawer first, and a drawer holding an earlier section in
+    // its history answers it by switching to that section instead of popping
+    // this screen. The fallback is for a deep link with nothing to pop at all.
+    if (router.canDismiss()) router.dismiss();
     else router.replace('/supplier');
   }, [router]);
 
@@ -317,7 +301,31 @@ export default function SupplierDetailScreen() {
   const belanjaTerakhir = riwayat.length ? riwayat[0] : null;
 
   return (
-    <AppShell title="Supplier">
+    <AppShell
+      title={current ? current.nama : 'Detail supplier'}
+      onBack={goBack}
+      headerRight={
+        current && canWrite ? (
+          <>
+            <IconAction
+              name="edit-2"
+              label="Ubah supplier"
+              onPress={() => setDraft(draftOf(current))}
+            />
+            {/* Archiving, not deleting: the contract has no DELETE for a
+                supplier, and `is_aktif: false` is the only removal there is. The
+                bin is what everyone reads as "take this out of the way", and
+                the way back is the same button pointing the other way. */}
+            <IconAction
+              name={current.aktif ? 'trash-2' : 'rotate-ccw'}
+              label={current.aktif ? 'Nonaktifkan supplier' : 'Aktifkan kembali'}
+              tone={current.aktif ? 'danger' : 'primary'}
+              onPress={toggleAktif}
+              disabled={saving}
+            />
+          </>
+        ) : undefined
+      }>
       {loading && (
         <View style={styles.centerBox}>
           <ActivityIndicator color={C.primary} />
@@ -333,24 +341,13 @@ export default function SupplierDetailScreen() {
 
       {!loading && current && (
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: 16, padding: 22 }}>
-          <View style={styles.detailHead}>
-            <BackButton onPress={goBack} />
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1 }}>
-              <Text style={styles.detailTitle}>{current.nama}</Text>
-              {!current.aktif && <NeutralBadge />}
+          {/* Everything that acts on the record is in the header bar now.
+              What the record *is* stays here. */}
+          {!current.aktif && (
+            <View style={styles.detailHead}>
+              <NeutralBadge />
             </View>
-            <View style={{ flex: 1 }} />
-            {canWrite && (
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <SecondaryButton label="Ubah supplier" onPress={() => setDraft(draftOf(current))} />
-                <SecondaryButton
-                  label={current.aktif ? 'Nonaktifkan' : 'Aktifkan kembali'}
-                  tone={current.aktif ? 'text-danger' : 'text-primary'}
-                  onPress={toggleAktif}
-                />
-              </View>
-            )}
-          </View>
+          )}
 
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
             <StatTile

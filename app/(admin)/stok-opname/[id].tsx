@@ -13,7 +13,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { OpnameWorksheet, netColor, netLabel, type OpnameDraft } from '@/components/opname/worksheet';
 import { AppShell } from '@/components/shell/AppShell';
-import { BackButton, Card, CardHead, GhostButton, KpiCard, Toast } from '@/components/shell/ui';
+import { Card, CardHead, GhostButton, KpiCard, Toast } from '@/components/shell/ui';
 import { Colors as C, num, tanggal } from '@/constants/theme-erp';
 import { useLocalStore } from '@/hooks/use-local-store';
 import { useCanWrite } from '@/services/permissions';
@@ -89,14 +89,17 @@ export default function StokOpnameDetailScreen() {
   }, [current, params.baru, toast]);
 
   const goBack = useCallback(() => {
-    // Nothing to pop when this was a deep link, and `back()` would leave the app.
-    if (router.canGoBack()) router.back();
+    // `dismiss()` targets the closest Stack — this section's own. `back()` is
+    // offered to the drawer first, and a drawer holding an earlier section in
+    // its history answers it by switching to that section instead of popping
+    // this screen. The fallback is for a deep link with nothing to pop at all.
+    if (router.canDismiss()) router.dismiss();
     else router.replace('/stok-opname');
   }, [router]);
 
   if (!current) {
     return (
-      <AppShell title="Stok Opname">
+      <AppShell title="Detail opname" onBack={goBack}>
         <View style={styles.centerBox}>
           <Text style={styles.errText}>Opname tidak ditemukan.</Text>
           <GhostButton label="Kembali ke daftar" onPress={goBack} />
@@ -137,7 +140,7 @@ export default function StokOpnameDetailScreen() {
     };
 
     return (
-      <AppShell title="Stok Opname">
+      <AppShell title={current.no} onBack={goBack}>
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: 16, padding: 22 }}>
           <OpnameWorksheet
             draft={draft}
@@ -145,8 +148,6 @@ export default function StokOpnameDetailScreen() {
             no={current.no}
             ruangLocked
             canWrite={canWrite}
-            backLabel="← Daftar"
-            onBack={goBack}
             onSaveDraft={() => commit(false)}
             onPost={() => commit(true)}
           />
@@ -162,11 +163,9 @@ export default function StokOpnameDetailScreen() {
   const net = netSelisih(current.items);
 
   return (
-    <AppShell title="Stok Opname">
+    <AppShell title={current.no} onBack={goBack}>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: 16, padding: 22 }}>
         <View style={styles.detailHead}>
-          <BackButton onPress={goBack} />
-          <Text style={styles.detailNo}>{current.no}</Text>
           <View style={[styles.badge, { backgroundColor: C.greenBg, borderColor: C.greenBorder }]}>
             <Text style={{ fontSize: 13, fontWeight: '600', color: C.green }}>Selesai</Text>
           </View>

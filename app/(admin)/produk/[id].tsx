@@ -23,6 +23,7 @@ import {
   type ProductFormValues,
 } from '@/components/produk/modals';
 import { AppShell } from '@/components/shell/AppShell';
+import { IconAction } from '@/components/shell/ui';
 import {
   ProdukColors as C,
   formatNumber,
@@ -206,9 +207,11 @@ export default function ProdukDetailScreen() {
   }, []);
 
   const goBack = useCallback(() => {
-    // Reached by deep link there is nothing to pop, and `back()` would leave
-    // the app. The list is where this record belongs, so that is the fallback.
-    if (router.canGoBack()) router.back();
+    // `dismiss()` targets the closest Stack — this section's own. `back()` is
+    // offered to the drawer first, and a drawer holding an earlier section in
+    // its history answers it by switching to that section instead of popping
+    // this screen. The fallback is for a deep link with nothing to pop at all.
+    if (router.canDismiss()) router.dismiss();
     else router.replace('/produk');
   }, [router]);
 
@@ -404,7 +407,31 @@ export default function ProdukDetailScreen() {
   const stokTotal = stok.reduce((sum, s) => sum + (s.stok_akhir ?? 0), 0);
 
   return (
-    <AppShell title="Master Produk">
+    <AppShell
+      title={current ? current.nama : 'Detail produk'}
+      onBack={goBack}
+      headerRight={
+        current && canWrite ? (
+          <>
+            <IconAction
+              name="edit-2"
+              label="Ubah produk"
+              onPress={() => setDraft(draftOf(current))}
+            />
+            {/* Archiving, not deleting — the contract has no `DELETE /product`,
+                and `is_aktif: false` is the only removal there is. The bin is
+                the icon everyone reads as "take this out of the way", and the
+                way back is the same button pointing the other way. */}
+            <IconAction
+              name={current.aktif ? 'trash-2' : 'rotate-ccw'}
+              label={current.aktif ? 'Arsipkan produk' : 'Aktifkan kembali'}
+              tone={current.aktif ? 'danger' : 'primary'}
+              onPress={toggleAktif}
+              disabled={saving}
+            />
+          </>
+        ) : undefined
+      }>
       {loading && (
         <View style={styles.detailLoading}>
           <ActivityIndicator color={C.primary} />
@@ -422,32 +449,15 @@ export default function ProdukDetailScreen() {
 
       {!loading && current && (
         <ScrollView style={styles.detailWrap} contentContainerStyle={{ gap: 16, padding: 22 }}>
-          <View style={styles.detailHead}>
-            <Pressable onPress={goBack} style={styles.backBtn}>
-              <Text style={styles.backBtnText}>← Daftar</Text>
-            </Pressable>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1 }}>
-              <Text style={styles.detailTitle}>{current.nama}</Text>
-              {!current.aktif && (
-                <View style={styles.badgeNeutral}>
-                  <Text style={styles.badgeNeutralText}>Nonaktif</Text>
-                </View>
-              )}
-            </View>
-            <View style={{ flex: 1 }} />
-            {canWrite && (
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <Pressable onPress={() => setDraft(draftOf(current))} style={styles.smallBtn}>
-                  <Text style={styles.smallBtnText}>Ubah produk</Text>
-                </Pressable>
-                <Pressable onPress={toggleAktif} disabled={saving} style={styles.smallBtn}>
-                  <Text style={[styles.smallBtnText, { color: current.aktif ? C.red : C.primary }]}>
-                    {current.aktif ? 'Nonaktifkan' : 'Aktifkan kembali'}
-                  </Text>
-                </Pressable>
+          {/* Everything that acts on the product is in the header bar now.
+              What the record *is* stays here. */}
+          {!current.aktif && (
+            <View style={styles.detailHead}>
+              <View style={styles.badgeNeutral}>
+                <Text style={styles.badgeNeutralText}>Nonaktif</Text>
               </View>
-            )}
-          </View>
+            </View>
+          )}
 
           <View style={{ flexDirection: wide ? 'row' : 'column', gap: 16, alignItems: 'flex-start' }}>
             <View style={[styles.card, wide ? { flex: 1, minWidth: 320 } : { width: '100%' }]}>
@@ -646,7 +656,6 @@ const styles = StyleSheet.create({
   detailHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 14, flexWrap: 'wrap' },
   backBtn: { height: 38, paddingHorizontal: 13, borderRadius: 9, borderWidth: 1, borderColor: C.border, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   backBtnText: { fontSize: 14.5, fontWeight: '600', color: C.dark2 },
-  detailTitle: { fontSize: 26, fontWeight: '800', letterSpacing: -0.3, color: C.text },
   smallBtn: { height: 38, paddingHorizontal: 15, borderRadius: 9, borderWidth: 1, borderColor: C.border, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   smallBtnText: { fontSize: 14.5, fontWeight: '600', color: C.dark2 },
   card: { backgroundColor: '#fff', borderWidth: 1, borderColor: C.borderCard, borderRadius: 12, overflow: 'hidden' },

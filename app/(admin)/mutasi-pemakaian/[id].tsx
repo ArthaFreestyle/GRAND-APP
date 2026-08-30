@@ -11,7 +11,6 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AppShell } from '@/components/shell/AppShell';
 import {
-  BackButton,
   Badge,
   Card,
   CardHead,
@@ -78,14 +77,17 @@ export default function MutasiDetailScreen() {
   }, [current, params.baru, toast]);
 
   const goBack = useCallback(() => {
-    // Nothing to pop when this was a deep link, and `back()` would leave the app.
-    if (router.canGoBack()) router.back();
+    // `dismiss()` targets the closest Stack — this section's own. `back()` is
+    // offered to the drawer first, and a drawer holding an earlier section in
+    // its history answers it by switching to that section instead of popping
+    // this screen. The fallback is for a deep link with nothing to pop at all.
+    if (router.canDismiss()) router.dismiss();
     else router.replace('/mutasi-pemakaian');
   }, [router]);
 
   if (!current) {
     return (
-      <AppShell title="Mutasi & Pemakaian">
+      <AppShell title="Detail transaksi" onBack={goBack}>
         <View style={styles.centerBox}>
           <Text style={styles.errText}>Transaksi tidak ditemukan.</Text>
           <GhostButton label="Kembali ke daftar" onPress={goBack} />
@@ -100,11 +102,9 @@ export default function MutasiDetailScreen() {
   const canReceive = canWrite && isMutasi && current.status === 'transit';
 
   return (
-    <AppShell title="Mutasi & Pemakaian">
+    <AppShell title={current.no} onBack={goBack}>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: 16, padding: 22 }}>
         <View style={styles.detailHead}>
-          <BackButton onPress={goBack} />
-          <Text style={styles.detailNo}>{current.no}</Text>
           <Badge label={jm.label} tone={jm.tone} />
           <Badge label={st.label} tone={st.tone} />
           <View style={{ flex: 1 }} />

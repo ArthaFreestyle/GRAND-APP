@@ -11,7 +11,6 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AppShell } from '@/components/shell/AppShell';
 import {
-  BackButton,
   Card,
   CardHead,
   EmptyState,
@@ -69,7 +68,11 @@ export default function PenjualanBaruScreen() {
   const rowProd = draft.rowKode ? prod(draft.rowKode) : null;
 
   function goBack() {
-    if (router.canGoBack()) router.back();
+    // `dismiss()` targets the closest Stack — this section's own. `back()` is
+    // offered to the drawer first, and a drawer holding an earlier section in
+    // its history answers it by switching to that section instead of popping
+    // this screen. The fallback is for a deep link with nothing to pop at all.
+    if (router.canDismiss()) router.dismiss();
     else router.replace('/penjualan');
   }
 
@@ -117,16 +120,11 @@ export default function PenjualanBaruScreen() {
   const sisa = total - dibayarNum;
 
   return (
-    <AppShell title="Penjualan">
+    <AppShell title="Nota baru" onBack={goBack}>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: 16, padding: 22 }}>
-        <View style={styles.detailHead}>
-          <BackButton label="← Batal" onPress={goBack} />
-          <Text style={styles.pageTitle}>Nota penjualan baru</Text>
-          <View style={{ flex: 1 }} />
-          <Text style={{ fontSize: 13.5, color: C.muted2 }}>
-            Nomor nota dibuat otomatis saat disimpan
-          </Text>
-        </View>
+        <Text style={{ fontSize: 13.5, color: C.muted2 }}>
+          Nomor nota dibuat otomatis saat disimpan
+        </Text>
 
         <Card className="flex-row flex-wrap gap-3.5 p-4">
           <View style={{ flex: 2, minWidth: 240 }}>

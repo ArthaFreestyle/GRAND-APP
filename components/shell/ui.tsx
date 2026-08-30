@@ -1,19 +1,32 @@
 /**
  * The shared building blocks every back-office screen is assembled from.
  *
- * Built on gluestack-ui primitives (`Button`, `Input`, `Modal`, `Checkbox`) for
- * the pieces where behaviour matters — focus, pressed and disabled states,
- * overlay and backdrop handling — and styled with NativeWind classes drawn from
- * the palette in `tailwind.config.js`, which mirrors `constants/theme-erp.ts`.
- * The look is the ported design's, not gluestack's defaults.
+ * Built on gluestack-ui primitives (`Button`, `Input`, `Checkbox`) for the
+ * pieces where behaviour matters — focus, pressed and disabled states — and
+ * styled with NativeWind classes drawn from the palette in
+ * `tailwind.config.js`, which mirrors `constants/theme-erp.ts`. The look is the
+ * ported design's, not gluestack's defaults. `ModalShell` is the exception: it
+ * is React Native's own `Modal`, for the reasons written above it.
  *
  * Where a colour is genuinely chosen at runtime (a status badge whose tint comes
  * from data), it stays a `className` string picked by the caller rather than a
  * hex value: NativeWind resolves classes at build time, so a computed hex would
  * have to fall back to inline styles and drift away from the palette.
+ *
+ * Every class here has to exist in `tailwind.config.js` — including the
+ * semantic ones the provider supplies values for (`bg-card`, `text-foreground`,
+ * `border-border`). A class Tailwind has never heard of does not fail loudly;
+ * it compiles to nothing, and the surface renders with no background at all.
  */
-import { useState, type ReactNode } from 'react';
-import { ScrollView, View } from 'react-native';
+import Feather from '@expo/vector-icons/Feather';
+import { type ComponentProps, type ReactNode } from 'react';
+import {
+  KeyboardAvoidingView,
+  Modal as RNModal,
+  Platform,
+  Pressable as RNPressable,
+  StyleSheet,
+} from 'react-native';
 
 import { Badge as GBadge, BadgeText } from '@/components/ui/badge';
 import { Box } from '@/components/ui/box';
@@ -24,13 +37,9 @@ import {
   CheckboxLabel,
 } from '@/components/ui/checkbox';
 import { Input, InputField } from '@/components/ui/input';
-import {
-  Modal as GModal,
-  ModalBackdrop,
-  ModalContent,
-} from '@/components/ui/modal';
 import { Pressable } from '@/components/ui/pressable';
 import { Text } from '@/components/ui/text';
+import { Colors } from '@/constants/theme-erp';
 
 /** Tailwind classes for a badge tint, so callers pass a palette entry, not a hex. */
 export interface BadgeTone {
@@ -97,31 +106,6 @@ export function NeutralBadge({ label = 'Nonaktif' }: { label?: string }) {
   return <Badge label={label} tone="neutral" small />;
 }
 
-export function SearchBar({
-  value,
-  onChangeText,
-  placeholder,
-  maxWidth = 420,
-}: {
-  value: string;
-  onChangeText: (v: string) => void;
-  placeholder: string;
-  maxWidth?: number;
-}) {
-  return (
-    <Input
-      className="h-9 flex-1 rounded-lg border border-border bg-card px-0 data-[focus=true]:border-primary"
-      style={{ maxWidth }}>
-      <InputField
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        className="px-3 text-[14.5px] text-foreground placeholder:text-faint"
-      />
-    </Input>
-  );
-}
-
 export function FilterPills<T extends string>({
   options,
   active,
@@ -180,36 +164,6 @@ export function TabSwitch<T extends string>({
         );
       })}
     </Box>
-  );
-}
-
-export function PagingBar({
-  label,
-  onPrev,
-  onNext,
-}: {
-  label: string;
-  onPrev: () => void;
-  onNext: () => void;
-}) {
-  return (
-    <Box className="h-12 flex-row items-center justify-between border-t border-line-light bg-thead px-4">
-      <Text className="text-sm text-muted-foreground">{label}</Text>
-      <Box className="flex-row gap-1.5">
-        <PageButton label="Sebelumnya" onPress={onPrev} />
-        <PageButton label="Berikutnya" onPress={onNext} />
-      </Box>
-    </Box>
-  );
-}
-
-function PageButton({ label, onPress }: { label: string; onPress: () => void }) {
-  return (
-    <Button
-      onPress={onPress}
-      className="h-[30px] rounded-[7px] border border-border bg-card px-3 data-[active=true]:bg-line-lighter">
-      <ButtonText className="text-[13px] font-semibold text-dark2">{label}</ButtonText>
-    </Button>
   );
 }
 
@@ -295,19 +249,51 @@ export function TinyButton({
   );
 }
 
-export function BackButton({
-  label = '← Daftar',
+/**
+ * A single action as an icon, for the header bar.
+ *
+ * A detail screen's actions used to be a row of bordered text buttons sitting
+ * above the record. On a phone two of them already wrap, and they are the same
+ * two on every record — which is what makes them chrome rather than content, and
+ * chrome belongs in the bar with the title.
+ *
+ * Feather rather than a hand-drawn glyph: a trash can is past the point where
+ * three `View`s stay honest, and `@expo/vector-icons` already ships with Expo.
+ *
+ * `label` is not decoration. An icon on its own is a guess, so every one of
+ * these carries the words a screen reader reads out, and the destructive ones
+ * are the ones that most need them.
+ */
+export function IconAction({
+  name,
+  label,
+  tone = 'default',
   onPress,
+  disabled,
 }: {
-  label?: string;
+  name: ComponentProps<typeof Feather>['name'];
+  /** What the action does, in words. Read out by a screen reader. */
+  label: string;
+  tone?: 'default' | 'danger' | 'primary';
   onPress: () => void;
+  disabled?: boolean;
 }) {
+  // The icon takes a colour prop, not a class - one of the few genuinely
+  // runtime colours in the app, and the reason `Colors` is imported here.
+  const colour =
+    tone === 'danger' ? Colors.red : tone === 'primary' ? Colors.primary : Colors.dark2;
   return (
-    <Button
+    <Pressable
       onPress={onPress}
-      className="h-8 rounded-lg border border-border bg-card px-2.5 data-[active=true]:bg-line-lighter">
-      <ButtonText className="text-[13px] font-semibold text-dark2">{label}</ButtonText>
-    </Button>
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !!disabled }}
+      className={`h-10 w-10 items-center justify-center rounded-full data-[active=true]:bg-line-lighter ${
+        disabled ? 'opacity-40' : ''
+      }`}>
+      <Feather name={name} size={19} color={colour} />
+    </Pressable>
   );
 }
 
@@ -363,6 +349,29 @@ export function Toast({ message }: { message: string | null }) {
 
 // ---- modal building blocks ----
 
+/**
+ * A dialog, on React Native's own `Modal`.
+ *
+ * This is the shape the Expo docs point at for this kind of content: a
+ * self-contained confirmation or edit form that is *not* a place in the app.
+ * Nothing here deserves a URL — "ubah pelanggan" is a decision taken about the
+ * record already on screen, and it is reached from that record's detail route,
+ * which is where the deep link and the history entry live. A route modal
+ * (`presentation: 'modal'` on a `Stack.Screen`) is for the other case: a flow
+ * with steps to link into and a screen of its own. The create forms already
+ * are that — `<section>/baru.tsx`.
+ *
+ * `transparent` is the RN `Modal` prop that stops the modal *window* from
+ * painting an opaque page over the app. It is not a colour choice and it is not
+ * optional: without it there is no dimmed app behind the card, just a white
+ * full-screen sheet. The two layers it lets us draw are both deliberate — a
+ * scrim, which has to be translucent to be a scrim at all, and the card itself,
+ * which is flat opaque `bg-card`.
+ *
+ * `onRequestClose` is what makes the Android hardware back button close the
+ * dialog instead of leaving the screen underneath it, and it is required on
+ * Android; tapping the scrim does the same thing for the pointer.
+ */
 export function ModalShell({
   visible,
   width,
@@ -375,16 +384,57 @@ export function ModalShell({
   children: ReactNode;
 }) {
   return (
-    <GModal isOpen={visible} onClose={onRequestClose} size="lg">
-      <ModalBackdrop />
-      <ModalContent
-        className="w-full overflow-hidden rounded-2xl border border-line-card bg-card p-0"
-        style={{ maxWidth: width }}>
-        {children}
-      </ModalContent>
-    </GModal>
+    <RNModal
+      visible={visible}
+      onRequestClose={onRequestClose}
+      transparent
+      animationType="fade"
+      // The scrim covers the status and navigation bars too — a dialog that
+      // dims everything except a strip at each end reads as a rendering fault.
+      statusBarTranslucent
+      navigationBarTranslucent>
+      <KeyboardAvoidingView
+        style={modalStyles.centre}
+        // Android already resizes the window for the keyboard; adding padding
+        // on top of that pushes the dialog off its own scrim.
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <RNPressable
+          style={modalStyles.scrim}
+          accessibilityRole="button"
+          accessibilityLabel="Tutup dialog"
+          onPress={onRequestClose}
+        />
+        <Box
+          className="w-full overflow-hidden rounded-2xl border border-line-card bg-card p-0"
+          style={[modalStyles.card, { maxWidth: width }]}>
+          {children}
+        </Box>
+      </KeyboardAvoidingView>
+    </RNModal>
   );
 }
+
+const modalStyles = StyleSheet.create({
+  centre: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 18 },
+  /**
+   * The one place in the app that is translucent on purpose: it exists to show
+   * the app underneath, dimmed. #0E2433 is the palette's text colour rather
+   * than black, so the dim keeps the blue cast the rest of the screen has.
+   */
+  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(14,36,51,0.35)' },
+  /**
+   * gluestack's `shadow-hard-2` is not in this project's Tailwind theme, and a
+   * card floating on a scrim needs the lift to read as being in front of it.
+   * Both platforms are set: `elevation` is Android's, the rest is iOS's.
+   */
+  card: {
+    shadowColor: '#0E2433',
+    shadowOpacity: 0.22,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 12,
+  },
+});
 
 export function ModalHead({ title, sub }: { title: string; sub: string }) {
   return (
@@ -536,146 +586,3 @@ export function OptionPicker({
     </Box>
   );
 }
-
-/**
- * A table that can be scrolled in both directions, and says so.
- *
- * The columns are fixed-width by design, so on a narrow window their total
- * outgrows the viewport and the right-hand ones simply disappear off the edge.
- * Two things fix that: the body scrolls horizontally down to `minWidth`, and the
- * edges fade wherever there is more content past them.
- *
- * The fades are the affordance that matters. Platform scroll bars only appear
- * *while* a scroll is happening, which is no use to someone who does not know
- * there is anything to scroll to; a fade is visible standing still.
- */
-export function DataTable({
-  minWidth,
-  head,
-  footer,
-  children,
-}: {
-  /** Width below which the body scrolls horizontally instead of squeezing. */
-  minWidth: number;
-  /** Column header row — stays put while the body scrolls vertically. */
-  head: ReactNode;
-  /** Usually a `PagingBar`; kept outside both scroll axes. */
-  footer?: ReactNode;
-  children: ReactNode;
-}) {
-  // Viewport and content are tracked separately per axis: neither onScroll nor
-  // onContentSizeChange knows both, and the fades need the difference.
-  const [box, setBox] = useState({
-    hView: 0,
-    hContent: 0,
-    hOffset: 0,
-    vView: 0,
-    vContent: 0,
-    vOffset: 0,
-  });
-  const patch = (p: Partial<typeof box>) => setBox((b) => ({ ...b, ...p }));
-
-  const moreRight = box.hContent - (box.hOffset + box.hView) > 1;
-  const moreDown = box.vContent - (box.vOffset + box.vView) > 1;
-  const atStart = box.hOffset <= 1;
-
-  return (
-    <Box className="flex-1 overflow-hidden rounded-[14px] border border-line-card bg-card">
-      <Box className="flex-1">
-        <ScrollView
-          horizontal
-          persistentScrollbar
-          style={{ flex: 1 }}
-          contentContainerStyle={{ flexGrow: 1 }}
-          scrollEventThrottle={16}
-          onLayout={(e) => patch({ hView: e.nativeEvent.layout.width })}
-          onContentSizeChange={(w) => patch({ hContent: w })}
-          onScroll={(e) => patch({ hOffset: e.nativeEvent.contentOffset.x })}>
-          <View style={{ minWidth, flex: 1 }}>
-            {head}
-            <ScrollView
-              style={{ flex: 1 }}
-              persistentScrollbar
-              scrollEventThrottle={16}
-              onLayout={(e) => patch({ vView: e.nativeEvent.layout.height })}
-              onContentSizeChange={(_w, h) => patch({ vContent: h })}
-              onScroll={(e) => patch({ vOffset: e.nativeEvent.contentOffset.y })}>
-              {children}
-            </ScrollView>
-          </View>
-        </ScrollView>
-
-        {moreDown && <EdgeFade side="bottom" />}
-        {moreRight && <EdgeFade side="right" />}
-        {moreRight && atStart && (
-          <Box
-            pointerEvents="none"
-            className="absolute bottom-2.5 left-4 rounded-full bg-toast/70 px-2.5 py-1">
-            <Text className="text-[11.5px] font-bold tracking-wide text-white">
-              geser untuk kolom lain →
-            </Text>
-          </Box>
-        )}
-      </Box>
-      {footer}
-    </Box>
-  );
-}
-
-/** A stepped fade — no gradient library, and none needed at this size. */
-function EdgeFade({ side }: { side: 'right' | 'bottom' }) {
-  const steps = [0.015, 0.03, 0.05, 0.08, 0.12];
-  const horizontal = side === 'right';
-  return (
-    <Box
-      pointerEvents="none"
-      className={
-        horizontal
-          ? 'absolute bottom-0 right-0 top-0 w-3.5 flex-row'
-          : 'absolute bottom-0 left-0 right-0 h-3.5 flex-col'
-      }>
-      {steps.map((opacity, i) => (
-        <View key={i} style={{ flex: 1, backgroundColor: `rgba(14,36,51,${opacity})` }} />
-      ))}
-    </Box>
-  );
-}
-
-/**
- * The chrome every back-office screen repeats: page padding, the toolbar above
- * a table, the table's header row and its cells, a data row, the detail header.
- *
- * These were nine near-identical StyleSheet entries copied into each of the nine
- * screens, drifting a pixel here and a colour there. As class strings they are
- * written once and read at the point of use, which is the whole reason to be on
- * NativeWind rather than StyleSheet.
- */
-export const cx = {
-  /** Page body: fills the shell below the header. */
-  screen: 'flex-1 gap-3 p-[18px]',
-  /** Search + filters + primary action, above a table. */
-  toolbar: 'flex-row items-center gap-3',
-  /** "N produk" beside the toolbar. */
-  countLabel: 'text-sm text-muted-foreground',
-  /**
-   * A table's column header. Rows carry more padding on the right than the left
-   * so the last column clears `DataTable`'s fade instead of sitting under it.
-   */
-  tableHead:
-    'h-12 flex-row items-center gap-3 border-b border-line-light bg-thead pl-[18px] pr-[34px]',
-  /** A column heading inside `tableHead`. */
-  th: 'text-[11.5px] font-bold tracking-wider text-faint',
-  /** One data row. */
-  row: 'flex-row items-center border-b border-line-lighter pl-[18px] pr-[34px]',
-  /** The pressable part of a row, left of its action buttons. */
-  rowMain: 'flex-1 flex-row items-center gap-3 py-3',
-  /** A row's primary label. */
-  nameText: 'text-[15.5px] font-semibold',
-  /** The second line under it. */
-  metaText: 'text-[13px] text-faint-2',
-  /** Back button + title + actions, at the top of a detail view. */
-  detailHead: 'flex-row items-center gap-3.5',
-  detailTitle: 'text-[22px] font-bold tracking-tight text-foreground',
-  /** A centred block for a spinner, an error, or an empty message. */
-  centerBox: 'items-center gap-3 p-10',
-} as const;

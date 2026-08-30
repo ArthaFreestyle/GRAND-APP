@@ -3,33 +3,39 @@
  *
  * Both the running count and the posted result are one route (`[id]`), which
  * renders whichever the session's status calls for. This screen keeps its
- * search, filter, and page underneath either.
+ * search, its filter, and its scroll underneath either.
+ *
+ * The table is gone: `RecordList` draws the same rows as the product list, with
+ * the session's status as the badge — the hand-rolled badge this screen used to
+ * build from `C.amberBg` and `C.greenBg` is the shared one now, so "Berjalan"
+ * is the same amber here as everywhere else.
+ *
+ * No paging: the store holds every session, so the list scrolls.
  */
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
 
 import { AppShell } from '@/components/shell/AppShell';
 import {
-  DataTable,
-  EmptyState,
-  FilterPills,
-  KpiCard,
-  PagingBar,
-  PrimaryButton,
-  SearchBar,
-} from '@/components/shell/ui';
-import { Colors as C, num, tanggal } from '@/constants/theme-erp';
+  ListHeader,
+  ListSearch,
+  NewRecordRow,
+  RecordList,
+  type RecordItem,
+} from '@/components/shell/record-list';
+import { FilterPills, KpiCard } from '@/components/shell/ui';
+import { num, tanggal } from '@/constants/theme-erp';
 import { useLocalStore } from '@/hooks/use-local-store';
 import { useCanWrite } from '@/services/permissions';
 import { countedItems, opnameStore, ruangNama, varianceItems } from '@/stores/opname';
 
-const PAGE_SIZE = 8;
+type StatusFilter = 'semua' | 'draft' | 'selesai';
 
-const STATUS_OPTIONS = [
-  { key: 'semua' as const, label: 'Semua' },
-  { key: 'draft' as const, label: 'Berjalan' },
-  { key: 'selesai' as const, label: 'Selesai' },
+const STATUS_OPTIONS: { key: StatusFilter; label: string }[] = [
+  { key: 'semua', label: 'Semua' },
+  { key: 'draft', label: 'Berjalan' },
+  { key: 'selesai', label: 'Selesai' },
 ];
 
 export default function StokOpnameListScreen() {
@@ -37,8 +43,7 @@ export default function StokOpnameListScreen() {
   const sessions = useLocalStore(opnameStore);
 
   const [query, setQuery] = useState('');
-  const [status, setStatus] = useState<'semua' | 'draft' | 'selesai'>('semua');
-  const [page, setPage] = useState(1);
+  const [status, setStatus] = useState<StatusFilter>('semua');
 
   const canWrite = useCanWrite('opname');
 
@@ -69,129 +74,103 @@ export default function StokOpnameListScreen() {
       });
   }, [sessions, query, status]);
 
-  const totalPage = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPage);
-  const slice = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const items = useMemo<RecordItem[]>(
+    () =>
+      filtered.map((t) => {
+        const isDraft = t.status === 'draft';
+        const countedN = countedItems(t.items).length;
+        const nVar = varianceItems(t.items).length;
+        return {
+          id: t.id,
+          title: ruangNama(t.ruang),
+          badge: isDraft ? 'Berjalan' : 'Selesai',
+          badgeTone: isDraft ? ('amber' as const) : ('green' as const),
+          meta: `${t.no} · ${tanggal(t.tanggal)} · ${t.petugas}`,
+          // "4/12" already says how many items there are; a second field
+          // repeating the 12 is the kind of column that gets added because
+          // there is space for it.
+          fields: [
+            {
+              label: isDraft ? 'Dihitung' : 'Hasil',
+              value: isDraft
+                ? `${countedN}/${t.items.length}`
+                : nVar
+                  ? `${nVar} selisih`
+                  : 'cocok',
+              width: 150,
+            },
+          ],
+        };
+      }),
+    [filtered]
+  );
+
+  const openDetail = useCallback(
+    (id: number) => {
+      // One address per session; the document route decides between the
+      // counting sheet and the posted result from its status.
+      router.push({ pathname: '/stok-opname/[id]', params: { id } });
+    },
+    [router]
+  );
+
+  const openNew = useCallback(() => {
+    router.push('/stok-opname/baru');
+  }, [router]);
+
+  const pickStatus = useCallback((k: StatusFilter) => setStatus(k), []);
+
+  const clearFilter = useCallback(() => {
+    setQuery('');
+    setStatus('semua');
+  }, []);
 
   return (
     <AppShell title="Stok Opname">
       <View style={styles.wrap}>
-        <View style={styles.toolbar}>
-          <SearchBar
-            value={query}
-            onChangeText={(t) => {
-              setQuery(t);
-              setPage(1);
-            }}
-            placeholder="Cari nomor atau ruang"
-          />
-          <FilterPills
-            options={STATUS_OPTIONS}
-            active={status}
-            onPick={(k) => {
-              setStatus(k);
-              setPage(1);
-            }}
-          />
-          <View style={{ flex: 1 }} />
-          <Text style={styles.countLabel}>{filtered.length} opname</Text>
-          {canWrite && (
-            <PrimaryButton label="Opname baru" onPress={() => router.push('/stok-opname/baru')} />
-          )}
-        </View>
-
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+        <View style={styles.tiles}>
           <KpiCard
             label="Opname berjalan"
             value={num(berjalanCount)}
-            valueClass={berjalanCount > 0 ? C.amber : C.text}
+            valueClass={berjalanCount > 0 ? 'text-amber' : 'text-foreground'}
             sub="sedang dihitung"
           />
           <KpiCard label="Opname selesai" value={num(selesaiCount)} sub="sudah terposting" />
           <KpiCard
             label="Selisih ditemukan"
             value={num(selisihCount)}
-            valueClass={selisihCount > 0 ? C.amber : C.text}
+            valueClass={selisihCount > 0 ? 'text-amber' : 'text-foreground'}
             sub="item disesuaikan"
           />
         </View>
 
-        <DataTable
-          minWidth={660}
-          head={
-            <View style={styles.tableHeadRow}>
-              <Text style={[styles.thText, { flex: 1 }]}>RUANG & DOKUMEN</Text>
-              <Text style={[styles.thText, { width: 176 }]}>STATUS</Text>
-              <Text style={[styles.thText, { width: 150, textAlign: 'right' }]}>HASIL</Text>
-            </View>
+        <RecordList
+          items={items}
+          loading={false}
+          error=""
+          filtered={query.trim() !== '' || status !== 'semua'}
+          onOpen={openDetail}
+          onClearFilter={clearFilter}
+          onCreate={canWrite ? openNew : undefined}
+          createLabel="Opname baru"
+          emptyTitle="Belum ada opname"
+          emptySub="Sesi perhitungan fisik yang dibuka akan terdaftar di sini beserta selisihnya."
+          header={
+            <ListHeader>
+              <ListSearch
+                value={query}
+                onChangeText={setQuery}
+                placeholder="Cari nomor, ruang, atau petugas"
+              />
+              <FilterPills options={STATUS_OPTIONS} active={status} onPick={pickStatus} />
+            </ListHeader>
           }
-          footer={
-            <PagingBar
-              label={
-                filtered.length
-                  ? `${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, filtered.length)} dari ${filtered.length} · halaman ${currentPage}/${totalPage}`
-                  : '0 hasil'
-              }
-              onPrev={() => setPage((p) => Math.max(1, p - 1))}
-              onNext={() => setPage((p) => Math.min(totalPage, p + 1))}
-            />
-          }>
-          {slice.map((t) => {
-            const isDraft = t.status === 'draft';
-            const countedN = countedItems(t.items).length;
-            const nVar = varianceItems(t.items).length;
-            return (
-              <Pressable
-                key={t.id}
-                // One address per session; the document route decides between
-                // the counting sheet and the posted result from its status.
-                onPress={() => router.push({ pathname: '/stok-opname/[id]', params: { id: t.id } })}
-                style={styles.row}>
-                <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
-                  <Text style={styles.namaText} numberOfLines={1}>
-                    {ruangNama(t.ruang)}
-                  </Text>
-                  <Text style={styles.metaText} numberOfLines={1}>
-                    {t.no} · {tanggal(t.tanggal)} · {t.petugas}
-                  </Text>
-                </View>
-                <View style={{ width: 176 }}>
-                  <View
-                    style={[
-                      styles.badge,
-                      {
-                        backgroundColor: isDraft ? C.amberBg : C.greenBg,
-                        borderColor: isDraft ? C.amberBorder : C.greenBorder,
-                      },
-                    ]}>
-                    <Text style={{ fontSize: 12.5, fontWeight: '600', color: isDraft ? C.amber : C.green }}>
-                      {isDraft ? 'Berjalan' : 'Selesai'}
-                    </Text>
-                  </View>
-                </View>
-                <View style={{ width: 150, alignItems: 'flex-end', gap: 2 }}>
-                  <Text
-                    style={{
-                      fontSize: 16,
-                      fontWeight: '600',
-                      color: isDraft ? C.amber : nVar ? C.amber : C.green,
-                    }}>
-                    {isDraft ? `${countedN}/${t.items.length}` : nVar ? `${nVar} selisih` : 'cocok'}
-                  </Text>
-                  <Text style={{ fontSize: 12, color: C.muted }}>
-                    {isDraft ? 'dihitung' : `${t.items.length} item`}
-                  </Text>
-                </View>
-              </Pressable>
-            );
-          })}
-          {slice.length === 0 && (
-            <EmptyState
-              title="Tidak ada opname yang cocok"
-              sub="Coba kata kunci lain atau ubah filter status."
-            />
-          )}
-        </DataTable>
+          leadRow={
+            canWrite ? (
+              <NewRecordRow title="Opname baru" onPress={openNew} />
+            ) : null
+          }
+        />
       </View>
     </AppShell>
   );
@@ -199,38 +178,5 @@ export default function StokOpnameListScreen() {
 
 const styles = StyleSheet.create({
   wrap: { flex: 1, padding: 18, gap: 12 },
-  toolbar: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
-  countLabel: { fontSize: 14, color: C.muted3 },
-  tableHeadRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingLeft: 20,
-    paddingRight: 36,
-    height: 48,
-    backgroundColor: C.tableHeaderBg,
-    borderBottomWidth: 1,
-    borderBottomColor: C.borderLight,
-  },
-  thText: { fontSize: 12.5, fontWeight: '600', letterSpacing: 0.5, color: C.muted },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingLeft: 20,
-    paddingRight: 36,
-    minHeight: 74,
-    borderBottomWidth: 1,
-    borderBottomColor: C.borderLighter,
-  },
-  namaText: { fontSize: 16.5, fontWeight: '500' },
-  metaText: { fontSize: 12.5, color: C.muted, fontFamily: 'monospace' },
-  badge: {
-    height: 26,
-    paddingHorizontal: 11,
-    borderRadius: 7,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
 });

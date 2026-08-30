@@ -11,14 +11,13 @@
  */
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
 
 import { ProductFormFields, Toast, type ProductFormValues } from '@/components/produk/modals';
 import { AppShell } from '@/components/shell/AppShell';
 import { Card, PrimaryButton, SecondaryButton } from '@/components/shell/ui';
 import { Box } from '@/components/ui/box';
 import { Text as UIText } from '@/components/ui/text';
-import { ProdukColors as C } from '@/constants/produk';
 import { messageOf } from '@/services/api';
 import { useCanWrite } from '@/services/permissions';
 import { createProduct, listSatuan, produkBus } from '@/services/produk';
@@ -62,8 +61,11 @@ export default function ProdukBaruScreen() {
   );
 
   function goBack() {
-    // Deep-linked straight onto the form there is nothing to pop back to.
-    if (router.canGoBack()) router.back();
+    // `dismiss()` targets the closest Stack — this section's own. `back()` is
+    // offered to the drawer first, and a drawer holding an earlier section in
+    // its history answers it by switching to that section instead of popping
+    // this screen. The fallback is for a deep link with nothing to pop at all.
+    if (router.canDismiss()) router.dismiss();
     else router.replace('/produk');
   }
 
@@ -103,15 +105,8 @@ export default function ProdukBaruScreen() {
   }
 
   return (
-    <AppShell title="Master Produk">
+    <AppShell title="Produk baru" onBack={goBack}>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.page}>
-        <View style={styles.head}>
-          <Pressable onPress={goBack} style={styles.backBtn}>
-            <Text style={styles.backBtnText}>← Daftar</Text>
-          </Pressable>
-          <Text style={styles.title}>Produk baru</Text>
-        </View>
-
         {/* Capped rather than stretched: a form is read down a column, and a
             single field 900pt wide is harder to fill in than one at 640. */}
         <Card className="w-full max-w-[640px]">
@@ -150,17 +145,4 @@ export default function ProdukBaruScreen() {
 
 const styles = StyleSheet.create({
   page: { padding: 22, gap: 16 },
-  head: { flexDirection: 'row', alignItems: 'center', gap: 14, flexWrap: 'wrap' },
-  backBtn: {
-    height: 38,
-    paddingHorizontal: 13,
-    borderRadius: 9,
-    borderWidth: 1,
-    borderColor: C.border,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backBtnText: { fontSize: 14.5, fontWeight: '600', color: C.dark2 },
-  title: { fontSize: 26, fontWeight: '800', letterSpacing: -0.3, color: C.text },
 });
