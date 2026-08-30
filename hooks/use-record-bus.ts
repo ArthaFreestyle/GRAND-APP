@@ -28,13 +28,25 @@ export interface RecordBus<T> {
 }
 
 /**
+ * Every bus that has ever been created, so something can address all of them at
+ * once without importing nine service modules to find them.
+ *
+ * There is exactly one caller and one reason for it: switching the active grant
+ * changes *which unit kerja's rows the API answers with*, which invalidates
+ * every list in the app at the same instant — not because a record changed, but
+ * because the question did. That is the one event no section can learn about
+ * from its own screen.
+ */
+const BUSES = new Set<RecordBus<unknown>>();
+
+/**
  * One bus per section, declared next to that section's row type. Module level,
  * so it outlives every screen that talks over it — a detail route publishing
  * while its list is being unmounted is a no-op, not a crash.
  */
 export function createRecordBus<T>(): RecordBus<T> {
   const listeners = new Set<(change: RecordChange<T>) => void>();
-  return {
+  const bus: RecordBus<T> = {
     publish(change) {
       // Copied first: a listener that unsubscribes while handling the change
       // must not shorten the set being iterated.
@@ -47,6 +59,20 @@ export function createRecordBus<T>(): RecordBus<T> {
       };
     },
   };
+  BUSES.add(bus as RecordBus<unknown>);
+  return bus;
+}
+
+/**
+ * Tells every mounted list to re-read page one. Lists that are not mounted need
+ * no telling: they fetch when they mount.
+ *
+ * `reload` rather than `saved` on purpose — after a context switch the old rows
+ * are not stale versions of the new ones, they are rows the session can no
+ * longer see at all, so there is nothing to patch in place.
+ */
+export function reloadAllRecords() {
+  for (const bus of BUSES) bus.publish({ kind: 'reload' });
 }
 
 /**

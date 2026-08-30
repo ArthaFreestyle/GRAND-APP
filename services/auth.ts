@@ -8,6 +8,8 @@ import { ApiError, apiRequest } from '@/services/api';
 import {
   clearSession,
   getSession,
+  recallGrant,
+  rememberGrant,
   sessionFromLoginResult,
   setSession,
   type LoginResult,
@@ -73,7 +75,39 @@ export async function switchContext(idUserRole: number): Promise<Session> {
 
   const session = sessionFromLoginResult(result, previous);
   setSession(session);
+  // Recorded after the server accepted it, not when it was tapped: what gets
+  // remembered has to be a choice that actually worked, or tomorrow's sign-in
+  // resumes straight into a grant that will only be refused again.
+  void rememberGrant(session.user.id, idUserRole);
   return session;
+}
+
+/**
+ * Re-activates the grant this user last worked as on this device.
+ *
+ * Login leaves `active: null` whenever more than one grant is usable, and the
+ * honest answer to that is usually not a question — the same person picks the
+ * same grant nearly every day. This resumes it silently and hands back the
+ * activated session; the picker is then only shown to someone who genuinely has
+ * a choice to make for the first time.
+ *
+ * Returns `null` when there is nothing to resume, which covers every way this
+ * can go stale at once: nothing remembered here yet, a grant the server no
+ * longer lists (revoked, or its role or unit retired), or a switch the server
+ * refused. All of them mean the same thing to the caller — ask.
+ */
+export async function resumeLastGrant(session: Session): Promise<Session | null> {
+  if (session.active) return session;
+  const remembered = await recallGrant(session.user.id);
+  if (remembered === null) return null;
+  // The remembered id is not evidence of anything on its own; `grants` is the
+  // server's current list of what this login may actually become.
+  if (!session.grants.some((g) => g.id_user_role === remembered)) return null;
+  try {
+    return await switchContext(remembered);
+  } catch {
+    return null;
+  }
 }
 
 /**

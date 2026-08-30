@@ -21,7 +21,6 @@
 // pointerdown-capture-on-window equivalent, so the first outside tap commits
 // and is swallowed rather than also reaching whatever is underneath).
 
-import { useRouter } from 'expo-router';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -30,9 +29,11 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useRequireSession } from '@/hooks/use-require-session';
+import { RoleSwitcherSheet } from '@/components/shell/role-switcher';
 import { rp } from '@/constants/theme-erp';
 import { logout } from '@/services/auth';
+import { roleLabel } from '@/services/permissions';
+import { useSession } from '@/services/session';
 import * as printer from '@/services/bluetooth-printer';
 import {
   PAPER_LABEL, PAPER_OPTIONS, encodeReceipt, encodeTestReceipt, receiptDateTime,
@@ -57,8 +58,8 @@ const K = {
   dark2: '#2E4557',
   primary: '#007CB9',
   primaryDark: '#005689',
-  primaryTint: 'rgba(0,124,185,0.10)',
-  primaryTintSoft: 'rgba(0,124,185,0.07)',
+  primaryTint: '#E6F2F8',
+  primaryTintSoft: '#EDF6FA',
   amberBg: '#FDF6E7',
   amberBorder: '#F0DFB4',
   amberDot: '#B4780A',
@@ -176,7 +177,8 @@ interface KasirState {
 }
 
 // ---- demo props the design exposes as editable, hardcoded here (no host to pass them) ----
-const CASHIER_NAME = 'Kasir: Rina';
+// The cashier's name is no longer among them: it comes from the session, which
+// is also whose name the receipt has to carry.
 const RUANG_NAME = 'Ruang Toko Depan';
 const SHOW_QUICK_TILES = true;
 const KREDIT_ENABLED = true;
@@ -285,8 +287,12 @@ const INITIAL_STATE: KasirState = {
 };
 
 export default function KasirScreen() {
-  const router = useRouter();
-  const allowed = useRequireSession();
+  const session = useSession();
+  // Who is on the till, for the header and for the receipt. `nama_lengkap` is
+  // nullable in the contract, and a username is still better than a placeholder.
+  const cashierName = session?.user.nama_lengkap || session?.user.username || 'Kasir';
+  const canSwitchRole = (session?.grants.length ?? 0) > 1;
+  const [roleSheetOpen, setRoleSheetOpen] = useState(false);
   // No navigator header on this screen, and it runs locked to landscape — where
   // the notch and the gesture bar sit on the *sides*, not just the top. Padding
   // the root keeps the absolutely positioned sheets (menu, backdrop, toast)
@@ -573,7 +579,7 @@ export default function KasirScreen() {
     const data: ReceiptData = {
       nota: record.nota,
       datetime: receiptDateTime(),
-      kasir: CASHIER_NAME,
+      kasir: cashierName,
       ruang: RUANG_NAME,
       jenis: record.jenis,
       pelanggan: record.pelanggan,
@@ -668,8 +674,6 @@ export default function KasirScreen() {
   const overlayEditing = state.editing;
 
   // After every hook above, so the redirect never changes the hook order.
-  if (!allowed) return null;
-
   return (
     <View
       style={[
@@ -683,8 +687,14 @@ export default function KasirScreen() {
       ]}>
       <View style={styles.header}>
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10 }}>
-          <Text style={styles.cashierName}>{CASHIER_NAME}</Text>
-          <Text style={styles.shiftText}>Shift #12 · 08:00</Text>
+          <Text style={styles.cashierName}>{cashierName}</Text>
+          {/* The active role sits in the chrome that is always on screen, next
+              to who is signed in: on this screen a mis-set role is a receipt
+              printed under the wrong person's name, which nothing downstream
+              can correct. */}
+          <Text style={styles.shiftText}>
+            {roleLabel(session?.active?.role)} · Shift #12 · 08:00
+          </Text>
         </View>
         <View style={styles.ruangBadge}>
           <View style={styles.lockIcon} />
@@ -732,14 +742,30 @@ export default function KasirScreen() {
               {state.printer ? `${state.printer.name} · siap cetak` : 'Belum ada printer · struk tidak dicetak'}
             </Text>
           </Pressable>
+          {canSwitchRole && (
+            <>
+              <View style={styles.menuDivider} />
+              <Pressable
+                onPress={() => {
+                  patch({ menuOpen: false });
+                  setRoleSheetOpen(true);
+                }}
+                style={styles.menuItem}>
+                <Text style={styles.menuItemText}>Ganti peran</Text>
+                <Text style={styles.menuItemHint} numberOfLines={1}>
+                  Sedang bertindak sebagai {roleLabel(session?.active?.role)}
+                </Text>
+              </Pressable>
+            </>
+          )}
           <View style={styles.menuDivider} />
           <Pressable
             onPress={() => {
-              // Drop the session before navigating: the login screen sends a
-              // live one straight back in. logout() finishes the revoke itself.
+              // No navigation to do: dropping the session closes the
+              // `Stack.Protected` guard this screen sits behind, and the
+              // navigator falls back to the login anchor on its own.
               patch({ menuOpen: false });
               void logout();
-              router.replace('/');
             }}
             style={styles.menuItem}>
             <Text style={[styles.menuItemText, { color: K.red }]}>Keluar</Text>
@@ -747,6 +773,8 @@ export default function KasirScreen() {
           </Pressable>
         </View>
       )}
+
+      <RoleSwitcherSheet visible={roleSheetOpen} onClose={() => setRoleSheetOpen(false)} />
 
       {state.historyOpen && (
         <View style={styles.historyOverlay}>

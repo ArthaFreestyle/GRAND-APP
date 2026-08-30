@@ -14,7 +14,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import {
-  BackButton,
   Card,
   CardHead,
   EmptyState,
@@ -69,8 +68,6 @@ export function OpnameWorksheet({
   /** A reopened draft already holds counts for its room, so the room is locked. */
   ruangLocked,
   canWrite,
-  backLabel,
-  onBack,
   onSaveDraft,
   onPost,
 }: {
@@ -79,8 +76,6 @@ export function OpnameWorksheet({
   no: string | null;
   ruangLocked: boolean;
   canWrite: boolean;
-  backLabel: string;
-  onBack: () => void;
   onSaveDraft: () => void;
   onPost: () => void;
 }) {
@@ -110,9 +105,9 @@ export function OpnameWorksheet({
 
   return (
     <>
+      {/* The number and the way back are in the header bar. What is left is
+          the state of the sheet and the caveat about its number. */}
       <View style={styles.detailHead}>
-        <BackButton label={backLabel} onPress={onBack} />
-        <Text style={styles.detailNo}>{no ?? 'Opname baru'}</Text>
         <View style={[styles.badge, { backgroundColor: C.amberBg, borderColor: C.amberBorder }]}>
           <Text style={{ fontSize: 13, fontWeight: '600', color: C.amber }}>Berjalan</Text>
         </View>

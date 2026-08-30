@@ -13,6 +13,13 @@ import { vars } from 'nativewind';
  * `rgb(var(--token) / <alpha>)`, which is what makes `bg-primary/70` work.
  * A hex here would break every opacity modifier.
  *
+ * This file supplies the *values* only. Each of these names also has to be
+ * declared as a colour in `tailwind.config.js` (as
+ * `rgb(var(--token) / <alpha-value>)`) or the class does not exist: Tailwind
+ * emits nothing for a name it does not know, NativeWind has nothing to apply,
+ * and the component paints no background at all. That is exactly how the
+ * dialogs and the tables ended up see-through.
+ *
  * The source of truth for the colours is `constants/theme-erp.ts`; the extra
  * shades that have no semantic equivalent here (green, amber, the border
  * ladder) live in `tailwind.config.js` instead. Keep the three in step.

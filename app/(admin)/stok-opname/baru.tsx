@@ -36,7 +36,11 @@ export default function StokOpnameBaruScreen() {
   const [draft, setDraft] = useState<OpnameDraft>(freshDraft);
 
   function goBack() {
-    if (router.canGoBack()) router.back();
+    // `dismiss()` targets the closest Stack — this section's own. `back()` is
+    // offered to the drawer first, and a drawer holding an earlier section in
+    // its history answers it by switching to that section instead of popping
+    // this screen. The fallback is for a deep link with nothing to pop at all.
+    if (router.canDismiss()) router.dismiss();
     else router.replace('/stok-opname');
   }
 
@@ -63,7 +67,7 @@ export default function StokOpnameBaruScreen() {
 
   if (!canWrite) {
     return (
-      <AppShell title="Stok Opname">
+      <AppShell title="Opname baru" onBack={goBack}>
         <View style={styles.centerBox}>
           <Text style={styles.errText}>Peran ini tidak bisa memulai opname.</Text>
           <GhostButton label="Kembali ke daftar" onPress={goBack} />
@@ -73,7 +77,7 @@ export default function StokOpnameBaruScreen() {
   }
 
   return (
-    <AppShell title="Stok Opname">
+    <AppShell title="Opname baru" onBack={goBack}>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: 16, padding: 22 }}>
         <OpnameWorksheet
           draft={draft}
@@ -81,8 +85,6 @@ export default function StokOpnameBaruScreen() {
           no={null}
           ruangLocked={false}
           canWrite
-          backLabel="← Batal"
-          onBack={goBack}
           onSaveDraft={() => commit(false)}
           onPost={() => commit(true)}
         />

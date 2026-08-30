@@ -10,6 +10,13 @@
 // abu-abu teks diturunkan dengan rona biru supaya menyatu; hijau dan merah
 // dipertahankan karena fungsional — "lunas" dan "jatuh tempo" harus bisa
 // dibedakan, dan emas tidak bisa menggantikan keduanya.
+//
+// Semua nilai di sini pekat. Tint tadinya rgba 10-28%, yang artinya warnanya
+// ikut apa pun yang kebetulan ada di belakangnya - di atas kartu putih satu
+// rupa, di atas latar halaman rupa lain, dan di atas baris tabel yang ditekan
+// rupa ketiga. Sekarang tint sudah dicampur duluan dengan putih dan ditulis
+// sebagai hex. Yang masih tembus pandang hanya yang memang harus: kerudung
+// gelap di belakang dialog dan gradasi tepi DataTable.
 
 export const Colors = {
   bg: '#F1F8FD',
@@ -25,14 +32,14 @@ export const Colors = {
   dark2: '#2E4557',
   primary: '#007CB9',
   primaryDark: '#005689',
-  primaryTintBg: 'rgba(0,124,185,0.10)',
+  primaryTintBg: '#E6F2F8',
   primaryTintBorder: '#A9D0E7',
   badgeBg: '#E9F2F9',
   green: '#2E7D4F',
-  greenBg: 'rgba(46,125,79,0.12)',
+  greenBg: '#E6EFEA',
   greenBorder: '#B7DBC4',
   amber: '#8A5A00',
-  amberBg: 'rgba(246,198,103,0.28)',
+  amberBg: '#FDEFD4',
   amberBorder: '#F0D69B',
   red: '#C8322B',
   redBg: '#FDF2F1',

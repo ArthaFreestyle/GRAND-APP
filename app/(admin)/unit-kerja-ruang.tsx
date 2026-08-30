@@ -1,23 +1,23 @@
 import { useMemo, useRef, useState } from 'react';
 
 import { AppShell } from '@/components/shell/AppShell';
+import {
+  ListHeader,
+  ListSearch,
+  NewRecordRow,
+  RecordList,
+  type RecordItem,
+} from '@/components/shell/record-list';
 import { useCanWrite } from '@/services/permissions';
 import {
-  Badge,
   CheckBox,
-  DataTable,
-  EmptyState,
   ErrorBanner,
   Field,
-  GhostButton,
   KpiCard,
   ModalFooter,
   ModalHead,
   ModalShell,
-  NeutralBadge,
   OptionPicker,
-  PrimaryButton,
-  SearchBar,
   TabSwitch,
   TextField,
   Toast,
@@ -25,7 +25,7 @@ import {
 } from '@/components/shell/ui';
 import { Box } from '@/components/ui/box';
 import { Text } from '@/components/ui/text';
-import { Colors as C, num } from '@/constants/theme-erp';
+import { num } from '@/constants/theme-erp';
 
 type UnitTipe = 'toko' | 'gudang' | 'kantor' | 'cabang';
 type RuangTipe = 'etalase' | 'gudang' | 'kelas' | 'kantor' | 'lab';
@@ -183,6 +183,130 @@ export default function UnitKerjaRuangScreen() {
     toast('Perubahan ruang tersimpan');
   }
 
+  // ---- what the list draws ----
+
+  /**
+   * The type chip becomes the row's badge, and an inactive record's badge says
+   * so instead: "nonaktif" is the fact that changes what you may do with the
+   * record, so it outranks the type, which stays legible on the meta line.
+   */
+  const unitItems = useMemo<RecordItem[]>(
+    () =>
+      filteredUnits.map((u) => {
+        const meta = UNIT_TIPE_META[u.tipe];
+        const uRooms = roomsOf(u.id);
+        const sku = uRooms.reduce((a, r) => a + r.sku, 0);
+        return {
+          id: u.id,
+          title: u.nama,
+          badge: u.aktif ? meta.label : 'Nonaktif',
+          badgeTone: u.aktif ? meta.tone : undefined,
+          dimmed: !u.aktif,
+          meta: `${u.kode} · ${meta.label} · PJ ${u.pj || '—'}`,
+          fields: [
+            { label: 'Ruang', value: `${uRooms.length} ruang`, width: 130 },
+            { label: 'SKU', value: num(sku), width: 110 },
+          ],
+        };
+      }),
+    // `roomsOf` closes over `rooms`, which is why it is a dependency in all but
+    // name - listing `rooms` is what actually re-counts a unit's rooms.
+    [filteredUnits, rooms] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  const ruangItems = useMemo<RecordItem[]>(
+    () =>
+      filteredRooms.map((r) => {
+        const meta = RUANG_TIPE_META[r.tipe];
+        const u = unitOf(r.unitId);
+        return {
+          id: r.id,
+          title: r.nama,
+          badge: r.aktif ? meta.label : 'Nonaktif',
+          badgeTone: r.aktif ? meta.tone : undefined,
+          dimmed: !r.aktif,
+          meta: `${r.kode} · ${u ? u.nama : '—'}`,
+          fields: [{ label: 'SKU', value: num(r.sku), width: 110 }],
+        };
+      }),
+    [filteredRooms, units] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  /**
+   * Tapping opens the record, the way it does in every other section. There is
+   * no detail *route* here — these two tables have no endpoint yet — so the
+   * dialog is the record: it holds every field either one has.
+   *
+   * A unit's rooms are reached from the Ruang tab's unit filter, which is on
+   * screen and says what it does. That used to be a "Lihat ruang" entry in the
+   * row menu, and the menu is gone.
+   */
+  function openUnitById(id: number) {
+    const u = units.find((x) => x.id === id);
+    // A read-only session has nothing to open: the row already draws everything
+    // this screen holds, and there is no detail behind it.
+    if (u && canWriteUnit) openUnitEdit(u);
+  }
+
+  function openRuangById(id: number) {
+    const r = rooms.find((x) => x.id === id);
+    if (r && canWriteRuang) openRuangEdit(r);
+  }
+
+  function newUnit() {
+    setModalErr('');
+    setUnitDraft({ kode: '', nama: '', tipe: 'toko', pj: '', telepon: '', aktif: true });
+    setModal({ kind: 'unit-new' });
+  }
+
+  function newRuang() {
+    setModalErr('');
+    setRuangDraft({
+      kode: '',
+      nama: '',
+      unitId: ruangUnit !== 'semua' ? ruangUnit : '',
+      tipe: 'gudang',
+      aktif: true,
+    });
+    setModal({ kind: 'ruang-new' });
+  }
+
+  function clearFilter() {
+    setQuery('');
+    setRuangUnit('semua');
+  }
+
+  const listHeader = (
+    <ListHeader>
+      <TabSwitch
+        options={[
+          { key: 'unit', label: 'Unit Kerja' },
+          { key: 'ruang', label: 'Ruang' },
+        ]}
+        active={tab}
+        onPick={(k) => {
+          setTab(k);
+          setQuery('');
+        }}
+      />
+      <ListSearch
+        value={query}
+        onChangeText={setQuery}
+        placeholder={tab === 'unit' ? 'Cari nama, kode, atau PJ' : 'Cari ruang, kode, atau unit'}
+      />
+      {tab === 'ruang' && (
+        <OptionPicker
+          options={[
+            { value: 'semua', label: 'Semua unit kerja' },
+            ...units.map((u) => ({ value: String(u.id), label: u.nama })),
+          ]}
+          value={ruangUnit}
+          onChange={setRuangUnit}
+        />
+      )}
+    </ListHeader>
+  );
+
   const isUnitModal = modal?.kind === 'unit-new' || modal?.kind === 'unit-edit';
   const isRuangModal = modal?.kind === 'ruang-new' || modal?.kind === 'ruang-edit';
   const isEdit = modal?.kind === 'unit-edit' || modal?.kind === 'ruang-edit';
@@ -190,147 +314,79 @@ export default function UnitKerjaRuangScreen() {
   return (
     <AppShell title="Unit Kerja & Ruang">
       <Box className="flex-1 gap-3.5 p-[18px]">
-        <Box style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+        <Box className="flex-row flex-wrap gap-3">
           <KpiCard label="Unit kerja" value={num(units.length)} sub={`${units.filter((u) => u.aktif).length} aktif`} />
           <KpiCard label="Ruang / lokasi" value={num(rooms.length)} sub={`${rooms.filter((r) => r.aktif).length} aktif`} />
-          <KpiCard label="SKU tersimpan" value={num(totalSku)} sub="akumulasi seluruh ruang" valueClass={'text-primary-dark'} />
+          <KpiCard label="SKU tersimpan" value={num(totalSku)} sub="akumulasi seluruh ruang" valueClass="text-primary-dark" />
           <KpiCard
             label="Unit nonaktif"
             value={num(units.filter((u) => !u.aktif).length)}
             sub="disembunyikan dari transaksi"
-            valueClass={units.some((u) => !u.aktif) ? C.amber : C.green}
+            valueClass={units.some((u) => !u.aktif) ? 'text-amber' : 'text-green'}
           />
         </Box>
 
-        <Box className="flex-row flex-wrap items-center gap-3">
-          <TabSwitch
-            options={[{ key: 'unit', label: 'Unit Kerja' }, { key: 'ruang', label: 'Ruang' }]}
-            active={tab}
-            onPick={(k) => { setTab(k); setQuery(''); }}
-          />
-          <SearchBar
-            value={query}
-            onChangeText={setQuery}
-            placeholder={tab === 'unit' ? 'Cari nama, kode, atau PJ' : 'Cari ruang, kode, atau unit'}
-            maxWidth={360}
-          />
-          {tab === 'ruang' && (
-            <OptionPicker
-              options={[{ value: 'semua', label: 'Semua unit kerja' }, ...units.map((u) => ({ value: String(u.id), label: u.nama }))]}
-              value={ruangUnit}
-              onChange={setRuangUnit}
-            />
-          )}
-          <Box style={{ flex: 1 }} />
-          <Text className="text-sm text-muted-foreground">{tab === 'unit' ? `${filteredUnits.length} unit` : `${filteredRooms.length} ruang`}</Text>
-          {(tab === 'unit' ? canWriteUnit : canWriteRuang) && (
-            <PrimaryButton
-              label={tab === 'unit' ? 'Unit kerja baru' : 'Ruang baru'}
-              onPress={() => {
-                setModalErr('');
-                if (tab === 'unit') {
-                  setUnitDraft({ kode: '', nama: '', tipe: 'toko', pj: '', telepon: '', aktif: true });
-                  setModal({ kind: 'unit-new' });
-                } else {
-                  setRuangDraft({ kode: '', nama: '', unitId: ruangUnit !== 'semua' ? ruangUnit : '', tipe: 'gudang', aktif: true });
-                  setModal({ kind: 'ruang-new' });
-                }
-              }}
-            />
-          )}
-        </Box>
-
+        {/* Two lists, one at a time, both `RecordList` - the same rows every
+            other section draws. The tab switch lives in the list header rather
+            than above the card because it selects what the list *is*, not how
+            it is filtered, and putting it anywhere else left the card looking
+            like it belonged to neither tab. */}
         {tab === 'unit' ? (
-          <DataTable
-            minWidth={720}
-            head={
-              <Box className="h-12 flex-row items-center gap-3 border-b border-line-light bg-thead pl-5 pr-9">
-                <Text className="flex-1 text-[12.5px] font-semibold tracking-wide text-faint">UNIT KERJA</Text>
-                <Text className="w-[140px] text-[12.5px] font-semibold tracking-wide text-faint">TIPE</Text>
-                <Text className="w-[130px] text-right text-[12.5px] font-semibold tracking-wide text-faint">RUANG</Text>
-                <Box style={{ width: 210 }} />
-              </Box>
+          <RecordList
+            items={unitItems}
+            loading={false}
+            error=""
+            filtered={query.trim() !== ''}
+            onOpen={openUnitById}
+            onClearFilter={clearFilter}
+            onCreate={canWriteUnit ? newUnit : undefined}
+            createLabel="Unit kerja baru"
+            emptyTitle="Belum ada unit kerja"
+            emptySub="Unit kerja mengelompokkan ruang penyimpanan dan pemakaian stok."
+            header={listHeader}
+            leadRow={
+              canWriteUnit ? (
+                <NewRecordRow title="Unit kerja baru" onPress={newUnit} />
+              ) : null
             }
             footer={
               <Box className="h-12 flex-row items-center border-t border-line-light bg-thead px-5">
                 <Text className="text-sm text-muted-foreground">
-                  {filteredUnits.length ? `Menampilkan ${filteredUnits.length} dari ${units.length} unit kerja` : '0 hasil'}
+                  {filteredUnits.length
+                    ? `Menampilkan ${filteredUnits.length} dari ${units.length} unit kerja`
+                    : '0 hasil'}
                 </Text>
               </Box>
-            }>
-              {filteredUnits.map((u) => {
-                const meta = UNIT_TIPE_META[u.tipe];
-                const uRooms = roomsOf(u.id);
-                const sku = uRooms.reduce((a, r) => a + r.sku, 0);
-                return (
-                  <Box key={u.id} className="min-h-[74px] flex-row items-center gap-3 border-b border-line-lighter pl-5 pr-9">
-                    <Box style={{ flex: 1, minWidth: 0, gap: 3 }}>
-                      <Box style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
-                        <Text className={`text-[17px] font-medium ${u.aktif ? 'text-foreground' : 'text-faint-2'}`} numberOfLines={1}>{u.nama}</Text>
-                        {!u.aktif && <NeutralBadge />}
-                      </Box>
-                      <Text className="text-[12.5px] text-faint" numberOfLines={1}>{u.kode} · PJ {u.pj || '—'}</Text>
-                    </Box>
-                    <Box style={{ width: 140 }}>
-                      <Badge label={meta.label} tone={meta.tone} small />
-                    </Box>
-                    <Box style={{ width: 130, alignItems: 'flex-end', gap: 2 }}>
-                      <Text style={{ fontSize: 16, fontWeight: '600' }}>{uRooms.length} ruang</Text>
-                      <Text style={{ fontSize: 12, color: C.muted }}>{num(sku)} SKU</Text>
-                    </Box>
-                    <Box style={{ width: 210, flexDirection: 'row', justifyContent: 'flex-end', gap: 8 }}>
-                      <GhostButton label="Lihat ruang" onPress={() => { setTab('ruang'); setRuangUnit(String(u.id)); setQuery(''); }} />
-                      {canWriteUnit && <GhostButton label="Ubah" onPress={() => openUnitEdit(u)} />}
-                    </Box>
-                  </Box>
-                );
-              })}
-              {filteredUnits.length === 0 && <EmptyState title="Tidak ada unit kerja yang cocok" sub="Coba kata kunci lain." />}
-          </DataTable>
+            }
+          />
         ) : (
-          <DataTable
-            minWidth={740}
-            head={
-              <Box className="h-12 flex-row items-center gap-3 border-b border-line-light bg-thead pl-5 pr-9">
-                <Text className="flex-1 text-[12.5px] font-semibold tracking-wide text-faint">RUANG</Text>
-                <Text className="w-[200px] text-[12.5px] font-semibold tracking-wide text-faint">UNIT KERJA</Text>
-                <Text className="w-[120px] text-[12.5px] font-semibold tracking-wide text-faint">TIPE</Text>
-                <Text className="w-[90px] text-right text-[12.5px] font-semibold tracking-wide text-faint">SKU</Text>
-                <Box style={{ width: 90 }} />
-              </Box>
+          <RecordList
+            items={ruangItems}
+            loading={false}
+            error=""
+            filtered={query.trim() !== '' || ruangUnit !== 'semua'}
+            onOpen={openRuangById}
+            onClearFilter={clearFilter}
+            onCreate={canWriteRuang ? newRuang : undefined}
+            createLabel="Ruang baru"
+            emptyTitle="Belum ada ruang"
+            emptySub="Ruang adalah lokasi fisik penyimpanan stok di dalam sebuah unit kerja."
+            header={listHeader}
+            leadRow={
+              canWriteRuang ? (
+                <NewRecordRow title="Ruang baru" onPress={newRuang} />
+              ) : null
             }
             footer={
               <Box className="h-12 flex-row items-center border-t border-line-light bg-thead px-5">
                 <Text className="text-sm text-muted-foreground">
-                  {filteredRooms.length ? `Menampilkan ${filteredRooms.length} dari ${rooms.length} ruang` : '0 hasil'}
+                  {filteredRooms.length
+                    ? `Menampilkan ${filteredRooms.length} dari ${rooms.length} ruang`
+                    : '0 hasil'}
                 </Text>
               </Box>
-            }>
-              {filteredRooms.map((r) => {
-                const meta = RUANG_TIPE_META[r.tipe];
-                const u = unitOf(r.unitId);
-                return (
-                  <Box key={r.id} className="min-h-[74px] flex-row items-center gap-3 border-b border-line-lighter pl-5 pr-9">
-                    <Box style={{ flex: 1, minWidth: 0, gap: 3 }}>
-                      <Box style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
-                        <Text className={`text-base font-medium ${r.aktif ? 'text-foreground' : 'text-faint-2'}`} numberOfLines={1}>{r.nama}</Text>
-                        {!r.aktif && <NeutralBadge />}
-                      </Box>
-                      <Text className="font-mono text-[12.5px] text-faint">{r.kode}</Text>
-                    </Box>
-                    <Text style={{ width: 200, fontSize: 14, color: C.dark2 }} numberOfLines={1}>{u ? u.nama : '—'}</Text>
-                    <Box style={{ width: 120 }}>
-                      <Badge label={meta.label} tone={meta.tone} small />
-                    </Box>
-                    <Text style={{ width: 90, textAlign: 'right', fontSize: 15 }}>{num(r.sku)}</Text>
-                    <Box style={{ width: 90, alignItems: 'flex-end' }}>
-                      {canWriteRuang && <GhostButton label="Ubah" onPress={() => openRuangEdit(r)} />}
-                    </Box>
-                  </Box>
-                );
-              })}
-              {filteredRooms.length === 0 && <EmptyState title="Tidak ada ruang yang cocok" sub="Coba kata kunci lain atau ubah filter unit kerja." />}
-          </DataTable>
+            }
+          />
         )}
       </Box>
 

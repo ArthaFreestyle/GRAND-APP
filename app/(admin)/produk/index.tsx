@@ -10,17 +10,20 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { AppShell } from '@/components/shell/AppShell';
 import {
+  ListHeader,
+  ListSearch,
+  NewRecordRow,
   RecordList,
   UndoBar,
   type RecordAction,
   type RecordItem,
 } from '@/components/shell/record-list';
 import { FilterPills, Toast } from '@/components/shell/ui';
-import { ProdukColors as C, formatNumber, formatTanggal } from '@/constants/produk';
+import { formatNumber } from '@/constants/produk';
 import { useRecordBus } from '@/hooks/use-record-bus';
 import { messageOf } from '@/services/api';
 import { useCanWrite } from '@/services/permissions';
@@ -59,25 +62,14 @@ type Filter = 'semua' | 'menipis' | 'nonaktif';
  */
 const FILTER_KEY = 'produk.filter';
 
+/** One shared empty array, so a read-only session's `bulkActions` is stable. */
+const NO_BULK: RecordAction[] = [];
+
 const FILTER_OPTIONS: { key: Filter; label: string }[] = [
   { key: 'semua', label: 'Semua' },
   { key: 'menipis', label: 'Stok menipis' },
   { key: 'nonaktif', label: 'Nonaktif' },
 ];
-
-// Module-level so each row's `actions` array keeps the same identity between
-// renders and `RecordRow`'s `memo` holds. Archiving is reversible - it flips
-// `is_aktif`, the only removal the contract offers - so it is a safe swipe with
-// an undo behind it rather than a `danger` action behind a confirmation.
-const ACTIONS_AKTIF: RecordAction[] = [
-  { key: 'ubah', label: 'Ubah produk' },
-  { key: 'arsip', label: 'Arsipkan', quick: true },
-];
-const ACTIONS_NONAKTIF: RecordAction[] = [
-  { key: 'ubah', label: 'Ubah produk' },
-  { key: 'aktifkan', label: 'Aktifkan', quick: true },
-];
-const ACTIONS_READONLY: RecordAction[] = [];
 
 export default function ProdukListScreen() {
   const router = useRouter();
@@ -235,12 +227,16 @@ export default function ProdukListScreen() {
     return () => clearTimeout(t);
   }, [query]);
 
-  // ---- list rows and their actions ----
+  // ---- list rows ----
 
   /**
    * The two sources answer different shapes, so both are flattened to what the
    * list actually draws. Building it here keeps `RecordList` unaware of what a
-   * product is, and the memo keeps each row's `actions` array stable.
+   * product is.
+   *
+   * No per-row actions: a row opens the product, and everything you can do to
+   * one is on the product. Archiving several at once is the exception, and that
+   * is `bulkActions` on the selection bar, not a menu per row.
    */
   const items = useMemo<RecordItem[]>(() => {
     if (filter === 'menipis') {
@@ -252,9 +248,6 @@ export default function ProdukListScreen() {
           { label: 'Stok', value: formatNumber(r.totalStok), danger: true, width: 110 },
           { label: 'Minimum', value: formatNumber(r.stokMin), width: 110 },
         ],
-        // The endpoint answers only active products, so the archive direction
-        // is the only one that applies here.
-        actions: canWrite ? ACTIONS_AKTIF : ACTIONS_READONLY,
       }));
     }
     return rows.map((r) => ({
@@ -262,20 +255,18 @@ export default function ProdukListScreen() {
       title: r.nama,
       badge: r.aktif ? undefined : 'Nonaktif',
       dimmed: !r.aktif,
-      meta: `${r.kode} · diperbarui ${formatTanggal(r.updatedAt)}`,
-      fields: [
-        {
-          label: 'Stok minimum',
-          value: `${formatNumber(r.stokMin)} ${r.namaSatuanDasar}`,
-          width: 150,
-        },
-      ],
-      actions: !canWrite ? ACTIONS_READONLY : r.aktif ? ACTIONS_AKTIF : ACTIONS_NONAKTIF,
+      // The code and what a unit *is*, and nothing else. The reorder point is
+      // a threshold, not a reading - it says nothing about this product until
+      // stock is next to it, and the list payload carries no stock. The
+      // "diperbarui" date was worse: it changed on every edit and was never the
+      // reason anyone opened a row.
+      meta: `${r.kode} · ${r.namaSatuanDasar}`,
+      fields: [],
     }));
-  }, [filter, lowRows, rows, canWrite]);
+  }, [filter, lowRows, rows]);
 
   const bulkActions = useMemo<RecordAction[]>(() => {
-    if (!canWrite) return ACTIONS_READONLY;
+    if (!canWrite) return NO_BULK;
     return filter === 'nonaktif'
       ? [{ key: 'aktifkan', label: 'Aktifkan' }]
       : [{ key: 'arsip', label: 'Arsipkan' }];
@@ -321,24 +312,6 @@ export default function ProdukListScreen() {
   const openNew = useCallback(() => {
     router.push('/produk/baru');
   }, [router]);
-
-  const runRowAction = useCallback(
-    (key: string, item: RecordItem) => {
-      if (key === 'ubah') {
-        // The edit form lives on the detail route, the only place that holds a
-        // whole product: a reorder-list row is not a `ProductRow` and would
-        // half-fill the form from what that list happens to carry. `ubah=1` is
-        // what opens the dialog there - a URL meaning "this product, with its
-        // form open".
-        router.push({ pathname: '/produk/[id]', params: { id: item.id, ubah: '1' } });
-        return;
-      }
-      if (key === 'arsip' || key === 'aktifkan') {
-        setAktif([item.id], key === 'aktifkan', item.title);
-      }
-    },
-    [router, setAktif]
-  );
 
   const runBulkAction = useCallback(
     (key: string, ids: number[]) => {
@@ -398,7 +371,6 @@ export default function ProdukListScreen() {
           filtered={search !== '' || filter !== 'semua'}
           bulkActions={bulkActions}
           onOpen={openDetail}
-          onAction={runRowAction}
           onBulkAction={runBulkAction}
           onRetry={reloadList}
           onClearFilter={clearFilter}
@@ -407,39 +379,26 @@ export default function ProdukListScreen() {
           emptyTitle="Belum ada produk"
           emptySub="Master produk masih kosong. Tambahkan produk pertama untuk mulai mencatat stok dan harga."
           header={
-            <View style={styles.listHeader}>
+            <ListHeader>
               {/* The search field has the width to itself. It is the control
                   that gets used on every visit; the count was decoration and
                   creating a product moved into the list as its first row. */}
-              <View style={styles.searchWrap}>
-                <View style={styles.searchIcon} />
-                <View style={styles.searchIconHandle} />
-                <TextInput
-                  value={query}
-                  onChangeText={setQuery}
-                  editable={filter !== 'menipis'}
-                  placeholder={
-                    filter === 'menipis'
-                      ? 'Pencarian tidak berlaku di daftar stok menipis'
-                      : 'Cari nama atau kode barang'
-                  }
-                  style={[styles.searchInput, filter === 'menipis' && styles.searchInputOff]}
-                />
-              </View>
+              <ListSearch
+                value={query}
+                onChangeText={setQuery}
+                editable={filter !== 'menipis'}
+                placeholder={
+                  filter === 'menipis'
+                    ? 'Pencarian tidak berlaku di daftar stok menipis'
+                    : 'Cari nama atau kode barang'
+                }
+              />
               <FilterPills options={FILTER_OPTIONS} active={filter} onPick={pickFilter} />
-            </View>
+            </ListHeader>
           }
           leadRow={
             canWrite ? (
-              <Pressable onPress={openNew} style={styles.newRow}>
-                <View style={styles.newRowPlus}>
-                  <Text style={styles.newRowPlusText}>+</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.newRowTitle}>Produk baru</Text>
-                  <Text style={styles.newRowSub}>Tambahkan barang ke master produk</Text>
-                </View>
-              </Pressable>
+              <NewRecordRow title="Produk baru" onPress={openNew} />
             ) : null
           }
           onEndReached={onEndReached}
@@ -456,61 +415,4 @@ export default function ProdukListScreen() {
 
 const styles = StyleSheet.create({
   listWrap: { flex: 1, padding: 18, gap: 12 },
-  // Search and chips sit inside the list card and never scroll away with
-  // the rows - on a long list they are the only way back out.
-  listHeader: { gap: 10, borderBottomWidth: 1, borderBottomColor: C.borderLight, padding: 14 },
-  searchWrap: { position: 'relative', justifyContent: 'center' },
-  searchIcon: {
-    position: 'absolute',
-    left: 13,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    borderWidth: 2,
-    borderColor: C.muted,
-    zIndex: 1,
-  },
-  searchIconHandle: {
-    position: 'absolute',
-    left: 24,
-    top: 25,
-    width: 8,
-    height: 2,
-    backgroundColor: C.muted,
-    transform: [{ rotate: '45deg' }],
-    zIndex: 1,
-  },
-  searchInput: {
-    minHeight: 52,
-    paddingLeft: 42,
-    paddingRight: 14,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: C.border,
-    backgroundColor: '#fff',
-    fontSize: 16.5,
-    color: C.text,
-  },
-  searchInputOff: { backgroundColor: C.tableHeaderBg, color: C.muted2 },
-  newRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 18,
-    paddingVertical: 13,
-    borderBottomWidth: 1,
-    borderBottomColor: C.borderLighter,
-    backgroundColor: C.tableHeaderBg,
-  },
-  newRowPlus: {
-    minWidth: 30,
-    minHeight: 30,
-    borderRadius: 15,
-    backgroundColor: C.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  newRowPlusText: { fontSize: 19, lineHeight: 22, fontWeight: '600', color: '#fff' },
-  newRowTitle: { fontSize: 15.5, fontWeight: '600', color: C.primaryDark },
-  newRowSub: { marginTop: 2, fontSize: 13, color: C.muted3 },
 });

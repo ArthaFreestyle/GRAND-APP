@@ -252,3 +252,25 @@ export async function listSatuan(): Promise<ApiSatuan[]> {
   );
   return page.data;
 }
+
+/**
+ * The last **POSTED** purchase of this product per supplier, newest first.
+ *
+ * The contract calls this the replacement for a purchase order, and names the
+ * purchase entry form as the caller that narrows it with `id_supplier`: the
+ * header there already says who is selling, so the useful question is "what did
+ * I pay this supplier last time", not "what does everyone charge".
+ *
+ * Draft and cancelled documents are excluded server-side, so every row is a
+ * price somebody actually paid. An unknown product answers 404; one never
+ * bought answers an empty page — two different facts, and the caller keeps them
+ * apart rather than showing "belum pernah dibeli" for a failed read.
+ */
+export function listRiwayatBeli(
+  id: number,
+  query: { page?: number; size?: number; id_supplier?: number } = {}
+): Promise<Paged<components['schemas']['RiwayatBeli']>> {
+  return authedList<components['schemas']['RiwayatBeli']>(
+    `/api/v1/product/${id}/riwayat-beli${buildQuery({ ...query })}`
+  );
+}

@@ -1,268 +1,163 @@
 /**
- * Pembelian — the entry form for a new invoice.
+ * Pembelian — typing a new document.
  *
- * Already a full page before this was a route; it just had no address and no
- * back button. Saving lands on the stored invoice via `replace`, so backing out
- * returns to the list rather than to a form still holding the items that were
- * just posted.
+ * `POST /pembelian` takes the header **and** its lines in one body and always
+ * creates a `DRAFT`: `status` is not a field, and nothing here moves stock. So
+ * this page saves once and lands on the document it made; submitting it for
+ * approval is a decision taken on the detail, deliberately not folded into a
+ * "simpan & ajukan" button that would make an irreversible flow feel like a
+ * save.
+ *
+ * The document number is not typed and not previewed. The server generates it
+ * (`BL/KODE/2026/08/0001`, reset monthly by the document's own `tanggal`, with
+ * `KODE` belonging to the unit kerja over the chosen ruang), and guessing at it
+ * here would mean showing a number that may not be the one stored.
+ *
+ * The totals in the summary are a **preview**. `subtotal`, `total`, and
+ * `biaya_angkut` are all recomputed server-side from the lines; what is shown
+ * while typing is this screen's own arithmetic over the same inputs, and the
+ * document that comes back is the one that counts.
  */
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import {
+  createBody,
+  EMPTY_HEADER,
+  pakaiKoli,
+  PembelianHeaderFields,
+  type PembelianHeaderValues,
+} from '@/components/pembelian/form';
+import {
+  emptyLine,
+  linesSubtotal,
+  linesToInput,
+  PembelianLineEditor,
+  type LineDraft,
+} from '@/components/pembelian/lines';
 import { AppShell } from '@/components/shell/AppShell';
 import {
-  BackButton,
   Card,
   CardHead,
-  EmptyState,
   ErrorBanner,
-  Field,
-  OptionPicker,
   PrimaryButton,
-  TextField,
-  TinyButton,
+  SecondaryButton,
 } from '@/components/shell/ui';
-import { Colors as C, addDays, rp, tanggal } from '@/constants/theme-erp';
+import { Colors as C, rp } from '@/constants/theme-erp';
+import { messageOf } from '@/services/api';
+import { numericToDecimal, rupiahToDecimal, rupiahToDecimalSigned } from '@/services/decimal';
+import { createPembelian, pembelianBus } from '@/services/pembelian';
 import { useCanWrite } from '@/services/permissions';
-import {
-  addFaktur,
-  prod,
-  prodNama,
-  PRODS,
-  sup,
-  SUPPLIERS,
-  TODAY,
-  type FakturItem,
-} from '@/stores/pembelian';
-
-interface Draft {
-  supId: string;
-  tanggal: string;
-  dibayar: string;
-  items: FakturItem[];
-  /** The item being assembled, above the item table. */
-  rowKode: string;
-  rowSatuan: string | null;
-  rowQty: string;
-  rowHarga: string;
-  err: string;
-}
-
-const FRESH: Draft = {
-  supId: '',
-  tanggal: TODAY,
-  dibayar: '0',
-  items: [],
-  rowKode: '',
-  rowSatuan: null,
-  rowQty: '',
-  rowHarga: '',
-  err: '',
-};
 
 export default function PembelianBaruScreen() {
   const router = useRouter();
   const canWrite = useCanWrite('pembelian');
-  const [draft, setDraft] = useState<Draft>(FRESH);
 
-  const rowProd = draft.rowKode ? prod(draft.rowKode) : null;
+  const [values, setValues] = useState<PembelianHeaderValues>(EMPTY_HEADER);
+  // Lazy: the initializer argument of `useState` is evaluated on every render
+  // whether or not it is used, and `emptyLine()` hands out a fresh key each time.
+  const [lines, setLines] = useState<LineDraft[]>(() => [emptyLine()]);
+  const [err, setErr] = useState('');
+  const [saving, setSaving] = useState(false);
 
   function goBack() {
-    if (router.canGoBack()) router.back();
+    // `dismiss()` targets the closest Stack — this section's own. `back()` is
+    // offered to the drawer first, and a drawer holding an earlier section in
+    // its history answers it by switching to that section instead of popping
+    // this screen. The fallback is for a deep link with nothing to pop at all.
+    if (router.canDismiss()) router.dismiss();
     else router.replace('/pembelian');
   }
 
-  function addRow() {
-    if (!draft.rowKode) return setDraft({ ...draft, err: '400 — pilih produk dulu.' });
-    const qty = parseInt(draft.rowQty || '', 10);
-    if (Number.isNaN(qty) || qty < 1) {
-      return setDraft({ ...draft, err: '400 — qty harus bilangan bulat ≥ 1.' });
+  async function save() {
+    if (saving) return;
+    const detail = linesToInput(lines);
+    if (!detail.ok) return setErr(detail.error);
+    const body = createBody(values, detail.detail);
+    if (!body.ok) return setErr(body.error);
+
+    setSaving(true);
+    try {
+      const created = await createPembelian(body.body);
+      // A new document has no row for the list to patch and lands wherever its
+      // date puts it, so the list re-reads the page it is on while the reader
+      // moves to the document itself.
+      pembelianBus.publish({ kind: 'reload' });
+      router.replace({ pathname: '/pembelian/[id]', params: { id: created.id, baru: '1' } });
+    } catch (e) {
+      // 409 is a duplicate `no_faktur_supplier` for this supplier — the one
+      // guard against the same nota being entered, and stocked, twice. The
+      // server names it.
+      setErr(messageOf(e, 'Gagal menyimpan dokumen pembelian.'));
+    } finally {
+      setSaving(false);
     }
-    const harga = parseInt(String(draft.rowHarga || '').replace(/\D/g, ''), 10);
-    if (Number.isNaN(harga) || harga <= 0) {
-      return setDraft({ ...draft, err: '400 — harga beli wajib diisi.' });
-    }
-    const items = [...draft.items, { kode: draft.rowKode, qty, satuan: draft.rowSatuan ?? '', harga }];
-    setDraft({ ...draft, items, rowKode: '', rowSatuan: null, rowQty: '', rowHarga: '', err: '' });
   }
 
-  function save() {
-    if (!draft.supId) return setDraft({ ...draft, err: '400 — pilih supplier dulu.' });
-    if (!draft.items.length) return setDraft({ ...draft, err: '400 — tambahkan minimal satu item.' });
-    const total = draft.items.reduce((s, it) => s + it.qty * it.harga, 0);
-    const dibayar = parseInt(String(draft.dibayar || '0').replace(/\D/g, ''), 10) || 0;
-    if (dibayar > total) return setDraft({ ...draft, err: '400 — pembayaran melebihi total faktur.' });
-
-    const created = addFaktur({
-      supId: parseInt(draft.supId, 10),
-      tanggal: draft.tanggal,
-      dibayar,
-      items: draft.items,
-    });
-    router.replace({ pathname: '/pembelian/[id]', params: { id: created.id, baru: '1' } });
-  }
-
-  const total = draft.items.reduce((a, it) => a + it.qty * it.harga, 0);
-  const dibayarNum = parseInt(String(draft.dibayar || '0').replace(/\D/g, ''), 10) || 0;
-  const sisa = total - dibayarNum;
+  const subtotal = linesSubtotal(lines);
+  const diskon = Number(rupiahToDecimal(values.diskonNota || '0'));
+  const ppn = Number(rupiahToDecimal(values.ppn || '0'));
+  const pembulatan = Number(rupiahToDecimalSigned(values.pembulatan || '0'));
+  const total = subtotal - diskon + ppn + pembulatan;
+  const angkut = values.ditanggungSupplier
+    ? 0
+    : Number(numericToDecimal(values.totalKoli) ?? '0') *
+      Number(rupiahToDecimal(values.tarifPerKoli || '0'));
 
   return (
-    <AppShell title="Pembelian">
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: 16, padding: 22 }}>
-        <View style={styles.detailHead}>
-          <BackButton label="← Batal" onPress={goBack} />
-          <Text style={styles.pageTitle}>Faktur pembelian baru</Text>
-          <View style={{ flex: 1 }} />
-          <Text style={{ fontSize: 13.5, color: C.muted2 }}>
-            Nomor faktur dibuat otomatis saat disimpan
-          </Text>
-        </View>
-
-        <Card className="flex-row flex-wrap gap-3.5 p-4">
-          <View style={{ flex: 2, minWidth: 240 }}>
-            <Field label="Supplier">
-              <OptionPicker
-                options={SUPPLIERS.map((s) => ({ value: String(s.id), label: `${s.kode} · ${s.nama}` }))}
-                value={draft.supId || null}
-                onChange={(v) => setDraft({ ...draft, supId: v, err: '' })}
-              />
-            </Field>
-          </View>
-          <View style={{ flex: 1, minWidth: 180 }}>
-            <Field label="Tanggal faktur">
-              <TextField
-                value={draft.tanggal}
-                onChangeText={(v) => setDraft({ ...draft, tanggal: v })}
-                placeholder="YYYY-MM-DD"
-              />
-            </Field>
-          </View>
-          <View style={{ flex: 1, minWidth: 200 }}>
-            <Field label="Tempo / jatuh tempo">
-              {/* Read-only: the term belongs to the supplier record, and the due
-                  date is derived from it and the invoice date. */}
-              <View style={styles.readout}>
-                <Text style={styles.readoutText}>{tempoReadout(draft.supId, draft.tanggal)}</Text>
-              </View>
-            </Field>
-          </View>
-        </Card>
+    <AppShell title="Faktur baru" onBack={goBack}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.page}>
+        <Text style={styles.headNote}>Tersimpan sebagai DRAFT · nomor dibuat server</Text>
 
         <Card>
-          <CardHead title="Item pembelian" />
-          <View style={styles.addRow}>
-            <View style={{ flex: 2, minWidth: 180 }}>
-              <Field label="PRODUK">
-                <OptionPicker
-                  options={PRODS.map((p) => ({ value: p.kode, label: `${p.kode} · ${p.nama}` }))}
-                  value={draft.rowKode || null}
-                  onChange={(v) => {
-                    const p = prod(v);
-                    const satuan = p ? p.satuan[0].u : null;
-                    // The base buy price times the unit factor: whoever is
-                    // typing corrects it, but the common case is already right.
-                    const harga = p ? String(p.hargaBeli * p.satuan[0].f) : '';
-                    setDraft({ ...draft, rowKode: v, rowSatuan: satuan, rowHarga: harga, err: '' });
-                  }}
-                />
-              </Field>
-            </View>
-            <View style={{ width: 100 }}>
-              <Field label="QTY">
-                <TextField
-                  value={draft.rowQty}
-                  onChangeText={(v) => setDraft({ ...draft, rowQty: v, err: '' })}
-                  keyboardType="numeric"
-                  placeholder="0"
-                />
-              </Field>
-            </View>
-            <View style={{ width: 130 }}>
-              <Field label="SATUAN">
-                <OptionPicker
-                  options={(rowProd?.satuan ?? []).map((u) => ({ value: u.u, label: u.u }))}
-                  value={draft.rowSatuan}
-                  onChange={(v) => {
-                    const sf = rowProd?.satuan.find((u) => u.u === v);
-                    const harga = sf && rowProd ? String(rowProd.hargaBeli * sf.f) : draft.rowHarga;
-                    setDraft({ ...draft, rowSatuan: v, rowHarga: harga });
-                  }}
-                />
-              </Field>
-            </View>
-            <View style={{ flex: 1, minWidth: 140 }}>
-              <Field label="HARGA BELI / SATUAN">
-                <TextField
-                  value={draft.rowHarga}
-                  onChangeText={(v) => setDraft({ ...draft, rowHarga: v, err: '' })}
-                  keyboardType="numeric"
-                  placeholder="0"
-                />
-              </Field>
-            </View>
-            <PrimaryButton label="Tambah" onPress={addRow} />
-          </View>
-          <View style={styles.itemsHeadRow}>
-            <Text style={{ flex: 1 }}>PRODUK</Text>
-            <Text style={{ width: 100, textAlign: 'right' }}>QTY</Text>
-            <Text style={{ width: 130, textAlign: 'right' }}>HARGA</Text>
-            <Text style={{ width: 140, textAlign: 'right' }}>SUBTOTAL</Text>
-            <View style={{ width: 80 }} />
-          </View>
-          {draft.items.map((it, i) => (
-            <View key={i} style={styles.itemRow}>
-              <Text style={{ flex: 1, fontSize: 15, fontWeight: '500' }} numberOfLines={1}>
-                {prodNama(it.kode)}
-              </Text>
-              <Text style={{ width: 100, textAlign: 'right', fontSize: 14.5 }}>
-                {it.qty.toLocaleString('id-ID')} {it.satuan}
-              </Text>
-              <Text style={{ width: 130, textAlign: 'right', fontSize: 14.5, color: C.dark2 }}>
-                {rp(it.harga)}
-              </Text>
-              <Text style={{ width: 140, textAlign: 'right', fontSize: 16, fontWeight: '600' }}>
-                {rp(it.qty * it.harga)}
-              </Text>
-              <View style={{ width: 80, alignItems: 'flex-end' }}>
-                <TinyButton
-                  label="Hapus"
-                  danger
-                  onPress={() => setDraft({ ...draft, items: draft.items.filter((_, j) => j !== i) })}
-                />
-              </View>
-            </View>
-          ))}
-          {draft.items.length === 0 && (
-            <EmptyState title="Belum ada item" sub="Pilih produk, isi qty dan harga beli, lalu klik Tambah." />
-          )}
+          <CardHead title="Header dokumen" />
+          <PembelianHeaderFields
+            isNew
+            values={values}
+            onChange={(patch) => {
+              setValues((v) => ({ ...v, ...patch }));
+              setErr('');
+            }}
+            error=""
+          />
         </Card>
 
+        <PembelianLineEditor
+          lines={lines}
+          onChange={setLines}
+          idSupplier={values.idSupplier}
+          pakaiKoli={pakaiKoli(values)}
+          editable
+        />
+
         <View style={{ alignItems: 'flex-end' }}>
-          <Card className="w-[380px] max-w-full gap-3 p-4">
-            <View style={styles.summaryRow}>
-              <Text style={{ fontSize: 14.5, color: C.muted3 }}>Total faktur</Text>
-              <Text style={{ fontSize: 22, fontWeight: '800' }}>{rp(total)}</Text>
+          <Card className="w-[420px] max-w-full gap-2.5 p-4">
+            <SumRow label="Subtotal baris" value={rp(subtotal)} />
+            <SumRow label="Diskon nota" value={`− ${rp(diskon)}`} />
+            <SumRow label="PPN" value={rp(ppn)} />
+            <SumRow label="Pembulatan" value={rp(pembulatan)} />
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>Total faktur</Text>
+              <Text style={styles.totalValue}>{rp(total)}</Text>
             </View>
-            <View style={styles.summaryRow}>
-              <Text style={{ fontSize: 14.5, color: C.dark2 }}>Bayar sekarang</Text>
-              <View style={{ width: 170 }}>
-                <TextField
-                  value={draft.dibayar}
-                  onChangeText={(v) => setDraft({ ...draft, dibayar: v, err: '' })}
-                  keyboardType="numeric"
-                  placeholder="0"
-                />
-              </View>
+            <View style={styles.angkutRow}>
+              <Text style={styles.angkutLabel}>Biaya angkut</Text>
+              <Text style={styles.angkutValue}>{rp(angkut)}</Text>
             </View>
-            <View style={[styles.summaryRow, { borderTopWidth: 1, borderTopColor: C.borderLight, paddingTop: 10 }]}>
-              <Text style={{ fontSize: 14.5, fontWeight: '600', color: C.dark2 }}>Sisa hutang</Text>
-              <Text style={{ fontSize: 18, fontWeight: '700', color: sisa > 0 ? C.red : C.green }}>
-                {rp(Math.max(0, sisa))}
-              </Text>
+            <Text style={styles.angkutNote}>
+              Di luar total — itu tagihan ekspedisi, bukan utang ke supplier. Angka di atas dihitung
+              ulang oleh server saat disimpan.
+            </Text>
+            <ErrorBanner message={err} />
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
+              <SecondaryButton label="Batal" onPress={goBack} tone="text-dark2" />
+              {/* The real guard is the server's; hiding the button keeps a reader
+                  from filling in a form that was always going to be refused. */}
+              {canWrite && (
+                <PrimaryButton label={saving ? 'Menyimpan…' : 'Simpan draft'} onPress={save} />
+              )}
             </View>
-            <ErrorBanner message={draft.err} />
-            {canWrite && <PrimaryButton label="Simpan faktur" onPress={save} />}
           </Card>
         </View>
       </ScrollView>
@@ -270,56 +165,35 @@ export default function PembelianBaruScreen() {
   );
 }
 
-function tempoReadout(supId: string, tanggalFaktur: string): string {
-  if (!supId) return 'Pilih supplier dulu';
-  const s = sup(parseInt(supId, 10));
-  if (!s) return '';
-  return s.tempo > 0
-    ? `${s.tempo} hari → jatuh ${tanggal(addDays(tanggalFaktur, s.tempo))}`
-    : 'Tunai — bayar di tempat';
+function SumRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.sumRow}>
+      <Text style={styles.sumLabel}>{label}</Text>
+      <Text style={styles.sumValue}>{value}</Text>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-  detailHead: { flexDirection: 'row', alignItems: 'center', gap: 14, flexWrap: 'wrap' },
-  pageTitle: { fontSize: 26, fontWeight: '800', letterSpacing: -0.3, color: C.text },
-  itemsHeadRow: {
+  page: { padding: 22, gap: 16 },
+  head: { flexDirection: 'row', alignItems: 'center', gap: 14, flexWrap: 'wrap' },
+  title: { fontSize: 26, fontWeight: '800', letterSpacing: -0.3, color: C.text },
+  headNote: { fontSize: 13, color: C.muted2 },
+  sumRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sumLabel: { fontSize: 14, color: C.muted3 },
+  sumValue: { fontSize: 15, color: C.dark2 },
+  totalRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 16,
-    height: 40,
-    backgroundColor: C.tableHeaderBg,
-    borderBottomWidth: 1,
-    borderBottomColor: C.borderLight,
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: C.borderLight,
+    paddingTop: 10,
   },
-  itemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 16,
-    minHeight: 56,
-    borderBottomWidth: 1,
-    borderBottomColor: C.borderLighter,
-  },
-  readout: {
-    height: 44,
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-    borderRadius: 9,
-    borderWidth: 1,
-    borderColor: C.borderLight,
-    backgroundColor: '#F7FBFE',
-  },
-  readoutText: { fontSize: 13.5, color: C.dark2 },
-  addRow: {
-    flexDirection: 'row',
-    gap: 10,
-    flexWrap: 'wrap',
-    alignItems: 'flex-end',
-    padding: 16,
-    backgroundColor: C.tableHeaderBg,
-    borderBottomWidth: 1,
-    borderBottomColor: C.borderLight,
-  },
-  summaryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  totalLabel: { fontSize: 14.5, fontWeight: '600', color: C.dark2 },
+  totalValue: { fontSize: 22, fontWeight: '800', letterSpacing: -0.2, color: C.text },
+  angkutRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  angkutLabel: { fontSize: 13.5, color: C.muted3 },
+  angkutValue: { fontSize: 15, fontWeight: '600', color: C.dark2 },
+  angkutNote: { fontSize: 12, color: C.muted2, lineHeight: 16 },
 });

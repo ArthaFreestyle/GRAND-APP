@@ -39,6 +39,7 @@ export interface Session {
 
 const SECURE_KEY = 'grand.session.credentials';
 const PROFILE_KEY = 'grand.session.profile';
+const LAST_GRANT_KEY = 'grand.session.last-grant';
 
 let current: Session | null = null;
 let hydrated = false;
@@ -171,6 +172,60 @@ export function sessionFromLoginResult(result: LoginResult, previous?: Session |
     grants: result.grants ?? [],
     active: result.aktif ?? null,
   };
+}
+
+// ---- the grant each user last worked as ----
+
+/**
+ * Which grant every user of *this device* last picked, keyed by user id.
+ *
+ * Deliberately outside the session, and deliberately **not cleared on logout**:
+ * the entire point is that it is still there tomorrow morning, when the same
+ * cashier signs in and would otherwise be asked again the question they already
+ * answered yesterday. Someone who holds two grants uses the same one almost
+ * every day; asking daily is a question with a 95% predictable answer.
+ *
+ * Keyed by user id because a POS terminal is shared hardware. An unkeyed "last
+ * grant" would preselect the closing shift's role for whoever opens tomorrow —
+ * which is worse than asking, because it is wrong silently. The map grows by
+ * one small integer per person who has ever signed in here, which is why it is
+ * not capped.
+ *
+ * It is a convenience and never an authorization: the id is only acted on when
+ * the server still lists it among that login's `grants`, and
+ * `auth/switch-context` re-checks it server-side regardless.
+ */
+type LastGrants = Record<string, number>;
+
+async function readLastGrants(): Promise<LastGrants> {
+  try {
+    const raw = await AsyncStorage.getItem(LAST_GRANT_KEY);
+    const parsed = raw ? (JSON.parse(raw) as unknown) : null;
+    // Anything but a plain object is treated as nothing remembered rather than
+    // thrown: a corrupt convenience must not break signing in.
+    return parsed && typeof parsed === 'object' ? (parsed as LastGrants) : {};
+  } catch {
+    return {};
+  }
+}
+
+export async function rememberGrant(userId: number | undefined, idUserRole: number): Promise<void> {
+  if (userId === undefined) return;
+  try {
+    const all = await readLastGrants();
+    all[String(userId)] = idUserRole;
+    await AsyncStorage.setItem(LAST_GRANT_KEY, JSON.stringify(all));
+  } catch {
+    // Losing the memory only costs one extra tap at the next sign-in.
+  }
+}
+
+/** The `id_user_role` this user last activated here, or `null` if none is remembered. */
+export async function recallGrant(userId: number | undefined): Promise<number | null> {
+  if (userId === undefined) return null;
+  const all = await readLastGrants();
+  const remembered = all[String(userId)];
+  return typeof remembered === 'number' ? remembered : null;
 }
 
 /** A session that has picked a grant, and so actually authorizes something. */

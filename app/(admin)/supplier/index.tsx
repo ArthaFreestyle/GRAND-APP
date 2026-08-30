@@ -1,50 +1,51 @@
 /**
  * Supplier — the list.
  *
- * Search, the status chips, and paging are all server-side now: `GET /supplier`
- * takes `page`, `size`, `search`, and `is_aktif`, so the count under the chips
- * is the real one rather than a slice of whatever happened to be in memory.
+ * Search, the status chips, and paging are all server-side: `GET /supplier`
+ * takes `page`, `size`, `search`, and `is_aktif`, so a chip filters the whole
+ * table rather than the rows that happen to be in memory.
  *
  * Opening a supplier and creating one are routes (`[id]` and `baru`), so this
- * screen keeps its page, its search, and its scroll while either is on top of
- * it. Edits made up there arrive over `supplierBus`.
+ * screen keeps its rows, its appended pages, and its scroll while either is on
+ * top of it. Edits made up there arrive over `supplierBus`.
  *
- * There is no HUTANG column any more. `GET /supplier` carries no balance — kode,
- * nama, telepon, alamat, npwp, is_aktif and audit columns, nothing else — so a
- * column would mean one `GET /supplier/{id}/utang` per visible row, the same N+1
- * the contract warns about for product stock. The balance is on the detail,
- * where one supplier is one call.
+ * There is no HUTANG column, and there was none in the table either. `GET
+ * /supplier` carries no balance — kode, nama, telepon, alamat, npwp, is_aktif
+ * and audit columns, nothing else — so a column would mean one
+ * `GET /supplier/{id}/utang` per visible row, the same N+1 the contract warns
+ * about for product stock. The balance is on the detail, where one supplier is
+ * one call.
+ *
+ * The table itself is gone: 760pt of fixed columns on a 354pt phone meant NPWP
+ * and the address sat off the right edge. `RecordList` stacks them instead, and
+ * the paging buttons became a scroll.
  */
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
 
 import { AppShell } from '@/components/shell/AppShell';
 import {
-  DataTable,
-  EmptyState,
-  FilterPills,
-  GhostButton,
-  NeutralBadge,
-  PagingBar,
-  PrimaryButton,
-  SearchBar,
-} from '@/components/shell/ui';
-import { Colors as C } from '@/constants/theme-erp';
+  ListHeader,
+  ListSearch,
+  NewRecordRow,
+  RecordList,
+  type RecordItem,
+} from '@/components/shell/record-list';
+import { FilterPills } from '@/components/shell/ui';
 import { useRecordBus } from '@/hooks/use-record-bus';
 import { messageOf } from '@/services/api';
 import { useCanWrite } from '@/services/permissions';
 import { listSupplier, supplierBus, type Supplier } from '@/services/supplier';
 
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_MS = 350;
 
 type StatusFilter = 'semua' | 'aktif' | 'nonaktif';
 
 /**
- * Replaces the old tipe chips. `tipe` has no column in the contract, while
- * `is_aktif` is a real query parameter — so this is the one filter the server
- * can honour, and it filters the whole table rather than the page on screen.
+ * `tipe` has no column in the contract, while `is_aktif` is a real query
+ * parameter — so this is the one filter the server can honour.
  */
 const STATUS_OPTIONS: { key: StatusFilter; label: string }[] = [
   { key: 'semua', label: 'Semua' },
@@ -62,8 +63,6 @@ export default function SupplierListScreen() {
   const router = useRouter();
 
   const [rows, setRows] = useState<Supplier[]>([]);
-  const [totalItem, setTotalItem] = useState(0);
-  const [totalPage, setTotalPage] = useState(1);
   const [listErr, setListErr] = useState('');
   const [listLoading, setListLoading] = useState(true);
 
@@ -71,50 +70,58 @@ export default function SupplierListScreen() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<StatusFilter>('semua');
   const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [moreErr, setMoreErr] = useState('');
 
   const canWrite = useCanWrite('supplier');
 
-  const reloadList = useCallback(async () => {
-    setListLoading(true);
-    try {
-      const result = await listSupplier({
-        page,
+  const fetchPage = useCallback(
+    (p: number) =>
+      listSupplier({
+        page: p,
         size: PAGE_SIZE,
         search: search || undefined,
         is_aktif: IS_AKTIF[status],
-      });
+      }),
+    [search, status]
+  );
+
+  const reloadList = useCallback(async () => {
+    setListLoading(true);
+    setMoreErr('');
+    try {
+      const result = await fetchPage(1);
       setRows(result.data);
-      setTotalItem(result.paging.total_item ?? result.data.length);
-      setTotalPage(Math.max(1, result.paging.total_page ?? 1));
+      setPage(1);
+      setHasMore(Math.max(1, result.paging.total_page ?? 1) > 1);
       setListErr('');
     } catch (e) {
       setListErr(messageOf(e, 'Gagal memuat daftar supplier.'));
       setRows([]);
+      setHasMore(false);
     } finally {
       setListLoading(false);
     }
-  }, [page, search, status]);
+  }, [fetchPage]);
 
   useEffect(() => {
     reloadList();
   }, [reloadList]);
 
   useEffect(() => {
-    const t = setTimeout(() => {
-      setSearch(query.trim());
-      setPage(1);
-    }, SEARCH_DEBOUNCE_MS);
+    const t = setTimeout(() => setSearch(query.trim()), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(t);
   }, [query]);
 
   // What the detail and the create form did while this screen sat underneath
-  // them. A saved supplier is patched into the page already on screen; a new one
-  // could be on any page of a list this screen does not sort, so it re-reads.
+  // them. A saved supplier is patched into the rows already on screen; a new one
+  // could be anywhere in a list this screen does not sort, so it re-reads.
   //
   // A patch can leave a row that no longer belongs under the active chip — a
   // supplier deactivated from the detail while "Aktif" is selected. It is left
   // visible on purpose: silently vanishing the record someone just edited reads
-  // as a bug, and the next page turn or reload settles it honestly.
+  // as a bug, and the next reload settles it honestly.
   useRecordBus(supplierBus, (change) => {
     if (change.kind === 'reload') {
       reloadList();
@@ -124,108 +131,109 @@ export default function SupplierListScreen() {
     setRows((list) => list.map((r) => (r.id === saved.id ? saved : r)));
   });
 
-  const pagingLabel = totalItem
-    ? `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, totalItem)} dari ${totalItem} · halaman ${page}/${totalPage}`
-    : '0 hasil';
+  const loadMore = useCallback(
+    async (force = false) => {
+      if (loadingMore || listLoading || !hasMore) return;
+      if (!force && moreErr !== '') return;
+      setLoadingMore(true);
+      const next = page + 1;
+      try {
+        const result = await fetchPage(next);
+        setRows((list) => {
+          const seen = new Set(list.map((x) => x.id));
+          return [...list, ...result.data.filter((x) => !seen.has(x.id))];
+        });
+        setPage(next);
+        setHasMore(next < Math.max(1, result.paging.total_page ?? 1));
+        setMoreErr('');
+      } catch (e) {
+        setMoreErr(messageOf(e, 'Gagal memuat halaman berikutnya.'));
+      } finally {
+        setLoadingMore(false);
+      }
+    },
+    [loadingMore, listLoading, hasMore, moreErr, page, fetchPage]
+  );
+
+  const onEndReached = useCallback(() => {
+    loadMore();
+  }, [loadMore]);
+
+  const retryMore = useCallback(() => {
+    setMoreErr('');
+    loadMore(true);
+  }, [loadMore]);
+
+  const items = useMemo<RecordItem[]>(
+    () =>
+      rows.map((r) => ({
+        id: r.id,
+        title: r.nama,
+        badge: r.aktif ? undefined : 'Nonaktif',
+        dimmed: !r.aktif,
+        meta: `${r.kode || 'tanpa kode'} · ${r.telepon || '—'}`,
+        // Nothing. The name, the code and the phone number are what a supplier
+        // is looked up by; NPWP and the address are what you read once you have
+        // found it, and both are on the detail. An address in a row is also the
+        // one value long enough to wrap and make every row a different height.
+        fields: [],
+      })),
+    [rows]
+  );
+
+  const openDetail = useCallback(
+    (id: number) => {
+      router.push({ pathname: '/supplier/[id]', params: { id } });
+    },
+    [router]
+  );
+
+  const openNew = useCallback(() => {
+    router.push('/supplier/baru');
+  }, [router]);
+
+  const pickStatus = useCallback((k: StatusFilter) => setStatus(k), []);
+
+  const clearFilter = useCallback(() => {
+    setQuery('');
+    setStatus('semua');
+  }, []);
 
   return (
     <AppShell title="Supplier">
       <View style={styles.listWrap}>
-        <View style={styles.toolbar}>
-          <SearchBar
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Cari nama atau kode supplier"
-          />
-          <FilterPills
-            options={STATUS_OPTIONS}
-            active={status}
-            onPick={(k) => {
-              setStatus(k);
-              setPage(1);
-            }}
-          />
-          <View style={{ flex: 1 }} />
-          <Text style={styles.countLabel}>{totalItem} supplier</Text>
-          {canWrite && (
-            <PrimaryButton label="Supplier baru" onPress={() => router.push('/supplier/baru')} />
-          )}
-        </View>
-
-        <DataTable
-          minWidth={760}
-          head={
-            <View style={styles.tableHeadRow}>
-              <Text style={[styles.thText, { flex: 1 }]}>NAMA</Text>
-              <Text style={[styles.thText, { width: 180 }]}>NPWP</Text>
-              <Text style={[styles.thText, { width: 220 }]}>ALAMAT</Text>
-              <View style={{ width: 90 }} />
-            </View>
+        <RecordList
+          items={items}
+          loading={listLoading}
+          error={listErr}
+          filtered={search !== '' || status !== 'semua'}
+          onOpen={openDetail}
+          onRetry={reloadList}
+          onClearFilter={clearFilter}
+          onCreate={canWrite ? openNew : undefined}
+          createLabel="Supplier baru"
+          emptyTitle="Belum ada supplier"
+          emptySub="Daftar supplier masih kosong. Tambahkan yang pertama untuk mulai mencatat faktur pembelian."
+          header={
+            <ListHeader>
+              <ListSearch
+                value={query}
+                onChangeText={setQuery}
+                placeholder="Cari nama atau kode supplier"
+              />
+              <FilterPills options={STATUS_OPTIONS} active={status} onPick={pickStatus} />
+            </ListHeader>
           }
-          footer={
-            <PagingBar
-              label={pagingLabel}
-              onPrev={() => setPage((p) => Math.max(1, p - 1))}
-              onNext={() => setPage((p) => Math.min(totalPage, p + 1))}
-            />
-          }>
-          {rows.map((r) => (
-            <View key={r.id} style={styles.row}>
-              <Pressable
-                onPress={() => router.push({ pathname: '/supplier/[id]', params: { id: r.id } })}
-                style={styles.rowMain}>
-                <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
-                    <Text
-                      style={[styles.namaText, { color: r.aktif ? C.text : C.muted2 }]}
-                      numberOfLines={1}>
-                      {r.nama}
-                    </Text>
-                    {!r.aktif && <NeutralBadge />}
-                  </View>
-                  <Text style={styles.metaText} numberOfLines={1}>
-                    {r.kode || 'tanpa kode'} · {r.telepon || '—'}
-                  </Text>
-                </View>
-                <Text style={{ width: 180, fontSize: 14, color: C.muted3 }} numberOfLines={1}>
-                  {r.npwp || '—'}
-                </Text>
-                <Text style={{ width: 220, fontSize: 14, color: C.muted3 }} numberOfLines={2}>
-                  {r.alamat || '—'}
-                </Text>
-              </Pressable>
-              <View style={{ width: 90, alignItems: 'flex-end' }}>
-                {/* The form lives on the detail route; `ubah=1` is a URL that
-                    means "this supplier, with its form open". */}
-                {canWrite && (
-                  <GhostButton
-                    label="Ubah"
-                    onPress={() =>
-                      router.push({ pathname: '/supplier/[id]', params: { id: r.id, ubah: '1' } })
-                    }
-                  />
-                )}
-              </View>
-            </View>
-          ))}
-          {listLoading && rows.length === 0 && (
-            <View style={styles.centerBox}>
-              <ActivityIndicator color={C.primary} />
-            </View>
-          )}
-          {!listLoading && listErr !== '' && (
-            <View style={styles.centerBox}>
-              <Text style={styles.errText}>{listErr}</Text>
-              <GhostButton label="Coba lagi" onPress={reloadList} />
-            </View>
-          )}
-          {!listLoading && listErr === '' && rows.length === 0 && (
-            <EmptyState
-              title="Tidak ada supplier yang cocok"
-              sub="Pencarian mencocokkan sebagian kode atau nama supplier — bukan alamat atau NPWP."
-            />
-          )}
-        </DataTable>
+          leadRow={
+            canWrite ? (
+              <NewRecordRow title="Supplier baru" onPress={openNew} />
+            ) : null
+          }
+          onEndReached={onEndReached}
+          loadingMore={loadingMore}
+          moreError={moreErr}
+          onRetryMore={retryMore}
+        />
       </View>
     </AppShell>
   );
@@ -233,39 +241,4 @@ export default function SupplierListScreen() {
 
 const styles = StyleSheet.create({
   listWrap: { flex: 1, padding: 18, gap: 12 },
-  toolbar: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
-  countLabel: { fontSize: 14, color: C.muted3 },
-  tableHeadRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingLeft: 20,
-    paddingRight: 36,
-    minHeight: 48,
-    paddingVertical: 11,
-    backgroundColor: C.tableHeaderBg,
-    borderBottomWidth: 1,
-    borderBottomColor: C.borderLight,
-  },
-  thText: { fontSize: 12.5, fontWeight: '600', letterSpacing: 0.5, color: C.muted },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: C.borderLighter,
-    minHeight: 74,
-  },
-  rowMain: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingLeft: 20,
-    paddingRight: 36,
-    paddingVertical: 10,
-  },
-  namaText: { fontSize: 17, fontWeight: '500' },
-  metaText: { fontSize: 12.5, color: C.muted },
-  centerBox: { padding: 40, alignItems: 'center', gap: 12 },
-  errText: { fontSize: 15, fontWeight: '600', color: C.red, textAlign: 'center' },
 });

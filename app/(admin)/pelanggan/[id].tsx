@@ -17,13 +17,12 @@ import {
 } from '@/components/pelanggan/form';
 import { AppShell } from '@/components/shell/AppShell';
 import {
-  BackButton,
   Card,
   CardHead,
   EmptyState,
   GhostButton,
+  IconAction,
   NeutralBadge,
-  SecondaryButton,
   StatTile,
   Toast,
 } from '@/components/shell/ui';
@@ -149,8 +148,11 @@ export default function PelangganDetailScreen() {
   }, []);
 
   const goBack = useCallback(() => {
-    // Nothing to pop when this was a deep link, and `back()` would leave the app.
-    if (router.canGoBack()) router.back();
+    // `dismiss()` targets the closest Stack — this section's own. `back()` is
+    // offered to the drawer first, and a drawer holding an earlier section in
+    // its history answers it by switching to that section instead of popping
+    // this screen. The fallback is for a deep link with nothing to pop at all.
+    if (router.canDismiss()) router.dismiss();
     else router.replace('/pelanggan');
   }, [router]);
 
@@ -214,7 +216,31 @@ export default function PelangganDetailScreen() {
   const sisaLimit = plafonAngka === null ? null : plafonAngka - piutangJalan;
 
   return (
-    <AppShell title="Pelanggan">
+    <AppShell
+      title={current ? current.nama : 'Detail pelanggan'}
+      onBack={goBack}
+      headerRight={
+        current && canWrite ? (
+          <>
+            <IconAction
+              name="edit-2"
+              label="Ubah pelanggan"
+              onPress={() => setDraft(draftOf(current))}
+            />
+            {/* Archiving, not deleting: the contract has no DELETE for a
+                pelanggan, and `is_aktif: false` is the only removal there is. The
+                bin is what everyone reads as "take this out of the way", and
+                the way back is the same button pointing the other way. */}
+            <IconAction
+              name={current.aktif ? 'trash-2' : 'rotate-ccw'}
+              label={current.aktif ? 'Nonaktifkan pelanggan' : 'Aktifkan kembali'}
+              tone={current.aktif ? 'danger' : 'primary'}
+              onPress={toggleAktif}
+              disabled={saving}
+            />
+          </>
+        ) : undefined
+      }>
       {loading && (
         <View style={styles.centerBox}>
           <ActivityIndicator color={C.primary} />
@@ -230,24 +256,13 @@ export default function PelangganDetailScreen() {
 
       {!loading && current && (
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: 16, padding: 22 }}>
-          <View style={styles.detailHead}>
-            <BackButton onPress={goBack} />
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1 }}>
-              <Text style={styles.detailTitle}>{current.nama}</Text>
-              {!current.aktif && <NeutralBadge />}
+          {/* Everything that acts on the record is in the header bar now.
+              What the record *is* stays here. */}
+          {!current.aktif && (
+            <View style={styles.detailHead}>
+              <NeutralBadge />
             </View>
-            <View style={{ flex: 1 }} />
-            {canWrite && (
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <SecondaryButton label="Ubah pelanggan" onPress={() => setDraft(draftOf(current))} />
-                <SecondaryButton
-                  label={current.aktif ? 'Nonaktifkan' : 'Aktifkan kembali'}
-                  tone={current.aktif ? 'text-danger' : 'text-primary'}
-                  onPress={toggleAktif}
-                />
-              </View>
-            )}
-          </View>
+          )}
 
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
             <StatTile

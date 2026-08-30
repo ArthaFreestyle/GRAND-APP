@@ -12,10 +12,10 @@
  */
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
 
 import { AppShell } from '@/components/shell/AppShell';
-import { BackButton, Card, PrimaryButton, SecondaryButton } from '@/components/shell/ui';
+import { Card, PrimaryButton, SecondaryButton } from '@/components/shell/ui';
 import {
   EMPTY_SUPPLIER,
   SUPPLIER_NOTE,
@@ -24,7 +24,6 @@ import {
 } from '@/components/supplier/form';
 import { Box } from '@/components/ui/box';
 import { Text as UIText } from '@/components/ui/text';
-import { Colors as C } from '@/constants/theme-erp';
 import { messageOf } from '@/services/api';
 import { useCanWrite } from '@/services/permissions';
 import { createSupplier, supplierBus } from '@/services/supplier';
@@ -38,7 +37,11 @@ export default function SupplierBaruScreen() {
   const [saving, setSaving] = useState(false);
 
   function goBack() {
-    if (router.canGoBack()) router.back();
+    // `dismiss()` targets the closest Stack — this section's own. `back()` is
+    // offered to the drawer first, and a drawer holding an earlier section in
+    // its history answers it by switching to that section instead of popping
+    // this screen. The fallback is for a deep link with nothing to pop at all.
+    if (router.canDismiss()) router.dismiss();
     else router.replace('/supplier');
   }
 
@@ -73,13 +76,8 @@ export default function SupplierBaruScreen() {
   }
 
   return (
-    <AppShell title="Supplier">
+    <AppShell title="Supplier baru" onBack={goBack}>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.page}>
-        <View style={styles.head}>
-          <BackButton onPress={goBack} />
-          <Text style={styles.title}>Supplier baru</Text>
-        </View>
-
         {/* Capped rather than stretched: a form is read down a column, and a
             single field the width of a tablet is harder to fill in than one at 640. */}
         <Card className="w-full max-w-[640px]">
@@ -112,6 +110,4 @@ export default function SupplierBaruScreen() {
 
 const styles = StyleSheet.create({
   page: { padding: 22, gap: 16 },
-  head: { flexDirection: 'row', alignItems: 'center', gap: 14, flexWrap: 'wrap' },
-  title: { fontSize: 26, fontWeight: '800', letterSpacing: -0.3, color: C.text },
 });
