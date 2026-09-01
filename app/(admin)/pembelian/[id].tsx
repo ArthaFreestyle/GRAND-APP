@@ -24,6 +24,12 @@
  *   - `GET /ekspedisi/{id}` — the carrier's name, which the document does not
  *     carry.
  *
+ * The two documents that keep moving after posting — penerimaan susulan and
+ * retur pembelian — are their own sections, and this screen is where they are
+ * started from: a short line is chased from the invoice that recorded the
+ * shortfall, and goods go back against the invoice they came in on. The buttons
+ * carry `?idPembelian=` so the form opens with the source already chosen.
+ *
  * `?ubah=1` opens the header dialog on arrival (that is how the list's "Ubah"
  * button gets here) and `?baru=1` says the create form just landed. Both are
  * read once on the way in: they seed the screen rather than driving it.
@@ -137,6 +143,8 @@ export default function PembelianDetailScreen() {
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const canWrite = useCanWrite('pembelian');
+  const canSusulan = useCanWrite('penerimaan-susulan');
+  const canRetur = useCanWrite('retur-pembelian');
   const role = useActiveRole();
 
   // Read once, on the way in: the parameters seed this screen rather than
@@ -419,6 +427,20 @@ export default function PembelianDetailScreen() {
 
   const sisaUtang = utang ? decimalToNumber(utang.sisa_utang) : 0;
 
+  /**
+   * The two documents that can still be written against this one, and only while
+   * they are genuinely possible.
+   *
+   * Both need the invoice POSTED: before that a line has no harga pokok to copy,
+   * no settled remainder, and nothing that has arrived. Beyond that the two ask
+   * different questions of the same lines — a susulan needs something still owed
+   * (`status_penerimaan`, the server's own cache), a retur needs something that
+   * actually arrived and has not gone back yet. A line can answer yes to both.
+   */
+  const bisaSusulan = canSusulan && doc?.status === 'POSTED' && doc.statusTerima === 'KURANG';
+  const bisaRetur =
+    canRetur && doc?.status === 'POSTED' && doc.lines.some((l) => l.qtyDapatDiretur > 0);
+
   return (
     <AppShell title={doc ? doc.nomor : 'Detail faktur'} onBack={goBack}>
       {loading && (
@@ -684,6 +706,45 @@ export default function PembelianDetailScreen() {
             </Card>
           )}
 
+          {/* Started from here rather than from an empty picker in either
+              section: the invoice is what somebody is holding when the second
+              delivery turns up or the goods have to go back, and the form
+              cannot be filled in without choosing it anyway. Each button is
+              rendered only while the document it starts is actually possible. */}
+          {(bisaSusulan || bisaRetur) && !editing && (
+            <Card className="p-4">
+              <Text style={styles.lanjutanLabel}>Dokumen lanjutan</Text>
+              <Text style={styles.lanjutanText}>
+                Faktur ini sudah diposting, jadi barisnya sudah punya harga pokok — keduanya
+                menyalin angka itu, bukan rata-rata bergerak hari ini.
+              </Text>
+              <View style={styles.lanjutanBar}>
+                {bisaSusulan && (
+                  <SecondaryButton
+                    label="Buat kiriman susulan"
+                    onPress={() =>
+                      router.push({
+                        pathname: '/penerimaan-susulan/baru',
+                        params: { idPembelian: doc.id },
+                      })
+                    }
+                  />
+                )}
+                {bisaRetur && (
+                  <SecondaryButton
+                    label="Buat retur pembelian"
+                    onPress={() =>
+                      router.push({
+                        pathname: '/retur-pembelian/baru',
+                        params: { idPembelian: doc.id },
+                      })
+                    }
+                  />
+                )}
+              </View>
+            </Card>
+          )}
+
           {(sisa || sisaErr !== '') && (
             <Card>
               <CardHead
@@ -730,10 +791,10 @@ export default function PembelianDetailScreen() {
                   </Wide>
                   <View style={styles.sisaNoteBox}>
                     <Text style={styles.sisaNote}>
-                      Kiriman susulan dan retur pembelian adalah dokumen tersendiri dan belum
-                      punya layar di aplikasi ini. Angka di atas adalah yang akan dipakai keduanya:
-                      susulan menambah stok tanpa menambah utang, retur hanya boleh atas barang
-                      yang benar-benar datang.
+                      Kekurangan kiriman dikejar dengan penerimaan susulan — dokumen tersendiri
+                      yang menambah stok tanpa menambah utang, karena fakturnya sudah terbit
+                      penuh di kiriman pertama. Bukan dengan retur: yang tidak pernah datang
+                      tidak bisa dikirim balik.
                     </Text>
                   </View>
                 </>
@@ -956,6 +1017,9 @@ const styles = StyleSheet.create({
   },
   sisaAngka: { width: 220, textAlign: 'right', fontSize: 14, color: C.dark2 },
   sisaKurang: { width: 150, textAlign: 'right', fontSize: 14.5, fontWeight: '600', color: C.amber },
+  lanjutanLabel: { fontSize: 13.5, fontWeight: '700', color: C.text },
+  lanjutanText: { fontSize: 12.5, color: C.muted3, lineHeight: 18, marginTop: 4 },
+  lanjutanBar: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
   sisaNoteBox: { padding: 14, backgroundColor: C.tableHeaderBg },
   sisaNote: { fontSize: 12.5, color: C.muted3, lineHeight: 18 },
   editNote: { fontSize: 12.5, color: C.muted3, lineHeight: 18 },

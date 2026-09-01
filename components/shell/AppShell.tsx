@@ -34,6 +34,12 @@ export const NAV_ITEMS = [
   { name: 'pelanggan', label: 'Pelanggan' },
   { name: 'supplier', label: 'Supplier' },
   { name: 'pembelian', label: 'Pembelian' },
+  // The two documents that keep moving after a pembelian is posted. They sit
+  // directly under it because that is what they are read against, and they are
+  // separate sections rather than tabs on the invoice because each has its own
+  // approval flow, its own numbering series, and its own work queue.
+  { name: 'penerimaan-susulan', label: 'Penerimaan Susulan' },
+  { name: 'retur-pembelian', label: 'Retur Pembelian' },
   { name: 'penjualan', label: 'Penjualan' },
   { name: 'mutasi-pemakaian', label: 'Mutasi & Pemakaian' },
   { name: 'stok-opname', label: 'Stok Opname' },

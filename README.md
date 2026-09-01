@@ -18,7 +18,7 @@ universal for Android/iOS/web).
 
 - `app/index.tsx` — login. `app/pilih-peran.tsx` — grant picker, only when the account holds more than one.
 - `app/kasir.tsx` — POS checkout screen (cart, barcode/search, keypad, payment). Locks to landscape while open; the header menu holds today's completed transactions and the Bluetooth receipt-printer picker.
-- `app/(admin)/` — back-office screens under one navigation drawer (`expo-router/drawer`, contents in `components/shell/AppShell.tsx`): Produk, Pelanggan, Supplier, Pembelian, Penjualan, Mutasi & Pemakaian, Stok Opname, Laporan, Unit Kerja & Ruang.
+- `app/(admin)/` — back-office screens under one navigation drawer (`expo-router/drawer`, contents in `components/shell/AppShell.tsx`): Produk, Pelanggan, Supplier, Pembelian, Penerimaan Susulan, Retur Pembelian, Penjualan, Mutasi & Pemakaian, Stok Opname, Laporan, Unit Kerja & Ruang.
 
 All screens currently run on **local component state with inline mock data** — none are wired to a backend yet. The one exception is receipt printing on the Kasir screen, which talks to a real Bluetooth printer (see below). `contracts/openapi.yaml` is the GRAND-ERP API contract; `types/api.ts` is generated from it (see below) for when screens are wired up for real.
 
@@ -117,6 +117,8 @@ app/
     pelanggan/        # index / [id] / baru
     supplier/         # index / [id] / baru
     pembelian/        # index / [id] / baru
+    penerimaan-susulan/ # index / [id] / baru — kiriman kedua atas faktur POSTED
+    retur-pembelian/  # index / [id] / baru — cerminnya, barang balik ke supplier
     penjualan/        # index / [id] / baru
     mutasi-pemakaian/ # index / [id] / baru
     stok-opname/      # index / [id] (draft = lembar hitung, selesai = hasil) / baru
@@ -128,7 +130,8 @@ components/
   pelanggan/          # Pelanggan form fields + its dialog
   supplier/           # Supplier form fields + its dialog
   pembelian/          # header form + dialog, the line editor, workflow dialog,
-                      # and the three status badges the screens share
+                      # the three status badges the screens share, and the line
+                      # editor its two derived documents both use (turunan.tsx)
   opname/             # the counting sheet, shared by stok-opname/[id] and /baru
 constants/
   theme-erp.ts        # shared color tokens + rp() currency formatter
@@ -144,8 +147,12 @@ services/
   produk.ts           # /api/v1/product + /api/v1/satuan, mapped for the screen
   pelanggan.ts        # /api/v1/pelanggan + its piutang query
   supplier.ts         # /api/v1/supplier + its utang query
+  alur-dokumen.ts     # alur DRAFT→DIAJUKAN→POSTED (+BATAL) yang dipakai bersama
+                      # ketiga modul dokumen; tabel aksinya tetap milik tiap modul
   pembelian.ts        # /api/v1/pembelian: dokumen, barisnya, dan alur
                       # ajukan/tolak/posting/batal beserta pembagian rolenya
+  penerimaan-susulan.ts # /api/v1/penerimaan-susulan: menambah stok, bukan utang
+  retur-pembelian.ts  # /api/v1/retur-pembelian: barang balik, tiga nilai berbeda
   ruang.ts            # /api/v1/ruang, the list read (picker for stock documents)
   ekspedisi.ts        # /api/v1/ekspedisi, reads only (carrier picker + name)
   decimal.ts          # the money decimal-string boundary, both directions
