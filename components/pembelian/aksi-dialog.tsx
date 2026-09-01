@@ -13,6 +13,12 @@
  * `alasan` and `alasan_batal` required precisely because a reversal nobody
  * explained cannot be told apart from a mistake, and `kartu_stok` keeps both
  * forever.
+ *
+ * All three document groups that write `kartu_stok` use this one dialog:
+ * pembelian and its two derived documents run the same four transitions. Every
+ * word it shows — the title, the explanation, the placeholder — comes off the
+ * `AksiDokumen` it is handed, so the dialog itself knows nothing about which
+ * document it is confirming. See `services/alur-dokumen.ts`.
  */
 import { View } from 'react-native';
 
@@ -25,7 +31,7 @@ import {
   TextField,
 } from '@/components/shell/ui';
 import { Text } from '@/components/ui/text';
-import type { AksiDokumen } from '@/services/pembelian';
+import type { AksiDokumen } from '@/services/alur-dokumen';
 
 export function AksiDialog({
   aksi,
@@ -56,11 +62,7 @@ export function AksiDialog({
                 <TextField
                   value={alasan}
                   onChangeText={onChangeAlasan}
-                  placeholder={
-                    aksi.key === 'tolak'
-                      ? 'Harga baris 3 tidak cocok dengan nota supplier'
-                      : 'Barang dikembalikan seluruhnya, faktur salah supplier'
-                  }
+                  placeholder={aksi.contoh}
                   multiline
                 />
               </Field>

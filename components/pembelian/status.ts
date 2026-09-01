@@ -13,20 +13,23 @@
  * Kept here rather than in each screen because the pembelian list, the pembelian
  * detail, and the supplier detail all render the same badges, and three private
  * copies had already started to disagree about the wording.
+ *
+ * `DOKUMEN_META` is keyed by `StatusAlur` rather than by pembelian's own status
+ * type, because the two derived documents — penerimaan susulan and retur
+ * pembelian — run the same four-step flow and read the same four badges. The
+ * other two maps stay pembelian's alone: only an invoice is owed money or owed
+ * goods.
  */
 import type { ToneName } from '@/components/shell/ui';
-import type {
-  StatusDokumen,
-  StatusPembayaran,
-  StatusPenerimaan,
-} from '@/services/pembelian';
+import type { StatusAlur } from '@/services/alur-dokumen';
+import type { StatusPembayaran, StatusPenerimaan } from '@/services/pembelian';
 
 export interface StatusMeta {
   label: string;
   tone: ToneName;
 }
 
-export const DOKUMEN_META: Record<StatusDokumen, StatusMeta> = {
+export const DOKUMEN_META: Record<StatusAlur, StatusMeta> = {
   DRAFT: { label: 'Draft', tone: 'neutral' },
   DIAJUKAN: { label: 'Diajukan', tone: 'amber' },
   POSTED: { label: 'Posted', tone: 'green' },

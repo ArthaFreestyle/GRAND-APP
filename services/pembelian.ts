@@ -35,12 +35,14 @@
  *   the two together anywhere overstates the debt.
  *
  * `penerimaan-susulan` and `retur-pembelian` — the two documents that keep
- * moving after a pembelian is posted — have no UI yet. What this module does
- * expose is their *effect*: `qtySusulanDasar`, `sisaDasar`, `qtyReturDasar`,
- * and `qtyDapatDiretur` on every line, so the detail can show what is still
- * owed and what could still go back without pretending to be able to record it.
+ * moving after a pembelian is posted — are their own modules and their own
+ * sections. What *this* one carries is their effect on the invoice they hang
+ * off: `qtySusulanDasar`, `sisaDasar`, `qtyReturDasar`, and `qtyDapatDiretur`
+ * on every line. Those four are the caps both of them are written against, so
+ * they are read from here rather than recomputed there.
  */
 import { createRecordBus } from '@/hooks/use-record-bus';
+import { pilihAksi, type AksiDokumen } from '@/services/alur-dokumen';
 import { buildQuery, type Paged } from '@/services/api';
 import { authedList, authedRequest } from '@/services/client';
 import type { RoleName } from '@/services/permissions';
@@ -428,28 +430,14 @@ export async function bagiRataKoli(id: number): Promise<PembelianDoc> {
 
 // ---- the workflow ----
 
-export type AksiKey = 'ajukan' | 'tolak' | 'posting' | 'batal';
-
-export interface AksiDokumen {
-  key: AksiKey;
-  /** Button label. */
-  label: string;
-  /** The one status the transition starts from. */
-  dari: StatusDokumen;
-  /**
-   * The roles the server accepts. `SUPERADMIN` is listed explicitly rather than
-   * assumed, because two of these are *only* SUPERADMIN and the difference is
-   * the whole point of the split.
-   */
-  roles: readonly RoleName[];
-  /** The mandatory reason's body key, or `null` when the endpoint takes no body. */
-  alasanField: 'alasan' | 'alasan_batal' | null;
-  /** Dialog title and the sentence explaining what the transition really does. */
-  judul: string;
-  penjelasan: string;
-  /** Whether the button should read as destructive. */
-  danger: boolean;
-}
+/**
+ * The workflow vocabulary is `services/alur-dokumen.ts` — the three document
+ * groups that write `kartu_stok` run the same four transitions with the same
+ * role split, and one description of that is enough. Re-exported here so a
+ * screen that already imports this module does not need a second import for the
+ * type of the table it is rendering.
+ */
+export type { AksiDokumen, AksiKey } from '@/services/alur-dokumen';
 
 /**
  * The four transitions, with who may run each.
@@ -486,6 +474,7 @@ export const AKSI: readonly AksiDokumen[] = [
     dari: 'DIAJUKAN',
     roles: ['SUPERADMIN'],
     alasanField: 'alasan',
+    contoh: 'Harga baris 3 tidak cocok dengan nota supplier',
     judul: 'Tolak pengajuan',
     penjelasan:
       'Dokumen kembali ke DRAFT dan bisa diperbaiki. Alasannya wajib — itu satu-satunya jalur balik ke yang mengetik.',
@@ -508,6 +497,7 @@ export const AKSI: readonly AksiDokumen[] = [
     dari: 'POSTED',
     roles: ['SUPERADMIN'],
     alasanField: 'alasan_batal',
+    contoh: 'Faktur salah supplier, seluruh barang dikembalikan',
     judul: 'Batalkan dokumen POSTED',
     penjelasan:
       'Menulis baris pembalik bertanggal hari ini — bukan tanggal dokumen — jadi periode yang sudah ditutup tidak bergeser. Pembaliknya dinilai pada rata-rata bergerak yang berlaku sekarang, bukan harga pokok baris aslinya.',
@@ -517,8 +507,7 @@ export const AKSI: readonly AksiDokumen[] = [
 
 /** The transitions this status and this role can actually run right now. */
 export function aksiTersedia(status: StatusDokumen, role: RoleName | null): AksiDokumen[] {
-  if (role === null) return [];
-  return AKSI.filter((a) => a.dari === status && a.roles.includes(role));
+  return pilihAksi(AKSI, status, role);
 }
 
 /**

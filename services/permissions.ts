@@ -57,6 +57,8 @@ export type WriteArea =
   | 'pelanggan'
   | 'supplier'
   | 'pembelian'
+  | 'penerimaan-susulan'
+  | 'retur-pembelian'
   | 'penjualan'
   | 'mutasi'
   | 'pemakaian'
@@ -79,6 +81,11 @@ const OWNER: Record<WriteArea, RoleName> = {
   supplier: 'INVENTARIS',
   ruang: 'INVENTARIS',
   pembelian: 'INVENTARIS',
+  // The derived documents follow the invoice they hang off: INVENTARIS types
+  // and submits, SUPERADMIN posts. The per-transition half of that is each
+  // module's own `AKSI` table, not this map.
+  'penerimaan-susulan': 'INVENTARIS',
+  'retur-pembelian': 'INVENTARIS',
   mutasi: 'INVENTARIS',
   pemakaian: 'INVENTARIS',
   opname: 'INVENTARIS',
