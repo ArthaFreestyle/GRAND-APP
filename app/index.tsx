@@ -16,9 +16,9 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ApiError } from '@/services/api';
-import { login, resumeLastGrant } from '@/services/auth';
+import { login } from '@/services/auth';
 import { homeRouteFor } from '@/services/permissions';
-import { clearSession, hasActiveContext, useSession } from '@/services/session';
+import { clearSession, hasChosenContext, useSession } from '@/services/session';
 
 /**
  * Sign in, and nothing else.
@@ -141,21 +141,6 @@ export default function LoginScreen() {
    */
   const [focused, setFocused] = useState<'username' | 'password' | null>(null);
 
-  /**
-   * Checked, this resumes the grant this user last worked as on this device and
-   * skips `/pilih-peran` — which is exactly what `rememberGrant` / `recallGrant`
-   * in `services/session.ts` already store, keyed per user id because a POS
-   * terminal is shared hardware. Unchecked, the resume is skipped and the
-   * picker is shown, so someone signing in on a colleague's device lands on the
-   * question instead of silently inheriting yesterday's answer.
-   *
-   * It changes nothing for the majority who hold exactly one grant: that one is
-   * activated server-side during `auth/login`, so there is no second step left
-   * to skip. Defaulted on, as the board has it, because for the people it does
-   * affect the answer is the same nearly every day.
-   */
-  const [ingatPerangkat, setIngatPerangkat] = useState(true);
-
   /** Moving from username to password with the keyboard's own "next" key. */
   const passwordRef = useRef<TextInput>(null);
 
@@ -240,12 +225,10 @@ export default function LoginScreen() {
         });
         return;
       }
-      // Exactly one usable grant is activated server-side, so `active` is set
-      // already and this is a no-op. More than one leaves the choice to us — and
-      // for someone who has made that choice on this device before, the answer
-      // is nearly always the same as last time, so resume it instead of asking,
-      // unless they have just said this is not their device.
-      if (ingatPerangkat) await resumeLastGrant(fresh);
+      // Nothing else happens here. Which grant this session works as is asked
+      // on `/pilih-peran`, for every sign-in — including the single-grant one
+      // the server has already activated, which is the case that most needs
+      // showing, because its holder was never asked anything.
     } catch (e) {
       // The contract answers every credential failure with one message, which is
       // the case the board points at the username field. Anything else — no
@@ -271,7 +254,7 @@ export default function LoginScreen() {
   // stack's anchor and stays mounted, so it is the one place that can answer
   // "where does this session belong" for a cold start, a fresh sign-in, and a
   // session dropped from somewhere else, with the same two conditions.
-  if (!busy && hasActiveContext(session)) {
+  if (!busy && hasChosenContext(session)) {
     return <Redirect href={homeRouteFor(session.active.role)} />;
   }
   if (!busy && session !== null && session.grants.length > 0) {
@@ -412,22 +395,15 @@ export default function LoginScreen() {
                 </View>
               </View>
 
+              {/* The board pairs "Lupa sandi?" with an "Ingat perangkat ini"
+                  checkbox, which is gone: it existed to skip `/pilih-peran` by
+                  resuming the grant last worked as on this device, and that
+                  screen is now shown on every sign-in. A checkbox that changes
+                  nothing is worse than no checkbox. What it used to control —
+                  `rememberGrant` / `recallGrant`, keyed per user id — still runs
+                  unconditionally, and the picker uses it to mark which row was
+                  last used rather than to skip the question. */}
               <View style={styles.row}>
-                <Pressable
-                  onPress={() => setIngatPerangkat((v) => !v)}
-                  hitSlop={12}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: ingatPerangkat }}
-                  accessibilityLabel="Ingat perangkat ini"
-                  style={styles.checkRow}>
-                  <View style={[styles.box, ingatPerangkat ? styles.boxOn : styles.boxOff]}>
-                    {ingatPerangkat ? (
-                      <Feather name="check" size={16} color={D.textOnBrand} />
-                    ) : null}
-                  </View>
-                  <Text style={styles.checkLabel}>Ingat perangkat ini</Text>
-                </Pressable>
-
                 {/* The board wires this to a no-op. A control that does nothing
                     is worse than no control, so rather than drop it or fake it,
                     it answers with the fact: this contract has no password reset
@@ -569,24 +545,18 @@ const styles = StyleSheet.create({
   },
   fieldError: { fontSize: 13, lineHeight: 18, marginTop: 8, color: D.danger },
 
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
-  checkRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  box: {
-    width: 24,
-    height: 24,
-    borderRadius: 8,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  boxOn: { backgroundColor: D.brand, borderColor: D.brand },
-  boxOff: { backgroundColor: D.surfacePage, borderColor: D.borderStrong },
-  checkLabel: { fontSize: 15, lineHeight: 22, color: D.textBody },
+  // One control left in this row now that the checkbox is gone, so it ranges
+  // right — a lone ghost button on the left would read as a heading for the
+  // notice slot underneath it.
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' },
 
   // `--control-h-sm`, ghost variant: no fill until pressed, brand ink text.
   ghost: {
     minHeight: 36,
     paddingHorizontal: 16,
+    // Pulls the button's own padding back off the gutter, so its label lines up
+    // with the right edge of the fields rather than sitting 16pt inside them.
+    marginRight: -16,
     borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',

@@ -9,7 +9,7 @@ import '../global.css';
 
 import { GluestackUIProvider } from '@/components/ui/gluestack-ui-provider';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { hasActiveContext, hydrateSession, useSession } from '@/services/session';
+import { hasChosenContext, hydrateSession, useSession } from '@/services/session';
 
 // Reading the stored session is a Keystore round trip. Holding the splash for
 // it is what keeps a signed-in user from seeing the login screen flash past on
@@ -67,10 +67,16 @@ export default function RootLayout() {
  * session that was already gone, and painted one frame before leaving.
  *
  * Three states, not two, because this contract has one more than the usual
- * signed-out / signed-in pair: a session can hold a token and still authorize
- * nothing until it picks a grant (`active: null`). That middle state gets its
- * own route rather than being folded into the login screen — it is a different
- * question, asked of someone who has already proved who they are.
+ * signed-out / signed-in pair: a session can hold a token and still not be
+ * ready to work. That middle state gets its own route rather than being folded
+ * into the login screen — it is a different question, asked of someone who has
+ * already proved who they are.
+ *
+ * The middle state is `hasChosenContext`, not `hasActiveContext`: a login with
+ * exactly one usable grant comes back with that grant already active, and the
+ * app still shows `/pilih-peran` so the person sees which role and unit kerja
+ * the session is about to work as. Guarding on "active" alone would skip the
+ * question for precisely the people who never chose anything.
  *
  * `index` is deliberately **not** guarded. It is the anchor every guard falls
  * back to when it closes, and it is also the one screen that knows where a
@@ -80,7 +86,7 @@ export default function RootLayout() {
  */
 function RootNavigator() {
   const session = useSession();
-  const ready = hasActiveContext(session);
+  const ready = hasChosenContext(session);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>

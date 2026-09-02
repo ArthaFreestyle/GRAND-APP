@@ -16,7 +16,7 @@ universal for Android/iOS/web).
 
 ## Screens
 
-- `app/index.tsx` — login. `app/pilih-peran.tsx` — grant picker, only when the account holds more than one.
+- `app/index.tsx` — login. `app/pilih-peran.tsx` — grant picker, shown after every login (with one grant it confirms rather than chooses).
 - `app/kasir.tsx` — POS checkout screen (cart, barcode/search, keypad, payment). Locks to landscape while open; the header menu holds today's completed transactions and the Bluetooth receipt-printer picker.
 - `app/(admin)/` — back-office screens under one navigation drawer (`expo-router/drawer`, contents in `components/shell/AppShell.tsx`): Produk, Pelanggan, Supplier, Pembelian, Penerimaan Susulan, Retur Pembelian, Penjualan, Mutasi & Pemakaian, Stok Opname, Laporan, Unit Kerja & Ruang.
 
@@ -105,7 +105,7 @@ works in a dev build or a release build — in Expo Go the printer screen report
 ```
 app/
   index.tsx           # login
-  pilih-peran.tsx     # grant picker (>1 grant only)
+  pilih-peran.tsx     # grant picker, after every login
   kasir.tsx           # POS Kasir (landscape)
   (admin)/            # back-office screens: a Drawer navigator, one screen per section
     _layout.tsx       # expo-router/drawer + AdminDrawerContent; safe-area padding
