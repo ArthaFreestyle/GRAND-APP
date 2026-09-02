@@ -87,11 +87,18 @@ export async function updatePelanggan(id: number, body: PelangganBody): Promise<
 
 /**
  * Open `KREDIT` notes, oldest first — a collection queue, not a history. Cash
- * notes never appear: they are `LUNAS` the moment they are posted.
+ * notes never appear: they are `LUNAS` the moment they are posted, because the
+ * money was taken at the counter and no allocation document points at them.
  *
- * `sisa_piutang` currently equals `total`, because nothing that could reduce it
- * exists yet (`retur-penjualan`, `penerimaan-pembayaran`). The shape will not
- * change when they arrive.
+ * `sisa_piutang` is `total` minus the effective allocations from
+ * `penerimaan-pembayaran`, so it is **not** the same number as `total` any more.
+ * `retur-penjualan` still does not exist and therefore still does not reduce it.
+ *
+ * Two things read this, and they ask different questions of the same page: the
+ * nota detail wants one row (`id_penjualan`), while a credit check before
+ * posting wants the sum of all of them. Summing a page is only honest while the
+ * page holds the whole queue, which is why the caller compares what it got with
+ * `paging.total_item` rather than trusting the total it computed.
  */
 export async function listPiutang(id: number, query: ListQuery = {}): Promise<Paged<PiutangNota>> {
   return authedList<PiutangNota>(`/api/v1/pelanggan/${id}/piutang${buildQuery({ ...query })}`);

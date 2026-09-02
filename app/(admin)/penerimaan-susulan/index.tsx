@@ -22,8 +22,8 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { DOKUMEN_META } from '@/components/pembelian/status';
 import { AppShell } from '@/components/shell/AppShell';
+import { DOKUMEN_META } from '@/components/shell/status-dokumen';
 import {
   ListHeader,
   ListSearch,

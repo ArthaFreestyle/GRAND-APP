@@ -8,11 +8,16 @@
  * were invented for the mock screens.
  *
  * Only the *entry* permission for each screen lives here. Which buttons a
- * document shows at which status (ajukan / posting / batal are split between
- * `INVENTARIS` and `SUPERADMIN` on purpose, so posting takes a second person)
- * belongs with each document module: see `AKSI` in `services/pembelian.ts`,
- * which pairs every transition with the status it starts from and the roles the
- * server accepts, and is the shape the remaining document modules should copy.
+ * document shows at which status belongs with each document module: see `AKSI`
+ * in `services/pembelian.ts`, which pairs every transition with the status it
+ * starts from and the roles the server accepts, and is the shape the remaining
+ * document modules should copy.
+ *
+ * That split is not the same in every group, which is exactly why it is not
+ * here. On a pembelian `INVENTARIS` submits and `SUPERADMIN` posts, so posting
+ * takes a second person. On a penjualan `CASHIER` posts unaided — a buyer at the
+ * counter cannot wait — and `SUPERADMIN` holds `batal` instead. Both grants pass
+ * `canWrite('penjualan')`; only `AKSI` knows which button each one gets.
  */
 import { useSession } from '@/services/session';
 

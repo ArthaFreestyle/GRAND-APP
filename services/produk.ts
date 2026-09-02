@@ -245,6 +245,39 @@ export function listStok(id: number): Promise<StokRuang[]> {
   return authedRequest<StokRuang[]>(`/api/v1/product/${id}/stok`);
 }
 
+/**
+ * The price version in force for each unit of one product, on one date.
+ *
+ * Not the same read as `ProductDetail.harga`, which is the whole history and
+ * leaves "which one applies" to the client. This endpoint resolves it, and that
+ * matters because `penjualan_detail.id_harga_jual` references **a version row**,
+ * not a number: a sales line has to record which entry of the price list its
+ * `harga_satuan_input` came off, and guessing the winner client-side would pin
+ * the wrong row whenever a version had just been closed.
+ *
+ * The resolution is a plain `berlaku_dari <= tanggal AND (berlaku_sampai IS NULL
+ * OR berlaku_sampai > tanggal)` rather than "newest wins", because an exclusion
+ * constraint guarantees two versions are never in force at once — there is never
+ * more than one candidate to choose between.
+ *
+ * `tanggal` defaults to today in WIB server-side. It is passed explicitly by the
+ * sales screens anyway: the document's own date decides the price, and a note
+ * typed after midnight for yesterday must not be priced at today's list.
+ *
+ * An unknown product answers **404**; a product with no version in force on that
+ * date — including one that has never had a price — answers an **empty list**.
+ * Two different facts, and the caller keeps them apart: a sale of a product with
+ * no price is allowed, with the amount typed by hand.
+ */
+export function listHargaJualBerlaku(
+  id: number,
+  tanggal?: string
+): Promise<components['schemas']['HargaJualBerlaku'][]> {
+  return authedRequest<components['schemas']['HargaJualBerlaku'][]>(
+    `/api/v1/product/${id}/harga-jual${buildQuery({ tanggal })}`
+  );
+}
+
 /** Master satuan, for the unit dropdowns. */
 export async function listSatuan(): Promise<ApiSatuan[]> {
   const page = await authedList<ApiSatuan>(

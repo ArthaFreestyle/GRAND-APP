@@ -29,8 +29,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { AksiDialog } from '@/components/pembelian/aksi-dialog';
-import { DOKUMEN_META } from '@/components/pembelian/status';
 import {
   barisSumber,
   draftsDari,
@@ -40,6 +38,8 @@ import {
   type TurunanDraft,
 } from '@/components/pembelian/turunan';
 import { AppShell } from '@/components/shell/AppShell';
+import { AksiDialog } from '@/components/shell/aksi-dialog';
+import { DOKUMEN_META } from '@/components/shell/status-dokumen';
 import {
   Badge,
   Card,

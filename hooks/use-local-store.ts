@@ -1,11 +1,12 @@
 /**
  * A module-level `useState` for screens that are not wired to an endpoint yet.
  *
- * Five back-office sections still run on seeded in-memory data because the
- * contract has no endpoint for them. That was harmless while each was a single
- * route holding its rows in `useState`: the list and the detail were the same
- * component. Split into routes they are not, and a detail that cannot see what
- * the list is holding would have to invent its own copy of the dataset.
+ * Two back-office sections still run on seeded in-memory data — mutasi &
+ * pemakaian, and stok opname — because neither is wired yet. That was harmless
+ * while each was a single route holding its rows in `useState`: the list and
+ * the detail were the same component. Split into routes they are not, and a
+ * detail that cannot see what the list is holding would have to invent its own
+ * copy of the dataset.
  *
  * So the dataset moved out of the component and the screens subscribe to it.
  * This is deliberately the smallest possible store — no actions, no reducers,

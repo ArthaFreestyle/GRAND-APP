@@ -38,7 +38,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { AksiDialog } from '@/components/pembelian/aksi-dialog';
 import {
   EMPTY_HEADER,
   headerBody,
@@ -53,8 +52,10 @@ import {
   PembelianLineEditor,
   type LineDraft,
 } from '@/components/pembelian/lines';
-import { BAYAR_META, DOKUMEN_META, TERIMA_META } from '@/components/pembelian/status';
+import { TERIMA_META } from '@/components/pembelian/status';
 import { AppShell } from '@/components/shell/AppShell';
+import { AksiDialog } from '@/components/shell/aksi-dialog';
+import { BAYAR_META, DOKUMEN_META } from '@/components/shell/status-dokumen';
 import {
   Badge,
   Card,

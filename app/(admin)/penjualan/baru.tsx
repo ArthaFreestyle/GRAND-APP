@@ -1,71 +1,61 @@
 /**
- * Penjualan — the entry form for a new note.
+ * Penjualan — typing a new nota.
  *
- * Already a full page before this was a route; it just had no address and no
- * back button. Saving lands on the stored note via `replace`, so backing out
- * returns to the list rather than to a form still holding items already posted.
+ * `POST /penjualan` takes the header **and** its lines in one body and always
+ * creates a `DRAFT`: `status` is not a field, and nothing here moves stock. So
+ * this page saves once and lands on the nota it made; posting it is a decision
+ * taken on the detail, deliberately not folded into a "simpan & posting" button
+ * that would make an irreversible write feel like a save.
+ *
+ * The lines may genuinely be empty here — the contract expects a nota to be
+ * opened while the goods are still being scanned — and only posting refuses a
+ * document without them. So this form saves an empty draft without complaint
+ * and says so, instead of inventing a rule the server does not have.
+ *
+ * The document number is not typed and not previewed. The server generates it
+ * (`PJ/KODE/2026/08/0001`, reset monthly by the nota's own `tanggal`, with
+ * `KODE` belonging to the unit kerja over the chosen ruang), and guessing at it
+ * here would mean showing a number that may not be the one stored.
+ *
+ * The totals in the summary are a **preview**: `subtotal` and `total` are
+ * recomputed server-side from the lines, and the document that comes back is the
+ * one that counts.
  */
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import {
+  createBody,
+  EMPTY_HEADER,
+  PenjualanHeaderFields,
+  type PenjualanHeaderValues,
+} from '@/components/penjualan/form';
+import {
+  emptyLine,
+  linesSubtotal,
+  linesToInput,
+  PenjualanLineEditor,
+  type LineDraft,
+} from '@/components/penjualan/lines';
 import { AppShell } from '@/components/shell/AppShell';
-import {
-  Card,
-  CardHead,
-  EmptyState,
-  ErrorBanner,
-  Field,
-  OptionPicker,
-  PrimaryButton,
-  TextField,
-  TinyButton,
-} from '@/components/shell/ui';
-import { Colors as C, addDays, rp, tanggal } from '@/constants/theme-erp';
+import { Card, CardHead, ErrorBanner, PrimaryButton, SecondaryButton } from '@/components/shell/ui';
+import { Colors as C, rp } from '@/constants/theme-erp';
+import { messageOf } from '@/services/api';
+import { rupiahToDecimal, rupiahToDecimalSigned } from '@/services/decimal';
+import { createPenjualan, penjualanBus } from '@/services/penjualan';
 import { useCanWrite } from '@/services/permissions';
-import {
-  addNota,
-  cust,
-  CUSTOMERS,
-  piutangCust,
-  prod,
-  prodNama,
-  PRODS,
-  TODAY,
-  type NotaItem,
-} from '@/stores/penjualan';
-
-interface Draft {
-  custId: string;
-  tanggal: string;
-  dibayar: string;
-  items: NotaItem[];
-  /** The item being assembled, above the item table. */
-  rowKode: string;
-  rowSatuan: string | null;
-  rowQty: string;
-  rowHarga: string;
-  err: string;
-}
-
-const FRESH: Draft = {
-  custId: '',
-  tanggal: TODAY,
-  dibayar: '0',
-  items: [],
-  rowKode: '',
-  rowSatuan: null,
-  rowQty: '',
-  rowHarga: '',
-  err: '',
-};
 
 export default function PenjualanBaruScreen() {
   const router = useRouter();
   const canWrite = useCanWrite('penjualan');
-  const [draft, setDraft] = useState<Draft>(FRESH);
 
-  const rowProd = draft.rowKode ? prod(draft.rowKode) : null;
+  const [values, setValues] = useState<PenjualanHeaderValues>(EMPTY_HEADER);
+  // Lazy: the initializer argument of `useState` is evaluated on every render
+  // whether or not it is used, and `emptyLine()` hands out a fresh key each time.
+  const [lines, setLines] = useState<LineDraft[]>(() => [emptyLine()]);
+  const [err, setErr] = useState('');
+  const [saving, setSaving] = useState(false);
 
   function goBack() {
     // `dismiss()` targets the closest Stack — this section's own. `back()` is
@@ -76,201 +66,86 @@ export default function PenjualanBaruScreen() {
     else router.replace('/penjualan');
   }
 
-  function addRow() {
-    if (!draft.rowKode) return setDraft({ ...draft, err: '400 — pilih produk dulu.' });
-    const qty = parseInt(draft.rowQty || '', 10);
-    if (Number.isNaN(qty) || qty < 1) {
-      return setDraft({ ...draft, err: '400 — qty harus bilangan bulat ≥ 1.' });
+  async function save() {
+    if (saving) return;
+    // An untouched first line is not a line somebody meant to type — it is the
+    // one the form opened with. Dropping it is what lets an empty draft be
+    // saved, which the contract explicitly allows.
+    const isi = lines.filter((l) => l.idProduct !== null);
+    const detail = isi.length === 0 ? { ok: true as const, detail: [] } : linesToInput(isi, values.tanggal);
+    if (!detail.ok) return setErr(detail.error);
+    const body = createBody(values, detail.detail);
+    if (!body.ok) return setErr(body.error);
+
+    setSaving(true);
+    try {
+      const created = await createPenjualan(body.body);
+      // A new nota has no row for the list to patch and lands wherever its date
+      // puts it, so the list re-reads the page it is on while the reader moves
+      // to the document itself.
+      penjualanBus.publish({ kind: 'reload' });
+      router.replace({ pathname: '/penjualan/[id]', params: { id: created.id, baru: '1' } });
+    } catch (e) {
+      // 409 here is a period already closed or a ruang frozen by a stock take —
+      // the server names which.
+      setErr(messageOf(e, 'Gagal menyimpan nota penjualan.'));
+    } finally {
+      setSaving(false);
     }
-    const harga = parseInt(String(draft.rowHarga || '').replace(/\D/g, ''), 10);
-    if (Number.isNaN(harga) || harga <= 0) {
-      return setDraft({ ...draft, err: '400 — harga jual wajib diisi.' });
-    }
-    const items = [...draft.items, { kode: draft.rowKode, qty, satuan: draft.rowSatuan ?? '', harga }];
-    setDraft({ ...draft, items, rowKode: '', rowSatuan: null, rowQty: '', rowHarga: '', err: '' });
   }
 
-  function save() {
-    if (draft.custId === '') return setDraft({ ...draft, err: '400 — pilih pelanggan dulu.' });
-    if (!draft.items.length) return setDraft({ ...draft, err: '400 — tambahkan minimal satu item.' });
-    const custId = parseInt(draft.custId, 10);
-    const c = cust(custId);
-    const total = draft.items.reduce((s, it) => s + it.qty * it.harga, 0);
-    const dibayar = parseInt(String(draft.dibayar || '0').replace(/\D/g, ''), 10) || 0;
-    if (dibayar > total) return setDraft({ ...draft, err: '400 — pembayaran melebihi total nota.' });
-    const sisaBaru = total - dibayar;
-    // The credit limit is the server's rule; refusing here keeps the reader from
-    // filling in a note that would be rejected on posting.
-    if (c && c.limit > 0) {
-      const terpakai = piutangCust(custId, null) + sisaBaru;
-      if (terpakai > c.limit) {
-        return setDraft({
-          ...draft,
-          err: `409 — piutang ${rp(terpakai)} melebihi limit kredit ${rp(c.limit)}. Kurangi tempo atau minta pembayaran di muka.`,
-        });
-      }
-    }
-
-    const created = addNota({ custId, tanggal: draft.tanggal, dibayar, items: draft.items });
-    router.replace({ pathname: '/penjualan/[id]', params: { id: created.id, baru: '1' } });
-  }
-
-  const total = draft.items.reduce((a, it) => a + it.qty * it.harga, 0);
-  const dibayarNum = parseInt(String(draft.dibayar || '0').replace(/\D/g, ''), 10) || 0;
-  const sisa = total - dibayarNum;
+  const subtotal = linesSubtotal(lines);
+  const diskon = Number(rupiahToDecimal(values.diskonNota || '0'));
+  const pembulatan = Number(rupiahToDecimalSigned(values.pembulatan || '0'));
+  const total = subtotal - diskon + pembulatan;
 
   return (
     <AppShell title="Nota baru" onBack={goBack}>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: 16, padding: 22 }}>
-        <Text style={{ fontSize: 13.5, color: C.muted2 }}>
-          Nomor nota dibuat otomatis saat disimpan
-        </Text>
-
-        <Card className="flex-row flex-wrap gap-3.5 p-4">
-          <View style={{ flex: 2, minWidth: 240 }}>
-            <Field label="Pelanggan">
-              <OptionPicker
-                options={CUSTOMERS.map((c) => ({
-                  value: String(c.id),
-                  label: c.id === 0 ? c.nama : `${c.kode} · ${c.nama}`,
-                }))}
-                value={draft.custId || null}
-                onChange={(v) => setDraft({ ...draft, custId: v, err: '' })}
-              />
-            </Field>
-          </View>
-          <View style={{ flex: 1, minWidth: 180 }}>
-            <Field label="Tanggal nota">
-              <TextField
-                value={draft.tanggal}
-                onChangeText={(v) => setDraft({ ...draft, tanggal: v })}
-                placeholder="YYYY-MM-DD"
-              />
-            </Field>
-          </View>
-          <View style={{ flex: 1, minWidth: 200 }}>
-            <Field label="Tempo & limit">
-              {/* Read-only: both belong to the customer record, and the due date
-                  is derived from the term and the note date. */}
-              <View style={styles.readout}>
-                <Text style={styles.readoutText}>{tempoReadout(draft.custId, draft.tanggal)}</Text>
-              </View>
-            </Field>
-          </View>
-        </Card>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.page}>
+        <Text style={styles.headNote}>Tersimpan sebagai DRAFT · nomor dibuat server</Text>
 
         <Card>
-          <CardHead title="Item penjualan" />
-          <View style={styles.addRow}>
-            <View style={{ flex: 2, minWidth: 180 }}>
-              <Field label="PRODUK">
-                <OptionPicker
-                  options={PRODS.map((p) => ({ value: p.kode, label: `${p.kode} · ${p.nama}` }))}
-                  value={draft.rowKode || null}
-                  onChange={(v) => {
-                    const p = prod(v);
-                    const satuan = p ? p.satuan[0].u : null;
-                    const harga = p ? String(p.satuan[0].harga) : '';
-                    setDraft({ ...draft, rowKode: v, rowSatuan: satuan, rowHarga: harga, err: '' });
-                  }}
-                />
-              </Field>
-            </View>
-            <View style={{ width: 100 }}>
-              <Field label="QTY">
-                <TextField
-                  value={draft.rowQty}
-                  onChangeText={(v) => setDraft({ ...draft, rowQty: v, err: '' })}
-                  keyboardType="numeric"
-                  placeholder="0"
-                />
-              </Field>
-            </View>
-            <View style={{ width: 130 }}>
-              <Field label="SATUAN">
-                <OptionPicker
-                  options={(rowProd?.satuan ?? []).map((u) => ({ value: u.u, label: u.u }))}
-                  value={draft.rowSatuan}
-                  onChange={(v) => {
-                    const sf = rowProd?.satuan.find((u) => u.u === v);
-                    const harga = sf ? String(sf.harga) : draft.rowHarga;
-                    setDraft({ ...draft, rowSatuan: v, rowHarga: harga });
-                  }}
-                />
-              </Field>
-            </View>
-            <View style={{ flex: 1, minWidth: 140 }}>
-              <Field label="HARGA JUAL / SATUAN">
-                <TextField
-                  value={draft.rowHarga}
-                  onChangeText={(v) => setDraft({ ...draft, rowHarga: v, err: '' })}
-                  keyboardType="numeric"
-                  placeholder="0"
-                />
-              </Field>
-            </View>
-            <PrimaryButton label="Tambah" onPress={addRow} />
-          </View>
-          <View style={styles.itemsHeadRow}>
-            <Text style={{ flex: 1 }}>PRODUK</Text>
-            <Text style={{ width: 100, textAlign: 'right' }}>QTY</Text>
-            <Text style={{ width: 130, textAlign: 'right' }}>HARGA</Text>
-            <Text style={{ width: 140, textAlign: 'right' }}>SUBTOTAL</Text>
-            <View style={{ width: 80 }} />
-          </View>
-          {draft.items.map((it, i) => (
-            <View key={i} style={styles.itemRow}>
-              <Text style={{ flex: 1, fontSize: 15, fontWeight: '500' }} numberOfLines={1}>
-                {prodNama(it.kode)}
-              </Text>
-              <Text style={{ width: 100, textAlign: 'right', fontSize: 14.5 }}>
-                {it.qty.toLocaleString('id-ID')} {it.satuan}
-              </Text>
-              <Text style={{ width: 130, textAlign: 'right', fontSize: 14.5, color: C.dark2 }}>
-                {rp(it.harga)}
-              </Text>
-              <Text style={{ width: 140, textAlign: 'right', fontSize: 16, fontWeight: '600' }}>
-                {rp(it.qty * it.harga)}
-              </Text>
-              <View style={{ width: 80, alignItems: 'flex-end' }}>
-                <TinyButton
-                  label="Hapus"
-                  danger
-                  onPress={() => setDraft({ ...draft, items: draft.items.filter((_, j) => j !== i) })}
-                />
-              </View>
-            </View>
-          ))}
-          {draft.items.length === 0 && (
-            <EmptyState title="Belum ada item" sub="Pilih produk, isi qty dan harga jual, lalu klik Tambah." />
-          )}
+          <CardHead title="Header nota" />
+          <PenjualanHeaderFields
+            values={values}
+            onChange={(patch) => {
+              setValues((v) => ({ ...v, ...patch }));
+              setErr('');
+            }}
+            error=""
+          />
         </Card>
 
+        <PenjualanLineEditor
+          lines={lines}
+          onChange={setLines}
+          tanggal={values.tanggal}
+          idRuang={values.idRuang}
+          editable
+        />
+
         <View style={{ alignItems: 'flex-end' }}>
-          <Card className="w-[380px] max-w-full gap-3 p-4">
-            <View style={styles.summaryRow}>
-              <Text style={{ fontSize: 14.5, color: C.muted3 }}>Total nota</Text>
-              <Text style={{ fontSize: 22, fontWeight: '800' }}>{rp(total)}</Text>
+          <Card className="w-[420px] max-w-full gap-2.5 p-4">
+            <SumRow label="Subtotal baris" value={rp(subtotal)} />
+            <SumRow label="Diskon nota" value={`− ${rp(diskon)}`} />
+            <SumRow label="Pembulatan" value={rp(pembulatan)} />
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>Total nota</Text>
+              <Text style={styles.totalValue}>{rp(total)}</Text>
             </View>
-            <View style={styles.summaryRow}>
-              <Text style={{ fontSize: 14.5, color: C.dark2 }}>Terima pembayaran</Text>
-              <View style={{ width: 170 }}>
-                <TextField
-                  value={draft.dibayar}
-                  onChangeText={(v) => setDraft({ ...draft, dibayar: v, err: '' })}
-                  keyboardType="numeric"
-                  placeholder="0"
-                />
-              </View>
+            <Text style={styles.note}>
+              Dihitung ulang oleh server saat disimpan. Harga pokok dan margin baru terisi saat
+              nota diposting, dari kartu stok — bukan dari layar ini.
+            </Text>
+            <ErrorBanner message={err} />
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
+              <SecondaryButton label="Batal" onPress={goBack} tone="text-dark2" />
+              {/* The real guard is the server's; hiding the button keeps a reader
+                  from filling in a form that was always going to be refused. */}
+              {canWrite && (
+                <PrimaryButton label={saving ? 'Menyimpan…' : 'Simpan draft'} onPress={save} />
+              )}
             </View>
-            <View style={[styles.summaryRow, { borderTopWidth: 1, borderTopColor: C.borderLight, paddingTop: 10 }]}>
-              <Text style={{ fontSize: 14.5, fontWeight: '600', color: C.dark2 }}>Sisa piutang</Text>
-              <Text style={{ fontSize: 18, fontWeight: '700', color: sisa > 0 ? C.red : C.green }}>
-                {rp(Math.max(0, sisa))}
-              </Text>
-            </View>
-            <ErrorBanner message={draft.err} />
-            {canWrite && <PrimaryButton label="Simpan nota" onPress={save} />}
           </Card>
         </View>
       </ScrollView>
@@ -278,63 +153,30 @@ export default function PenjualanBaruScreen() {
   );
 }
 
-function tempoReadout(custId: string, tanggalNota: string): string {
-  if (!custId) return 'Pilih pelanggan dulu';
-  const c = cust(parseInt(custId, 10));
-  if (!c) return '';
-  let t =
-    c.tempo > 0
-      ? `${c.tempo} hari → jatuh ${tanggal(addDays(tanggalNota, c.tempo))}`
-      : 'Tunai — bayar di tempat';
-  if (c.limit > 0) {
-    const dipakai = piutangCust(c.id, null);
-    t += `\nSisa limit ${rp(Math.max(0, c.limit - dipakai))} / ${rp(c.limit)}`;
-  }
-  return t;
+function SumRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.sumRow}>
+      <Text style={styles.sumLabel}>{label}</Text>
+      <Text style={styles.sumValue}>{value}</Text>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-  detailHead: { flexDirection: 'row', alignItems: 'center', gap: 14, flexWrap: 'wrap' },
-  pageTitle: { fontSize: 26, fontWeight: '800', letterSpacing: -0.3, color: C.text },
-  itemsHeadRow: {
+  page: { padding: 22, gap: 16 },
+  headNote: { fontSize: 13, color: C.muted2 },
+  sumRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sumLabel: { fontSize: 14, color: C.muted3 },
+  sumValue: { fontSize: 15, color: C.dark2 },
+  totalRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 16,
-    height: 40,
-    backgroundColor: C.tableHeaderBg,
-    borderBottomWidth: 1,
-    borderBottomColor: C.borderLight,
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: C.borderLight,
+    paddingTop: 10,
   },
-  itemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 16,
-    minHeight: 56,
-    borderBottomWidth: 1,
-    borderBottomColor: C.borderLighter,
-  },
-  readout: {
-    minHeight: 44,
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 9,
-    borderWidth: 1,
-    borderColor: C.borderLight,
-    backgroundColor: '#F7FBFE',
-  },
-  readoutText: { fontSize: 13, color: C.dark2, lineHeight: 18 },
-  addRow: {
-    flexDirection: 'row',
-    gap: 10,
-    flexWrap: 'wrap',
-    alignItems: 'flex-end',
-    padding: 16,
-    backgroundColor: C.tableHeaderBg,
-    borderBottomWidth: 1,
-    borderBottomColor: C.borderLight,
-  },
-  summaryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  totalLabel: { fontSize: 14.5, fontWeight: '600', color: C.dark2 },
+  totalValue: { fontSize: 22, fontWeight: '800', letterSpacing: -0.2, color: C.text },
+  note: { fontSize: 12, color: C.muted2, lineHeight: 16 },
 });

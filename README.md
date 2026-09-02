@@ -125,18 +125,23 @@ app/
     laporan.tsx       # no detail view, so still a single file
     unit-kerja-ruang.tsx
 components/
-  shell/              # AppShell (admin sidebar/header) + shared ui primitives
+  shell/              # AppShell (admin sidebar/header) + shared ui primitives,
+                      # the workflow confirmation dialog, and the status badges
+                      # every document group draws (status-dokumen.ts)
   produk/             # Produk form fields + its dialogs
   pelanggan/          # Pelanggan form fields + its dialog
   supplier/           # Supplier form fields + its dialog
-  pembelian/          # header form + dialog, the line editor, workflow dialog,
-                      # the three status badges the screens share, and the line
-                      # editor its two derived documents both use (turunan.tsx)
+  pembelian/          # header form + dialog, the line editor, the receipt
+                      # status badge only an invoice has, and the line editor its
+                      # two derived documents both use (turunan.tsx)
+  penjualan/          # header form + dialog and the line editor, which resolves
+                      # id_harga_jual — the price-list version a line was priced
+                      # from, not just the amount
   opname/             # the counting sheet, shared by stok-opname/[id] and /baru
 constants/
   theme-erp.ts        # shared color tokens + rp() currency formatter
   produk.ts           # Produk screen's mock data + types
-stores/               # in-memory datasets for the three sections with no endpoint
+stores/               # in-memory datasets for the two sections with no endpoint
                       # yet; module-level so a list and its detail routes share
                       # them. Deleted per section as its endpoint is wired.
 contracts/
@@ -147,12 +152,15 @@ services/
   produk.ts           # /api/v1/product + /api/v1/satuan, mapped for the screen
   pelanggan.ts        # /api/v1/pelanggan + its piutang query
   supplier.ts         # /api/v1/supplier + its utang query
-  alur-dokumen.ts     # alur DRAFT→DIAJUKAN→POSTED (+BATAL) yang dipakai bersama
-                      # ketiga modul dokumen; tabel aksinya tetap milik tiap modul
+  alur-dokumen.ts     # alur DRAFT→(DIAJUKAN→)POSTED (+BATAL) yang dipakai
+                      # bersama keempat modul dokumen; tabel aksinya tetap milik
+                      # tiap modul, dan penjualan cuma memakai dua barisnya
   pembelian.ts        # /api/v1/pembelian: dokumen, barisnya, dan alur
                       # ajukan/tolak/posting/batal beserta pembagian rolenya
   penerimaan-susulan.ts # /api/v1/penerimaan-susulan: menambah stok, bukan utang
   retur-pembelian.ts  # /api/v1/retur-pembelian: barang balik, tiga nilai berbeda
+  penjualan.ts        # /api/v1/penjualan: nota keluar, alur posting/batal tanpa
+                      # pengajuan, dan id_harga_jual per baris
   ruang.ts            # /api/v1/ruang, the list read (picker for stock documents)
   ekspedisi.ts        # /api/v1/ekspedisi, reads only (carrier picker + name)
   decimal.ts          # the money decimal-string boundary, both directions

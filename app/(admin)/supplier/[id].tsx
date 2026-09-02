@@ -22,8 +22,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { BAYAR_META, DOKUMEN_META } from '@/components/pembelian/status';
 import { AppShell } from '@/components/shell/AppShell';
+import { BAYAR_META, DOKUMEN_META } from '@/components/shell/status-dokumen';
 import {
   Badge,
   Card,

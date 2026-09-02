@@ -14,11 +14,14 @@
  * explained cannot be told apart from a mistake, and `kartu_stok` keeps both
  * forever.
  *
- * All three document groups that write `kartu_stok` use this one dialog:
- * pembelian and its two derived documents run the same four transitions. Every
- * word it shows — the title, the explanation, the placeholder — comes off the
- * `AksiDokumen` it is handed, so the dialog itself knows nothing about which
- * document it is confirming. See `services/alur-dokumen.ts`.
+ * Every document group that writes `kartu_stok` uses this one dialog, and they
+ * do not all run the same transitions: pembelian and its two derived documents
+ * run four, penjualan runs two — `DRAFT → POSTED → BATAL`, with no approval step
+ * at all. That costs the dialog nothing, because every word it shows — the
+ * title, the explanation, the placeholder, whether a reason is even collected —
+ * comes off the `AksiDokumen` it is handed. It knows nothing about which
+ * document it is confirming, which is why it lives in `shell/` rather than under
+ * any one section. See `services/alur-dokumen.ts`.
  */
 import { View } from 'react-native';
 
