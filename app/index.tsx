@@ -15,6 +15,14 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+/*
+ * The one thing these two revision-1 screens take from the shared module. Their
+ * `D` block stays: it is the worked example of *how* a screen is ported, and its
+ * hex is a deliberate duplicate. A typeface is not a palette value, though — it
+ * is chrome that has to match on every screen at once, so it is imported rather
+ * than copied.
+ */
+import { RamahWeight as W } from '@/constants/theme-ramah';
 import { ApiError } from '@/services/api';
 import { login } from '@/services/auth';
 import { homeRouteFor } from '@/services/permissions';
@@ -502,7 +510,7 @@ const styles = StyleSheet.create({
   wordmark: {
     fontSize: 26,
     lineHeight: 32,
-    fontWeight: '700',
+    ...W.bold,
     letterSpacing: -0.78,
     color: D.brand,
   },
@@ -510,15 +518,15 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     lineHeight: 34,
-    fontWeight: '700',
+    ...W.bold,
     letterSpacing: -0.28,
     color: D.textTitle,
   },
-  lede: { fontSize: 15, lineHeight: 22, color: D.textBody },
+  lede: { fontSize: 15, lineHeight: 22, ...W.regular, color: D.textBody },
 
   fields: { gap: 16 },
   // `--type-caption` at `--fw-medium`, 8pt clear of its field.
-  label: { fontSize: 13, lineHeight: 18, fontWeight: '500', color: D.textBody, marginBottom: 8 },
+  label: { fontSize: 13, lineHeight: 18, ...W.medium, color: D.textBody, marginBottom: 8 },
   /**
    * The filled field. `minHeight` rather than `height` so a raised system font
    * size grows it instead of being clipped by it, and the border is always 1.5
@@ -540,10 +548,10 @@ const styles = StyleSheet.create({
     minWidth: 0,
     paddingVertical: 12,
     fontSize: 16,
-    fontWeight: '500',
+    ...W.medium,
     color: D.textTitle,
   },
-  fieldError: { fontSize: 13, lineHeight: 18, marginTop: 8, color: D.danger },
+  fieldError: { fontSize: 13, lineHeight: 18, ...W.regular, marginTop: 8, color: D.danger },
 
   // One control left in this row now that the checkbox is gone, so it ranges
   // right — a lone ghost button on the left would read as a heading for the
@@ -562,7 +570,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   ghostPressed: { backgroundColor: D.brandTintSoft },
-  ghostText: { fontSize: 14, lineHeight: 20, fontWeight: '600', color: D.brandInk },
+  ghostText: { fontSize: 14, lineHeight: 20, ...W.semibold, color: D.brandInk },
 
   notice: {
     flexDirection: 'row',
@@ -574,7 +582,7 @@ const styles = StyleSheet.create({
   },
   noticeDanger: { backgroundColor: D.dangerTint },
   noticeInfo: { backgroundColor: D.accentBlueTint },
-  noticeText: { flex: 1, fontSize: 13, lineHeight: 18, color: D.textBody },
+  noticeText: { flex: 1, fontSize: 13, lineHeight: 18, ...W.regular, color: D.textBody },
 
   submit: {
     minHeight: CONTROL_H,
@@ -590,7 +598,7 @@ const styles = StyleSheet.create({
   submitText: {
     fontSize: 16,
     lineHeight: 20,
-    fontWeight: '600',
+    ...W.semibold,
     letterSpacing: -0.16,
     color: D.textOnBrand,
   },

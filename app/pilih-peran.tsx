@@ -4,6 +4,14 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+/*
+ * The one thing these two revision-1 screens take from the shared module. Their
+ * `D` block stays: it is the worked example of *how* a screen is ported, and its
+ * hex is a deliberate duplicate. A typeface is not a palette value, though — it
+ * is chrome that has to match on every screen at once, so it is imported rather
+ * than copied.
+ */
+import { RamahWeight as W } from '@/constants/theme-ramah';
 import { ApiError } from '@/services/api';
 import { logout, switchContext } from '@/services/auth';
 import { asRoleName, roleLabel, type RoleName } from '@/services/permissions';
@@ -389,7 +397,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 18,
     lineHeight: 24,
-    fontWeight: '600',
+    ...W.semibold,
     letterSpacing: -0.18,
     color: D.textTitle,
   },
@@ -402,11 +410,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     lineHeight: 28,
-    fontWeight: '600',
+    ...W.semibold,
     letterSpacing: -0.22,
     color: D.textTitle,
   },
-  lede: { fontSize: 15, lineHeight: 22, color: D.textBody },
+  lede: { fontSize: 15, lineHeight: 22, ...W.regular, color: D.textBody },
 
   /**
    * `minHeight` rather than `height`, so a raised system font size grows the
@@ -436,13 +444,13 @@ const styles = StyleSheet.create({
   },
   rowText: { flex: 1, minWidth: 0 },
   // `--type-body-strong`.
-  rowTitle: { fontSize: 15, lineHeight: 22, fontWeight: '600', color: D.textTitle },
+  rowTitle: { fontSize: 15, lineHeight: 22, ...W.semibold, color: D.textTitle },
   // `--type-caption`, `--text-muted`.
-  rowSubtitle: { fontSize: 13, lineHeight: 18, color: D.textMuted },
+  rowSubtitle: { fontSize: 13, lineHeight: 18, ...W.regular, color: D.textMuted },
   // A hint, not a status: `--fs-micro` in the accent blue the note at the foot
   // of the screen already speaks in, so it reads as the app remembering rather
   // than as something being wrong with the row.
-  rowHint: { fontSize: 11, lineHeight: 14, fontWeight: '600', color: D.accentBlueInk, marginTop: 2 },
+  rowHint: { fontSize: 11, lineHeight: 14, ...W.semibold, color: D.accentBlueInk, marginTop: 2 },
   divider: { height: 1, backgroundColor: D.borderHairline },
 
   notice: {
@@ -454,7 +462,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: D.dangerTint,
   },
-  noticeText: { flex: 1, fontSize: 13, lineHeight: 18, color: D.textBody },
+  noticeText: { flex: 1, fontSize: 13, lineHeight: 18, ...W.regular, color: D.textBody },
 
   info: {
     flexDirection: 'row',
@@ -466,5 +474,5 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: D.accentBlueTint,
   },
-  infoText: { flex: 1, fontSize: 13, lineHeight: 18, color: D.textBody },
+  infoText: { flex: 1, fontSize: 13, lineHeight: 18, ...W.regular, color: D.textBody },
 });

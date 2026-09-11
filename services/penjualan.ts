@@ -119,6 +119,21 @@ export interface PenjualanLine {
 export interface PenjualanDoc extends PenjualanRow {
   subtotal: string;
   diskonNota: string;
+  /**
+   * PPN keluaran as **money, not a rate** — the same shape as `pembelian.ppn`,
+   * and the reason it is money is that a document has to keep saying the right
+   * thing after the national rate changes. It is *exclusive*: the price in
+   * `product_harga_jual` is the DPP and this sits on top, so a KREDIT note's
+   * receivable rises by the tax too, which is what is actually billed. There is
+   * no `ppn_dikreditkan` counterpart the way pembelian has one — output VAT is
+   * a debt to the state, never a cost of goods, so it never touches
+   * `kartu_stok`.
+   *
+   * The client computes the percentage and sends the result; see
+   * `app/(admin)/kasir.tsx`, which is also where the rate is set and where it
+   * can be switched off entirely.
+   */
+  ppn: string;
   /** May be negative — that is the note's rounding line, not an error. */
   pembulatan: string;
   /** `null` until POSTED. Once filled, the note's margin is `total - totalHpp`. */
@@ -171,6 +186,7 @@ function toDoc(p: ApiPenjualan): PenjualanDoc {
     ...toRow(p),
     subtotal: p.subtotal ?? '0.00',
     diskonNota: p.diskon_nota ?? '0.00',
+    ppn: p.ppn ?? '0.00',
     pembulatan: p.pembulatan ?? '0.00',
     totalHpp: p.total_hpp ?? null,
     // Absent on the list by contract. A nota genuinely without lines cannot be
@@ -306,6 +322,12 @@ export interface PenjualanHeaderBody {
   id_pelanggan?: number | null;
   jenis_pembayaran?: JenisPembayaran;
   diskon_nota?: string;
+  /**
+   * Rupiah, not a rate, and never negative. `total = subtotal - diskon_nota +
+   * ppn + pembulatan`, so sending a figure that does not match what was shown
+   * at the counter changes the note rather than the display.
+   */
+  ppn?: string;
   pembulatan?: string;
 }
 

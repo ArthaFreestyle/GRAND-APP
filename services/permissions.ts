@@ -50,9 +50,14 @@ export function roleLabel(role: string | undefined | null): string {
  * other two roles it is the reverse. This is keyed off the role the *server*
  * activated, which is the only one that means anything — the old login screen
  * guessed from a card the user tapped before authenticating.
+ *
+ * `/beranda` rather than `/produk` since the tab bar landed. Beranda is the
+ * first of the three roots and the only screen that answers "what is most
+ * urgent today"; Katalog answers "how much of this is left", which is a
+ * question you arrive at, not one you open the app on.
  */
-export function homeRouteFor(role: string | undefined | null): '/kasir' | '/produk' {
-  return asRoleName(role) === 'CASHIER' ? '/kasir' : '/produk';
+export function homeRouteFor(role: string | undefined | null): '/kasir' | '/beranda' {
+  return asRoleName(role) === 'CASHIER' ? '/kasir' : '/beranda';
 }
 
 /** The areas the app has screens for today. */

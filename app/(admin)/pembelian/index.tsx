@@ -129,6 +129,20 @@ export default function PembelianListScreen() {
   }, [fetchPage]);
 
   useEffect(() => {
+    // A real render cascade, and a pre-existing one: the fetch effect flips the
+    // screen into its loading state synchronously, so React renders once for the
+    // new inputs and again for the flag before a byte is requested.
+    // `eslint-config-expo` 57 promotes this to an error; under SDK 54 the same
+    // code drew the same two renders in silence.
+    //
+    // The fix is the one `app/(admin)/produk/index.tsx` now uses — derive loading
+    // from "the key I want loaded" vs "the key I have loaded", so nothing is set
+    // on the way in. It is deliberately not applied here yet: this screen is
+    // queued for the Ramah port, the repo has no test runner, and restructuring
+    // load state on a screen that cannot be exercised trades a measurable-in-
+    // microseconds cascade for the risk of a spinner that never stops. It goes
+    // when the screen is ported.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     reloadList();
   }, [reloadList]);
 

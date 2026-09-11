@@ -24,7 +24,6 @@ import {
   KeyboardAvoidingView,
   Modal as RNModal,
   Platform,
-  Pressable as RNPressable,
   StyleSheet,
 } from 'react-native';
 
@@ -361,16 +360,24 @@ export function Toast({ message }: { message: string | null }) {
  * with steps to link into and a screen of its own. The create forms already
  * are that — `<section>/baru.tsx`.
  *
- * `transparent` is the RN `Modal` prop that stops the modal *window* from
- * painting an opaque page over the app. It is not a colour choice and it is not
- * optional: without it there is no dimmed app behind the card, just a white
- * full-screen sheet. The two layers it lets us draw are both deliberate — a
- * scrim, which has to be translucent to be a scrim at all, and the card itself,
- * which is flat opaque `bg-card`.
+ * **It is opaque, and it used to be a card floating on a translucent scrim.**
+ * `transparent` on an RN `Modal` stops the modal *window* painting a page over
+ * the app, which is what let a dimmed app show through behind the card. That
+ * dimming is the one thing the design system has no room for: its entire
+ * elevation vocabulary is hairline, tint and the *sheet* scrim, and a dialog is
+ * not a sheet. What it bought in practice was a dialog that read as provisional
+ * — a layer over the screen rather than the thing being worked on — and a
+ * lift-off shadow to sell the illusion, which is banned outright.
  *
- * `onRequestClose` is what makes the Android hardware back button close the
- * dialog instead of leaving the screen underneath it, and it is required on
- * Android; tapping the scrim does the same thing for the pointer.
+ * So the window is opaque now and painted the page colour, with the dialog on
+ * it as one more flat white card. Two things follow from dropping the scrim:
+ * there is no `Pressable` behind the card any more (an invisible full-screen
+ * dismiss target on an opaque page is a tap that loses your work with nothing on
+ * screen to warn you), and no shadow (nothing to lift off). Closing is the
+ * dialog's own cancel control, or the Android back button.
+ *
+ * `onRequestClose` is what makes that back button close the dialog instead of
+ * leaving the screen underneath it, and it is required on Android.
  */
 export function ModalShell({
   visible,
@@ -387,26 +394,21 @@ export function ModalShell({
     <RNModal
       visible={visible}
       onRequestClose={onRequestClose}
-      transparent
       animationType="fade"
-      // The scrim covers the status and navigation bars too — a dialog that
-      // dims everything except a strip at each end reads as a rendering fault.
+      // A modal is its own window and is outside every padded box in the app, so
+      // it opts back into drawing under the system bars and pays for them
+      // itself — otherwise the page stops short at each end and the strip left
+      // behind reads as a rendering fault.
       statusBarTranslucent
       navigationBarTranslucent>
       <KeyboardAvoidingView
-        style={modalStyles.centre}
-        // Android already resizes the window for the keyboard; adding padding
-        // on top of that pushes the dialog off its own scrim.
+        style={modalStyles.page}
+        // Android already resizes the window for the keyboard; adding padding on
+        // top of that pushes the dialog off the top of its own page.
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <RNPressable
-          style={modalStyles.scrim}
-          accessibilityRole="button"
-          accessibilityLabel="Tutup dialog"
-          onPress={onRequestClose}
-        />
         <Box
           className="w-full overflow-hidden rounded-2xl border border-line-card bg-card p-0"
-          style={[modalStyles.card, { maxWidth: width }]}>
+          style={{ maxWidth: width }}>
           {children}
         </Box>
       </KeyboardAvoidingView>
@@ -415,25 +417,18 @@ export function ModalShell({
 }
 
 const modalStyles = StyleSheet.create({
-  centre: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 18 },
   /**
-   * The one place in the app that is translucent on purpose: it exists to show
-   * the app underneath, dimmed. #0E2433 is the palette's text colour rather
-   * than black, so the dim keeps the blue cast the rest of the screen has.
+   * The dialog's ground. Opaque, and the same page colour every screen in the
+   * back office sits on, so opening a dialog reads as arriving somewhere rather
+   * than as a layer settling over what was already there.
+   *
+   * Written as hex rather than a `bg-page` class because this is the modal's own
+   * window: it is outside the provider's tree for CSS-variable purposes on
+   * Android, and a class that resolves to nothing there renders a see-through
+   * window with no warning — which is the exact bug the note at the top of
+   * `tailwind.config.js` records.
    */
-  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(14,36,51,0.35)' },
-  /**
-   * gluestack's `shadow-hard-2` is not in this project's Tailwind theme, and a
-   * card floating on a scrim needs the lift to read as being in front of it.
-   * Both platforms are set: `elevation` is Android's, the rest is iOS's.
-   */
-  card: {
-    shadowColor: '#0E2433',
-    shadowOpacity: 0.22,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 12,
-  },
+  page: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 18, backgroundColor: '#F1F8FD' },
 });
 
 export function ModalHead({ title, sub }: { title: string; sub: string }) {

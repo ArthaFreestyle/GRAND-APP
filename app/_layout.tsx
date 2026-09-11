@@ -1,4 +1,22 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+/*
+ * Four **deep** imports, not one from the package root.
+ *
+ * `@expo-google-fonts/poppins`'s index re-exports all eighteen faces, each a
+ * `require()` of a .ttf — and Metro does not tree-shake an asset `require`, so
+ * importing four names from the root ships every italic and every weight from
+ * Thin to Black. That is about 3 MB of fonts for the four the app draws in.
+ * `npx expo export --platform android` lists them, which is how it was caught.
+ *
+ * `useFonts` comes from `expo-font` itself for the same reason: the root is
+ * where the package re-exports it from, and touching the root is the thing being
+ * avoided.
+ */
+import { Poppins_400Regular } from '@expo-google-fonts/poppins/400Regular';
+import { Poppins_500Medium } from '@expo-google-fonts/poppins/500Medium';
+import { Poppins_600SemiBold } from '@expo-google-fonts/poppins/600SemiBold';
+import { Poppins_700Bold } from '@expo-google-fonts/poppins/700Bold';
+import { useFonts } from 'expo-font';
+import { DarkTheme, DefaultTheme, ThemeProvider } from "expo-router/react-navigation";
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -11,9 +29,10 @@ import { GluestackUIProvider } from '@/components/ui/gluestack-ui-provider';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { hasChosenContext, hydrateSession, useSession } from '@/services/session';
 
-// Reading the stored session is a Keystore round trip. Holding the splash for
-// it is what keeps a signed-in user from seeing the login screen flash past on
-// every cold start.
+// Reading the stored session is a Keystore round trip, and the four Poppins
+// faces are files. Holding the splash for both is what keeps a signed-in user
+// from seeing the login screen flash past on every cold start, and every screen
+// from painting one frame in the platform font before swapping family under it.
 SplashScreen.preventAutoHideAsync().catch(() => {
   // Already hidden, or no splash on this platform — not worth failing over.
 });
@@ -24,11 +43,34 @@ export const unstable_settings = { anchor: 'index' };
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
-  const [ready, setReady] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+
+  /**
+   * Poppins, in the four weights `constants/theme-ramah.ts` names.
+   *
+   * Loaded at runtime rather than embedded by the `expo-font` config plugin,
+   * because the runtime loader registers each file under the family name we
+   * give it and that name is then the same on Android and iOS — the plugin
+   * takes the family from the file on iOS and from the file *name* on Android,
+   * which would put a `Platform.select` in every text style in the app.
+   *
+   * `error` is a value here, not an exception: a face that fails to decode must
+   * not hold the splash screen forever. The app opens in the platform font
+   * instead, which is why every `RamahWeight` entry still carries its numeric
+   * `fontWeight` — the hierarchy survives the fallback.
+   */
+  const [fontsLoaded, fontsError] = useFonts({
+    Poppins_400Regular,
+    Poppins_500Medium,
+    Poppins_600SemiBold,
+    Poppins_700Bold,
+  });
 
   useEffect(() => {
-    hydrateSession().finally(() => setReady(true));
+    hydrateSession().finally(() => setHydrated(true));
   }, []);
+
+  const ready = hydrated && (fontsLoaded || fontsError !== null);
 
   useEffect(() => {
     if (ready) SplashScreen.hideAsync().catch(() => {});
@@ -39,10 +81,20 @@ export default function RootLayout() {
   // The back-office screens are a light-mode design port; forcing the mode here
   // keeps a device in dark mode from half-inverting components that were never
   // given a dark palette.
-  // `expo-router/drawer` is a gesture-handler navigator: on Android its
-  // swipe-from-the-edge only reaches the JS side from inside this root view,
-  // and without it the drawer silently stops opening by gesture on exactly one
-  // platform.
+  // `GestureHandlerRootView` stays now that the drawer it was added for is
+  // gone. `react-native-screens` builds its native-stack gestures on
+  // gesture-handler — the swipe-back on iOS and the predictive back animation
+  // on Android both run through it — and `ModalShell`'s scrim is a
+  // `Pressable` inside a `Modal`, which on Android needs the root view above it
+  // to receive touches at all. Removing it would break those quietly, on one
+  // platform each, which is exactly the class of bug it was introduced to fix.
+  //
+  // There is **no sheet provider here any more**. `RamahSheet` is
+  // `@expo/ui/community/bottom-sheet` now, which presents natively: it wraps its
+  // own `Host`, needs no portal and no provider, and its host carries
+  // `pointerEvents="none"` while the sheet is closed — which is precisely what
+  // the hand-rolled `Modal` window it replaced did not, and why the app went
+  // dead to touches after the first sheet was dismissed.
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <GluestackUIProvider mode="light">
@@ -96,7 +148,37 @@ function RootNavigator() {
       </Stack.Protected>
       <Stack.Protected guard={ready}>
         <Stack.Screen name="(admin)" />
-        <Stack.Screen name="kasir" />
+        {/*
+          Katalog sits **beside** the tabs for the same reason susulan does,
+          below — and it moved out the day the till took the middle tab.
+
+          The bar has three roots and the board draws three: Beranda, Kasir,
+          Nota. Katalog is not one of them any more, and a route inside
+          `(admin)` with no `NativeTabs.Trigger` is a route nothing can reach.
+          So it is pushed from the stack that *contains* the tabs, which is also
+          how the board draws the screen itself: `LayarGudang.dc.html` gives
+          Katalog an `AppHeader` with a back arrow to home, not a tab root with
+          no way back. Beranda's metric card and its Katalog tile are what push
+          it, and closing it returns there.
+        */}
+        <Stack.Screen name="produk" />
+        {/*
+          Penerimaan susulan sits **beside** the tabs, not inside them.
+
+          Two reasons, and the first is a hard constraint. Native tabs register a
+          route only through a `NativeTabs.Trigger`, and a trigger marked
+          `hidden` "cannot be navigated to in any way" — so a susulan left inside
+          `(admin)` would either occupy a fourth tab nobody wants or become
+          unreachable, and `/penerimaan-susulan/baru?idPembelian=` is a link the
+          invoice screen pushes on every short delivery.
+
+          The second is that this is where it belonged anyway. A susulan is
+          always started from the invoice that recorded the shortfall (F1 → F2 on
+          the board), never from a standing menu. Pushed from the stack that
+          *contains* the tabs, closing it returns to the invoice the reader came
+          from rather than to a susulan index they never visited.
+        */}
+        <Stack.Screen name="penerimaan-susulan" />
       </Stack.Protected>
     </Stack>
   );

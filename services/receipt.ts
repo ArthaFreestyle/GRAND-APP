@@ -24,11 +24,28 @@ export interface ReceiptData {
   datetime: string;
   kasir: string;
   ruang: string;
-  jenis: 'TUNAI' | 'KREDIT';
+  /**
+   * What the paper says about how the money arrived.
+   *
+   * Three, where the contract's `penjualan.jenis_pembayaran' has two. That is
+   * not a mismatch to tidy away: the document's field answers *is the shop
+   * still owed anything*, and QRIS answers that exactly as cash does, so a
+   * QRIS sale is posted TUNAI. The receipt answers a different question — the
+   * one the person holding it asks — and 'Pembayaran: QRIS' is what lets a
+   * buyer match the slip to their bank app.
+   */
+  jenis: 'TUNAI' | 'QRIS' | 'KREDIT';
   pelanggan: string | null;
   items: ReceiptLine[];
   sub: number;
   notaDisc: number;
+  /**
+   * PPN in rupiah, **not** a rate, and exclusive of the line prices — the shape
+   * `POST /penjualan` takes, so the paper and the payload can never disagree
+   * about what was charged. Printed only when it is non-zero: a shop that does
+   * not charge it should not have a "PPN 0" line on every receipt.
+   */
+  ppn: number;
   bulat: number;
   total: number;
   paid: number;
@@ -88,6 +105,7 @@ export function encodeReceipt(data: ReceiptData, columns: PaperColumns): Uint8Ar
 
   const totals: (string | ((e: ReceiptPrinterEncoder) => void))[][] = [['Subtotal', num(data.sub)]];
   if (data.notaDisc > 0) totals.push(['Diskon nota', `-${num(data.notaDisc)}`]);
+  if (data.ppn > 0) totals.push(['PPN 11%', num(data.ppn)]);
   if (data.bulat !== 0) totals.push(['Pembulatan', `${data.bulat < 0 ? '-' : ''}${num(Math.abs(data.bulat))}`]);
   totals.push([
     (e) => e.bold().text('TOTAL').bold(),
@@ -95,6 +113,10 @@ export function encodeReceipt(data: ReceiptData, columns: PaperColumns): Uint8Ar
   ]);
   if (data.jenis === 'TUNAI') {
     totals.push(['Tunai', num(data.paid)], ['Kembali', num(data.change)]);
+  } else if (data.jenis === 'QRIS') {
+    // No cash tendered and nothing to hand back, so the two lines a cash sale
+    // ends on would both be the total and zero — noise on a 32-column slip.
+    totals.push(['Dibayar', num(data.total)], ['Status', 'LUNAS']);
   } else {
     totals.push(['Piutang', num(data.total)], ['Status', 'BELUM LUNAS']);
   }

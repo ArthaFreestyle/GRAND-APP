@@ -6,6 +6,8 @@
  * direction of goods — so they share one editor rather than two that would drift.
  * What differs is a `mode`, and it changes exactly three things: which quantity
  * caps a line, which lines are worth offering at all, and the words for both.
+ * Only `susulan` has a screen today; `retur` is kept because the mode is two
+ * lines of copy and deleting it is how the next person rebuilds this file.
  *
  * ### Why this is not a product search
  *
@@ -15,6 +17,17 @@
  * refuses anything else. So the source document *is* the form — its lines are
  * listed, each with the ceiling that applies to it, and typing a quantity is
  * what puts one on the document. Leaving it blank leaves the line off.
+ *
+ * ### The ceiling is written, not discovered
+ *
+ * The board is explicit about this and it is the one rule here worth protecting:
+ * *"jumlahnya dibatasi sisa itu — batasnya ditulis di bawah tiap stepper, bukan
+ * baru muncul sebagai error."* The remainder is printed under every field before
+ * anything is typed, and the `+` stops at it. Going over is still possible by
+ * typing, and then it is said in red on the same line — because the number might
+ * be right and the *invoice's* remainder stale, and a field that refuses to hold
+ * what somebody is reading off a delivery note is worse than one that disagrees
+ * out loud.
  *
  * ### The two ceilings are on different axes
  *
@@ -38,20 +51,27 @@
  * invoice's unit is the default because it is nearly always right, and the
  * alternatives cost a `GET /product/{id}` that is only spent when asked for.
  */
+import Feather from '@expo/vector-icons/Feather';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { SatuanOption } from '@/components/pembelian/lines';
 import {
-  Card,
-  CardHead,
-  EmptyState,
-  Field,
-  GhostButton,
-  OptionPicker,
-  TextField,
-} from '@/components/shell/ui';
-import { Colors as C, num, rp } from '@/constants/theme-erp';
+  RamahChip,
+  RamahIconButton,
+  RamahSectionHeader,
+  RamahSheet,
+  RamahSheetOption,
+} from '@/components/shell/ramah';
+import { formatNumber, formatRupiah } from '@/constants/produk';
+import {
+  RamahColors as C,
+  RamahIcon,
+  RamahLayout as L,
+  RamahRadius as R,
+  RamahType as T,
+  RamahWeight as W,
+} from '@/constants/theme-ramah';
 import { decimalToNumber, numericToDecimal } from '@/services/decimal';
 import type { PembelianDoc } from '@/services/pembelian';
 import { getProduct } from '@/services/produk';
@@ -140,11 +160,11 @@ export function barisSumber(
         hppDasar: l.hppDasar ?? '0.0000',
         ringkas:
           mode === 'susulan'
-            ? `Diterima ${num(l.qtyDiterimaDasar)}${
-                l.qtySusulanDasar > 0 ? ` + susulan ${num(l.qtySusulanDasar)}` : ''
-              } dari ${num(l.qtyDasar)} ${l.namaSatuanDasar}`
-            : `Datang ${num(datang)}${
-                l.qtyReturDasar > 0 ? ` · sudah diretur ${num(l.qtyReturDasar)}` : ''
+            ? `Diterima ${formatNumber(l.qtyDiterimaDasar)}${
+                l.qtySusulanDasar > 0 ? ` + susulan ${formatNumber(l.qtySusulanDasar)}` : ''
+              } dari ${formatNumber(l.qtyDasar)} ${l.namaSatuanDasar}`
+            : `Datang ${formatNumber(datang)}${
+                l.qtyReturDasar > 0 ? ` · sudah diretur ${formatNumber(l.qtyReturDasar)}` : ''
               } ${l.namaSatuanDasar}`,
       };
     })
@@ -327,26 +347,29 @@ export function TurunanLineEditor({
   const terisi = drafts.filter((d) => d.qty.trim() !== '').length;
 
   return (
-    <Card>
-      <CardHead
-        title={copy.judul}
-        right={
-          <Text style={styles.headRight}>
-            {terisi} dari {drafts.length} baris · {rp(nilaiTurunan(drafts))}
-          </Text>
-        }
-      />
-      {drafts.map((d) => (
-        <BarisRow
-          key={d.sumber.idPembelianDetail}
-          draft={d}
-          mode={mode}
-          editable={editable}
-          onPatch={patch}
-        />
-      ))}
-      {drafts.length === 0 && <EmptyState title={copy.kosongJudul} sub={copy.kosongSub} />}
-    </Card>
+    <View style={styles.group}>
+      {/* The count is in the heading's action slot rather than on a card of its
+          own: "2 dari 5 baris" is the state of this whole group, and it is the
+          number somebody checks before pressing save. */}
+      <RamahSectionHeader>{`${copy.judul} · ${terisi} dari ${drafts.length} terisi`}</RamahSectionHeader>
+
+      {drafts.length === 0 ? (
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyTitle}>{copy.kosongJudul}</Text>
+          <Text style={styles.emptySub}>{copy.kosongSub}</Text>
+        </View>
+      ) : (
+        drafts.map((d) => (
+          <BarisRow
+            key={d.sumber.idPembelianDetail}
+            draft={d}
+            mode={mode}
+            editable={editable}
+            onPatch={patch}
+          />
+        ))
+      )}
+    </View>
   );
 }
 
@@ -362,24 +385,37 @@ function BarisRow({
   onPatch: (id: number, next: Partial<TurunanDraft>) => void;
 }) {
   const [loadingSatuan, setLoadingSatuan] = useState(false);
+  const [satuanErr, setSatuanErr] = useState('');
+  const [satuanSheet, setSatuanSheet] = useState(false);
+  const [focused, setFocused] = useState(false);
   const copy = COPY[mode];
   const { sumber } = draft;
 
-  /** The alternatives, fetched only when somebody actually wants a different unit. */
+  /**
+   * The alternatives, fetched only when somebody actually wants a different unit.
+   *
+   * A failure is **said**, not swallowed. Leaving `satuan` null does keep the
+   * invoice's unit on screen — the one the server will accept anyway — but the
+   * control that was pressed is a chip with a chevron on it, and a chevron that
+   * does nothing twice in a row reads as the app being broken rather than as the
+   * lookup having failed. The line is still usable in the invoice's unit, which
+   * is what the message says.
+   */
   const loadSatuan = useCallback(async () => {
     setLoadingSatuan(true);
+    setSatuanErr('');
     try {
       const detail = await getProduct(sumber.idProduct);
       onPatch(sumber.idPembelianDetail, {
         satuan: detail.satuan.map((s) => ({ id: s.idSatuan, nama: s.nama, faktor: s.faktor })),
       });
+      setSatuanSheet(true);
     } catch {
-      // Leaving `satuan` null keeps the invoice's unit on screen, which is the
-      // one the server will accept anyway.
+      setSatuanErr(`Satuan lain tidak terbaca. Baris ini tetap bisa diisi dalam ${draft.namaSatuan}.`);
     } finally {
       setLoadingSatuan(false);
     }
-  }, [onPatch, sumber.idPembelianDetail, sumber.idProduct]);
+  }, [onPatch, sumber.idPembelianDetail, sumber.idProduct, draft.namaSatuan]);
 
   const dasar = qtyDasarOf(draft);
   const diisi = draft.qty.trim() !== '';
@@ -387,118 +423,277 @@ function BarisRow({
   // this again under a row lock and only that check decides.
   const lewatBatas = diisi && dasar > sumber.batasDasar;
 
+  /**
+   * The ceiling, expressed in the unit that is actually on screen.
+   *
+   * `batasDasar` is in base units and the field may be holding cartons, so the
+   * stepper's own limit is the floor of the division — four-and-a-bit cartons of
+   * remainder is four cartons you may type, and the rest is typed in pcs on a
+   * second document or as a different unit on this one.
+   */
+  const batasInput = Math.floor(sumber.batasDasar / Math.max(1, draft.faktor));
+
+  const setQty = (next: number) => {
+    onPatch(sumber.idPembelianDetail, { qty: next <= 0 ? '' : String(next) });
+  };
+  const current = Number(numericToDecimal(draft.qty) ?? '0');
+
   return (
-    <View style={[styles.box, diisi && styles.boxAktif]}>
-      <View style={styles.top}>
-        <View style={{ flex: 1, minWidth: 200, gap: 3 }}>
+    <View style={[styles.card, diisi && styles.cardAktif]}>
+      <View style={styles.head}>
+        <View style={styles.grow}>
           <Text style={styles.nama} numberOfLines={2}>
             {sumber.nama}
-          </Text>
-          <Text style={styles.kode} numberOfLines={1}>
-            {sumber.kode}
           </Text>
           <Text style={styles.ringkas} numberOfLines={2}>
             {sumber.ringkas}
           </Text>
         </View>
+        {/* The ceiling, before anything is typed. This is the board's rule and
+            the reason this block is at the top of the card rather than beside
+            the field: it is what the reader is comparing the delivery note to. */}
         <View style={styles.batasBox}>
-          <Text style={styles.batasLabel}>{copy.batas.toUpperCase()}</Text>
-          <Text style={styles.batasValue}>
-            {num(sumber.batasDasar)} {sumber.namaSatuanDasar}
+          <Text style={styles.batasLabel}>{copy.batas}</Text>
+          <Text style={styles.batasValue} numberOfLines={1}>
+            {`${formatNumber(sumber.batasDasar)} ${sumber.namaSatuanDasar}`}
           </Text>
         </View>
       </View>
 
-      <View style={styles.fieldRow}>
-        <View style={{ flexGrow: 1, flexBasis: 130 }}>
-          <Field
-            label="QTY"
-            hint={draft.faktor === 1 ? 'kosong = tidak ikut' : `x${draft.faktor} satuan dasar`}>
-            <TextField
+      <View style={styles.qtyBlock}>
+        <Text style={styles.fieldLabel}>Jumlah datang</Text>
+        <View style={styles.stepRow}>
+          <RamahIconButton
+            icon="minus"
+            variant="outline"
+            label={`Kurangi jumlah ${sumber.nama}`}
+            size={44}
+            disabled={!editable || current <= 0}
+            onPress={() => setQty(current - 1)}
+          />
+          <View
+            style={[
+              styles.qtyLine,
+              { borderBottomColor: lewatBatas ? C.danger : focused ? C.borderFocus : C.borderHairline },
+            ]}>
+            <TextInput
               value={draft.qty}
               onChangeText={(v) => onPatch(sumber.idPembelianDetail, { qty: v })}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
               keyboardType="numeric"
               placeholder="0"
+              placeholderTextColor={C.textMuted}
               editable={editable}
+              accessibilityLabel={`Jumlah ${sumber.nama} dalam ${draft.namaSatuan}`}
+              style={styles.qtyInput}
             />
-          </Field>
+          </View>
+          <RamahIconButton
+            icon="plus"
+            variant="tint"
+            label={`Tambah jumlah ${sumber.nama}`}
+            size={44}
+            // Stops at the ceiling. Typing past it is still allowed — see the
+            // note at the top of this file.
+            disabled={!editable || current >= batasInput}
+            onPress={() => setQty(current + 1)}
+          />
         </View>
-        <View style={{ flexGrow: 1, flexBasis: 170 }}>
-          <Field label="SATUAN">
-            {loadingSatuan ? (
-              <View style={styles.readout}>
-                <ActivityIndicator color={C.primary} />
-              </View>
-            ) : draft.satuan === null ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <View style={[styles.readout, { flex: 1 }]}>
-                  <Text style={styles.readoutText}>{draft.namaSatuan || '—'}</Text>
-                </View>
-                {editable && <GhostButton label="Ganti" onPress={loadSatuan} />}
-              </View>
-            ) : (
-              <OptionPicker
-                options={draft.satuan.map((s) => ({
-                  value: String(s.id),
-                  label: s.faktor === 1 ? s.nama : `${s.nama} (x${s.faktor})`,
-                }))}
-                value={String(draft.idSatuanInput)}
-                onChange={(v) => {
-                  const picked = draft.satuan?.find((s) => s.id === Number(v));
-                  if (!picked) return;
-                  onPatch(sumber.idPembelianDetail, {
-                    idSatuanInput: picked.id,
-                    namaSatuan: picked.nama,
-                    faktor: picked.faktor,
-                  });
-                }}
-              />
-            )}
-          </Field>
+
+        <View style={styles.satuanRow}>
+          {loadingSatuan ? (
+            <ActivityIndicator color={C.brand} />
+          ) : (
+            <RamahChip
+              label={draft.namaSatuan || '—'}
+              iconRight={editable ? 'chevron-down' : undefined}
+              accessibilityLabel={`Satuan ${draft.namaSatuan}. Ganti satuan`}
+              onPress={
+                editable
+                  ? draft.satuan === null
+                    ? () => void loadSatuan()
+                    : () => setSatuanSheet(true)
+                  : undefined
+              }
+            />
+          )}
+          {draft.faktor === 1 ? null : (
+            <Text style={styles.faktorNote}>{`×${formatNumber(draft.faktor)} ${sumber.namaSatuanDasar}`}</Text>
+          )}
         </View>
+
+        {satuanErr ? <Text style={styles.lineErr}>{satuanErr}</Text> : null}
+
+        {/* One caption line, and which one it is depends on the state: the limit
+            while the field is empty, what the entry amounts to once it is not,
+            and the overrun in red when it is over. Never two at once. */}
+        {lewatBatas ? (
+          <Text style={styles.lineErr}>
+            {`${formatNumber(dasar)} ${sumber.namaSatuanDasar} melebihi ${copy.batas} ${formatNumber(sumber.batasDasar)}`}
+          </Text>
+        ) : diisi ? (
+          <Text style={styles.lineNote}>
+            {`${formatNumber(dasar)} ${sumber.namaSatuanDasar} masuk kartu stok · ${formatRupiah(
+              dasar * decimalToNumber(sumber.hppDasar)
+            )}`}
+          </Text>
+        ) : (
+          <Text style={styles.lineNote}>
+            {batasInput === 0
+              ? `Sisa ${formatNumber(sumber.batasDasar)} ${sumber.namaSatuanDasar} lebih kecil dari satu ${draft.namaSatuan}`
+              : `Maksimal ${formatNumber(batasInput)} ${draft.namaSatuan}. Kosong berarti baris ini tidak ikut.`}
+          </Text>
+        )}
       </View>
 
-      {diisi && (
-        <View style={styles.foot}>
-          <Text style={[styles.footNote, lewatBatas && { color: C.red, fontWeight: '600' }]}>
-            {lewatBatas
-              ? `${num(dasar)} ${sumber.namaSatuanDasar} melebihi ${copy.batas} ${num(sumber.batasDasar)}`
-              : `${num(dasar)} ${sumber.namaSatuanDasar}`}
-          </Text>
-          <Text style={styles.footValue}>
-            {rp(dasar * decimalToNumber(sumber.hppDasar))}
+      <RamahSheet
+        visible={satuanSheet}
+        title={`Satuan ${sumber.nama}`}
+        onClose={() => setSatuanSheet(false)}>
+        <View style={styles.sheetLead}>
+          <Text style={styles.sheetLeadText}>
+            Satuan di kiriman kedua tidak harus sama dengan satuan di faktur — lima pcs kurang dari
+            baris yang diketik per dus itu hal biasa. Yang dicatat kartu stok tetap satuan dasar.
           </Text>
         </View>
-      )}
+        {(draft.satuan ?? []).map((s) => (
+          <RamahSheetOption
+            key={s.id}
+            label={s.nama}
+            sub={
+              s.faktor === 1
+                ? 'Satuan dasar'
+                : `1 ${s.nama} = ${formatNumber(s.faktor)} ${sumber.namaSatuanDasar}`
+            }
+            selected={s.id === draft.idSatuanInput}
+            onPress={() => {
+              onPatch(sumber.idPembelianDetail, {
+                idSatuanInput: s.id,
+                namaSatuan: s.nama,
+                faktor: s.faktor,
+              });
+              setSatuanSheet(false);
+            }}
+          />
+        ))}
+      </RamahSheet>
     </View>
   );
 }
 
+/** A read-only line of a saved document — no field, no stepper, nothing to patch. */
+export function BarisTerpasang({
+  nama,
+  kode,
+  qty,
+  satuan,
+  dasar,
+  namaSatuanDasar,
+  nilai,
+  onPress,
+}: {
+  nama: string;
+  kode: string;
+  qty: string;
+  satuan: string;
+  dasar: number;
+  namaSatuanDasar: string;
+  nilai: string;
+  /** Set once the document is POSTED: opens the product's kartu stok. */
+  onPress?: () => void;
+}) {
+  const [down, setDown] = useState(false);
+  return (
+    <Pressable
+      onPress={onPress}
+      onPressIn={() => setDown(true)}
+      onPressOut={() => setDown(false)}
+      disabled={!onPress}
+      accessibilityRole={onPress ? 'button' : undefined}
+      accessibilityLabel={
+        onPress
+          ? `${nama}, ${qty} ${satuan}. Buka kartu stok`
+          : `${nama}, ${qty} ${satuan}, ${formatRupiah(nilai)}`
+      }
+      style={[styles.terpasang, down && { backgroundColor: C.surfaceStack }]}>
+      <View style={styles.grow}>
+        <Text style={styles.nama} numberOfLines={2}>
+          {nama || kode}
+        </Text>
+        <Text style={styles.ringkas} numberOfLines={1}>
+          {`${qty} ${satuan}${dasar ? ` · ${formatNumber(dasar)} ${namaSatuanDasar}` : ''}`}
+        </Text>
+      </View>
+      <Text style={styles.terpasangNilai} numberOfLines={1}>
+        {formatRupiah(nilai)}
+      </Text>
+      {onPress ? <Feather name="chevron-right" size={RamahIcon.row} color={C.iconMuted} /> : null}
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
-  headRight: { fontSize: 13.5, color: C.muted3 },
-  box: { gap: 12, padding: 16, borderBottomWidth: 1, borderBottomColor: C.borderLighter },
-  // A filled line reads as being on the document; an untouched one is a
-  // candidate the reader scrolled past.
-  boxAktif: { backgroundColor: C.tableHeaderBg },
-  top: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' },
-  nama: { fontSize: 15.5, fontWeight: '500', color: C.text },
-  kode: { fontSize: 12.5, color: C.muted, fontFamily: 'monospace' },
-  ringkas: { fontSize: 12.5, color: C.muted3 },
-  batasBox: { alignItems: 'flex-end', gap: 3, minWidth: 120 },
-  batasLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.5, color: C.muted2 },
-  batasValue: { fontSize: 15, fontWeight: '600', color: C.dark2 },
-  fieldRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  readout: {
-    minHeight: 40,
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-    borderRadius: 9,
+  grow: { flex: 1, minWidth: 0 },
+  group: { gap: L.cardGap },
+
+  emptyCard: {
+    backgroundColor: C.surfaceCard,
     borderWidth: 1,
-    borderColor: C.borderLight,
-    backgroundColor: C.card,
+    borderColor: C.borderHairline,
+    borderRadius: R.card,
+    padding: L.cardPad,
+    gap: L.space1,
   },
-  readoutText: { fontSize: 14, color: C.dark2 },
-  foot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
-  footNote: { fontSize: 12.5, color: C.muted3 },
-  footValue: { fontSize: 15, fontWeight: '600', color: C.text },
+  emptyTitle: { ...T.rowTitle, color: C.textTitle },
+  emptySub: { ...T.caption, color: C.textBody },
+
+  card: {
+    backgroundColor: C.surfaceCard,
+    borderWidth: 1,
+    borderColor: C.borderHairline,
+    borderRadius: R.card,
+    paddingVertical: L.cardPadDense,
+    paddingHorizontal: L.cardPad,
+    gap: L.space3,
+  },
+  // A filled line reads as being *on* the document; an untouched one is a
+  // candidate the reader scrolled past. Border and tint, never a shadow.
+  cardAktif: { borderColor: C.borderBrand, backgroundColor: C.brandTintSoft },
+
+  head: { flexDirection: 'row', alignItems: 'flex-start', gap: L.cardGap },
+  nama: { ...T.rowTitle, color: C.textTitle },
+  ringkas: { ...T.caption, color: C.textBody, marginTop: 2 },
+  batasBox: { flexShrink: 0, maxWidth: 132, alignItems: 'flex-end' },
+  batasLabel: { ...T.micro, color: C.textMuted },
+  batasValue: { ...T.rowTitle, color: C.textTitle, textAlign: 'right', marginTop: 2 },
+
+  qtyBlock: { gap: 6 },
+  fieldLabel: { ...T.fieldLabel, color: C.textBody },
+  stepRow: { flexDirection: 'row', alignItems: 'center', gap: L.cardGap },
+  qtyLine: { flex: 1, minWidth: 0, borderBottomWidth: 1.5, paddingBottom: 7 },
+  qtyInput: {
+    padding: 0,
+    minHeight: 23,
+    ...T.fieldValue,
+    color: C.textTitle,
+    textAlign: 'center',
+  },
+  satuanRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingTop: L.space1 },
+  faktorNote: { ...T.caption, color: C.textMuted },
+  lineNote: { ...T.caption, color: C.textBody },
+  lineErr: { ...T.caption, color: C.textDanger, ...W.semibold },
+
+  sheetLead: { paddingHorizontal: L.gutter, paddingBottom: L.space3 },
+  sheetLeadText: { ...T.caption, color: C.textBody },
+
+  terpasang: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: L.cardGap,
+    paddingVertical: L.space3,
+    paddingHorizontal: L.cardPad,
+    minHeight: L.rowH,
+  },
+  terpasangNilai: { ...T.rowTitle, color: C.textTitle, textAlign: 'right', flexShrink: 0 },
 });

@@ -566,17 +566,31 @@ export function RecordList({
   const [selected, setSelected] = useState<number[]>([]);
   const selecting = selected.length > 0;
 
-  // Drop only what is genuinely gone - a filter change replaces the rows and a
-  // selection must not survive it, but appending a page leaves every selected
-  // record right where it was. Returning the same array when nothing was
-  // dropped matters: a new one here would invalidate `renderItem` on every page.
-  useEffect(() => {
+  /**
+   * Drop only what is genuinely gone - a filter change replaces the rows and a
+   * selection must not survive it, but appending a page leaves every selected
+   * record right where it was. Returning the same array when nothing was
+   * dropped matters: a new one here would invalidate `renderItem` on every page.
+   *
+   * Adjusted **during render**, not in an effect. This is React's own documented
+   * shape for "a prop changed and some state derived from it is now wrong"
+   * (https://react.dev/reference/react/useState#storing-information-from-previous-renders):
+   * React discards the in-progress render and re-runs this component with the
+   * corrected state before anything is committed. The effect version drew one
+   * frame with a selection bar still counting a record that had already left the
+   * list, then corrected it - which is the cascade `react-hooks/set-state-in-effect`
+   * exists to catch, and here the rule was pointing at a real, if brief, wrong
+   * frame rather than only a wasted one.
+   */
+  const [itemsSeen, setItemsSeen] = useState(items);
+  if (itemsSeen !== items) {
+    setItemsSeen(items);
     setSelected((s) => {
       if (s.length === 0) return s;
       const kept = s.filter((id) => items.some((i) => i.id === id));
       return kept.length === s.length ? s : kept;
     });
-  }, [items]);
+  }
 
   const toggle = useCallback((id: number) => {
     setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));

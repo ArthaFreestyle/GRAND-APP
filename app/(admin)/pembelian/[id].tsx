@@ -24,11 +24,12 @@
  *   - `GET /ekspedisi/{id}` — the carrier's name, which the document does not
  *     carry.
  *
- * The two documents that keep moving after posting — penerimaan susulan and
- * retur pembelian — are their own sections, and this screen is where they are
- * started from: a short line is chased from the invoice that recorded the
- * shortfall, and goods go back against the invoice they came in on. The buttons
- * carry `?idPembelian=` so the form opens with the source already chosen.
+ * Penerimaan susulan keeps moving after posting, is its own section, and this
+ * screen is where it is started from: a short line is chased from the invoice
+ * that recorded the shortfall. The button carries `?idPembelian=` so the form
+ * opens with the source already chosen. Retur pembelian is the same shape and
+ * belongs beside it, but its section was deleted with the seven others the
+ * Ramah design does not draw.
  *
  * `?ubah=1` opens the header dialog on arrival (that is how the list's "Ubah"
  * button gets here) and `?baru=1` says the create form just landed. Both are
@@ -118,8 +119,19 @@ export default function PembelianDetailScreen() {
   const id = Number(params.id);
 
   const [doc, setDoc] = useState<PembelianDoc | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadErr, setLoadErr] = useState('');
+  /**
+   * A malformed `:id` in the URL is a fact about the *route*, known the moment
+   * the params arrive — so it is derived during render, not written into state
+   * from an effect. Doing it in the effect cost a render, then an effect, then
+   * a second render, to conclude something that was already true; that is the
+   * cascade `react-hooks/set-state-in-effect` objects to, and it was there long
+   * before the rule started saying so.
+   */
+  const idValid = Number.isFinite(id);
+  const [loadingState, setLoading] = useState(true);
+  const [loadErrState, setLoadErr] = useState('');
+  const loading = idValid && loadingState;
+  const loadErr = idValid ? loadErrState : 'Alamat dokumen tidak dikenali.';
 
   const [namaEkspedisi, setNamaEkspedisi] = useState('');
   const [sisa, setSisa] = useState<SisaPembelian | null>(null);
@@ -145,7 +157,6 @@ export default function PembelianDetailScreen() {
 
   const canWrite = useCanWrite('pembelian');
   const canSusulan = useCanWrite('penerimaan-susulan');
-  const canRetur = useCanWrite('retur-pembelian');
   const role = useActiveRole();
 
   // Read once, on the way in: the parameters seed this screen rather than
@@ -240,11 +251,8 @@ export default function PembelianDetailScreen() {
   const generation = useRef(0);
 
   useEffect(() => {
-    if (!Number.isFinite(id)) {
-      setLoading(false);
-      setLoadErr('Alamat dokumen tidak dikenali.');
-      return;
-    }
+    // Nothing to set: an unparseable id already reads as a failure page above.
+    if (!Number.isFinite(id)) return;
     const mine = ++generation.current;
     // Two ways to go stale, and they are not the same one. `cancelled` is this
     // effect being torn down; the generation check is a reload started while
@@ -252,6 +260,20 @@ export default function PembelianDetailScreen() {
     let cancelled = false;
     const alive = () => !cancelled && generation.current === mine;
 
+    // A real render cascade, and a pre-existing one: the fetch effect flips the
+    // screen into its loading state synchronously, so React renders once for the
+    // new inputs and again for the flag before a byte is requested.
+    // `eslint-config-expo` 57 promotes this to an error; under SDK 54 the same
+    // code drew the same two renders in silence.
+    //
+    // The fix is the one `app/(admin)/produk/index.tsx` now uses — derive loading
+    // from "the key I want loaded" vs "the key I have loaded", so nothing is set
+    // on the way in. It is deliberately not applied here yet: this screen is
+    // queued for the Ramah port, the repo has no test runner, and restructuring
+    // load state on a screen that cannot be exercised trades a measurable-in-
+    // microseconds cascade for the risk of a spinner that never stops. It goes
+    // when the screen is ported.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setLoadErr('');
     setSisa(null);
@@ -429,18 +451,20 @@ export default function PembelianDetailScreen() {
   const sisaUtang = utang ? decimalToNumber(utang.sisa_utang) : 0;
 
   /**
-   * The two documents that can still be written against this one, and only while
-   * they are genuinely possible.
+   * The one document that can still be written against this one, and only while
+   * it is genuinely possible.
    *
-   * Both need the invoice POSTED: before that a line has no harga pokok to copy,
-   * no settled remainder, and nothing that has arrived. Beyond that the two ask
-   * different questions of the same lines — a susulan needs something still owed
-   * (`status_penerimaan`, the server's own cache), a retur needs something that
-   * actually arrived and has not gone back yet. A line can answer yes to both.
+   * It needs the invoice POSTED: before that a line has no harga pokok to copy,
+   * no settled remainder, and nothing that has arrived. `status_penerimaan` is
+   * the server's own cache of whether anything is still owed.
+   *
+   * A retur pembelian is the other document that hangs off a posted invoice, and
+   * its button used to sit beside this one. `app/(admin)/retur-pembelian/` was
+   * deleted with the seven other sections the Ramah design does not draw, so the
+   * button pointed at a route that no longer exists — `services/retur-pembelian.ts`
+   * is kept for when the section comes back, and the button comes back with it.
    */
   const bisaSusulan = canSusulan && doc?.status === 'POSTED' && doc.statusTerima === 'KURANG';
-  const bisaRetur =
-    canRetur && doc?.status === 'POSTED' && doc.lines.some((l) => l.qtyDapatDiretur > 0);
 
   return (
     <AppShell title={doc ? doc.nomor : 'Detail faktur'} onBack={goBack}>
@@ -712,36 +736,23 @@ export default function PembelianDetailScreen() {
               delivery turns up or the goods have to go back, and the form
               cannot be filled in without choosing it anyway. Each button is
               rendered only while the document it starts is actually possible. */}
-          {(bisaSusulan || bisaRetur) && !editing && (
+          {bisaSusulan && !editing && (
             <Card className="p-4">
               <Text style={styles.lanjutanLabel}>Dokumen lanjutan</Text>
               <Text style={styles.lanjutanText}>
-                Faktur ini sudah diposting, jadi barisnya sudah punya harga pokok — keduanya
-                menyalin angka itu, bukan rata-rata bergerak hari ini.
+                Faktur ini sudah diposting, jadi barisnya sudah punya harga pokok — kiriman
+                susulan menyalin angka itu, bukan rata-rata bergerak hari ini.
               </Text>
               <View style={styles.lanjutanBar}>
-                {bisaSusulan && (
-                  <SecondaryButton
-                    label="Buat kiriman susulan"
-                    onPress={() =>
-                      router.push({
-                        pathname: '/penerimaan-susulan/baru',
-                        params: { idPembelian: doc.id },
-                      })
-                    }
-                  />
-                )}
-                {bisaRetur && (
-                  <SecondaryButton
-                    label="Buat retur pembelian"
-                    onPress={() =>
-                      router.push({
-                        pathname: '/retur-pembelian/baru',
-                        params: { idPembelian: doc.id },
-                      })
-                    }
-                  />
-                )}
+                <SecondaryButton
+                  label="Buat kiriman susulan"
+                  onPress={() =>
+                    router.push({
+                      pathname: '/penerimaan-susulan/baru',
+                      params: { idPembelian: doc.id },
+                    })
+                  }
+                />
               </View>
             </Card>
           )}

@@ -21,6 +21,7 @@
  * What is *not* here is anything only one document can be. `TERIMA_META` stays
  * in `components/pembelian/status.ts`: only an invoice is owed goods.
  */
+import type { RamahBadgeTone } from '@/components/shell/ramah';
 import type { ToneName } from '@/components/shell/ui';
 import type { StatusAlur } from '@/services/alur-dokumen';
 import type { components } from '@/types/api';
@@ -42,6 +43,37 @@ export const DOKUMEN_META: Record<StatusAlur, StatusMeta> = {
   DIAJUKAN: { label: 'Diajukan', tone: 'amber' },
   POSTED: { label: 'Posted', tone: 'green' },
   BATAL: { label: 'Batal', tone: 'red' },
+};
+
+/**
+ * The same four states, toned for the Ramah palette.
+ *
+ * A second map rather than a translation of `tone` above, because the two
+ * palettes disagree about more than hex: the old one tints all four, while
+ * `LayarGudang.dc.html`'s `STATUS_META` **fills** `POSTED` and `BATAL` and tints
+ * the other two. That is the useful distinction and it is deliberate — a filled
+ * pill is a document that has moved something it cannot take back, and the two
+ * filled colours are what somebody reads scanning thirty rows without reading any
+ * words.
+ *
+ * The **labels are shared** with the map above, not retyped. A document's status
+ * is one word in this app and it has to be the same word on a ported screen and
+ * an unported one, for as long as both exist — two maps that each own their
+ * wording is exactly how the private copies this file replaced started to
+ * disagree.
+ *
+ * This is for a screen drawing a **badge**. `app/(admin)/beranda.tsx`
+ * deliberately does not: its invoice preview prints
+ * `DOKUMEN_META[status].label` as a row's `meta` and tints the row's *glyph* by
+ * status instead, which is a `RamahTileTone` and a different axis entirely —
+ * "is this document still moving" rather than "what state is it in". Both read
+ * their wording from here, which is the part that has to stay in step.
+ */
+export const DOKUMEN_RAMAH: Record<StatusAlur, { label: string; tone: RamahBadgeTone }> = {
+  DRAFT: { label: DOKUMEN_META.DRAFT.label, tone: 'neutral' },
+  DIAJUKAN: { label: DOKUMEN_META.DIAJUKAN.label, tone: 'info' },
+  POSTED: { label: DOKUMEN_META.POSTED.label, tone: 'success' },
+  BATAL: { label: DOKUMEN_META.BATAL.label, tone: 'danger' },
 };
 
 /**
