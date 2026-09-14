@@ -170,7 +170,9 @@ export default function LaporanScreen() {
         ) : null}
 
         {/* ---- Nilai persediaan ---- */}
-        <RamahSectionHeader>Nilai persediaan</RamahSectionHeader>
+        <View style={styles.groupStart}>
+          <RamahSectionHeader>Nilai persediaan</RamahSectionHeader>
+        </View>
         {persediaanErr ? (
           <RamahInlineError message={persediaanErr} onRetry={reload} />
         ) : loading && persediaan === null ? (
@@ -202,7 +204,9 @@ export default function LaporanScreen() {
         )}
 
         {/* ---- Laba kotor ---- */}
-        <RamahSectionHeader>Laba kotor per bulan</RamahSectionHeader>
+        <View style={styles.groupStart}>
+          <RamahSectionHeader>Laba kotor per bulan</RamahSectionHeader>
+        </View>
         {labaErr ? (
           <RamahInlineError message={labaErr} onRetry={reload} />
         ) : loading && laba === null ? (
@@ -223,7 +227,9 @@ export default function LaporanScreen() {
         )}
 
         {/* ---- Pergerakan, as a link ---- */}
-        <RamahSectionHeader>Pergerakan stok</RamahSectionHeader>
+        <View style={styles.groupStart}>
+          <RamahSectionHeader>Pergerakan stok</RamahSectionHeader>
+        </View>
         <Pressable
           onPress={() => router.push('/laporan/pergerakan')}
           accessibilityRole="button"
@@ -301,16 +307,19 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: C.surfaceSunken },
   grow: { flex: 1, minWidth: 0 },
   body: { flex: 1 },
-  bodyContent: { paddingHorizontal: L.gutter, paddingTop: L.space2, gap: L.cardGap },
+  bodyContent: { paddingHorizontal: L.gutter, paddingTop: L.space2, gap: L.stack },
+  // Each report opens a group: `group` above its heading, `stack` between the
+  // cards under it.
+  groupStart: { paddingTop: L.group - L.stack },
 
-  stamp: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: L.space1 },
-  // Guide §1 wants a time on every operational number, and `T.caption` is the
+  stamp: { flexDirection: 'row', alignItems: 'center', gap: L.space2, paddingVertical: L.space1 },
+  // Guide §1 wants a time on every operational number, and `T.bodySmall` is the
   // merchant scale's metadata size — the stamp is both.
-  stampText: { ...T.caption, color: C.textMuted, flex: 1, minWidth: 0 },
-  stampAction: { ...T.caption, color: C.textLink },
+  stampText: { ...T.bodySmall, color: C.textMuted, flex: 1, minWidth: 0 },
+  stampAction: { ...T.bodySmall, color: C.textLink },
 
   loadingBox: { paddingVertical: L.space6, alignItems: 'center' },
-  kosong: { ...T.caption, color: C.textBody, paddingVertical: L.space4 },
+  kosong: { ...T.bodySmall, color: C.textBody, paddingVertical: L.space4 },
 
   totalCard: {
     padding: L.cardPad,
@@ -318,10 +327,10 @@ const styles = StyleSheet.create({
     backgroundColor: C.surfaceCard,
     borderWidth: 1,
     borderColor: C.borderHairline,
-    gap: 2,
+    gap: L.inline,
   },
-  totalLabel: { ...T.fieldLabel, color: C.textBody },
-  totalValue: { ...T.metric, color: C.textTitle },
+  totalLabel: { ...T.caption, color: C.textBody },
+  totalValue: { ...T.titleLarge, color: C.textTitle },
 
   row: {
     flexDirection: 'row',
@@ -332,8 +341,8 @@ const styles = StyleSheet.create({
     // Guide §7: a list row is 56, whether or not it happens to be tappable.
     minHeight: L.rowH,
   },
-  rowLabel: { ...T.body, color: C.textTitle, flex: 1, minWidth: 0 },
-  rowValue: { ...T.rowTitle, color: C.textTitle, textAlign: 'right' },
+  rowLabel: { ...T.bodyModerate, color: C.textTitle, flex: 1, minWidth: 0 },
+  rowValue: { ...T.titleTiny, color: C.textTitle, textAlign: 'right' },
 
   bulanCard: {
     padding: L.cardPad,
@@ -341,26 +350,26 @@ const styles = StyleSheet.create({
     backgroundColor: C.surfaceCard,
     borderWidth: 1,
     borderColor: C.borderHairline,
-    gap: 2,
+    gap: L.inline,
   },
   bulanHead: { flexDirection: 'row', alignItems: 'center', gap: L.space2 },
-  bulanNama: { ...T.rowTitle, color: C.textTitle, flex: 1, minWidth: 0 },
+  bulanNama: { ...T.titleTiny, color: C.textTitle, flex: 1, minWidth: 0 },
   marginChip: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: L.space2,
+    paddingVertical: L.space1,
     borderRadius: R.pill,
     backgroundColor: C.brandTint,
   },
   marginChipRugi: { backgroundColor: C.red50 },
-  marginText: { ...T.delta, color: C.brandInk },
+  marginText: { ...T.caption, color: C.brandInk },
   marginTextRugi: { color: C.red600 },
-  bulanValue: { ...T.metric, color: C.textTitle },
-  bulanCaption: { ...T.caption, color: C.textBody, paddingTop: L.space2 },
+  bulanValue: { ...T.titleLarge, color: C.textTitle },
+  bulanCaption: { ...T.bodySmall, color: C.textBody, paddingTop: L.space2 },
   bulanDivider: { height: 1, backgroundColor: C.borderHairline, marginVertical: L.space3 },
 
-  rincian: { flexDirection: 'row', alignItems: 'baseline', gap: L.space3, paddingVertical: 3 },
-  rincianLabel: { ...T.caption, color: C.textBody, flex: 1, minWidth: 0 },
-  rincianValue: { ...T.caption, color: C.textTitle, textAlign: 'right' },
+  rincian: { flexDirection: 'row', alignItems: 'baseline', gap: L.space3, paddingVertical: L.space1 },
+  rincianLabel: { ...T.bodySmall, color: C.textBody, flex: 1, minWidth: 0 },
+  rincianValue: { ...T.bodySmall, color: C.textTitle, textAlign: 'right' },
 
   linkCard: {
     flexDirection: 'row',
@@ -372,6 +381,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.borderHairline,
   },
-  linkTitle: { ...T.rowTitle, color: C.textTitle },
-  linkSub: { ...T.caption, color: C.textBody },
+  linkTitle: { ...T.titleTiny, color: C.textTitle },
+  linkSub: { ...T.bodySmall, color: C.textBody },
 });

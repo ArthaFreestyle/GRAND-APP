@@ -56,7 +56,7 @@ import {
   RamahRadius as R,
   RamahTileTone,
   RamahType as T,
-  RamahWeight as W,
+  type RamahTypeName,
   scoreTone,
   type RamahTileToneName,
 } from '@/constants/theme-ramah';
@@ -305,7 +305,7 @@ export function RamahChip({
 }
 
 /**
- * The small grey heading above a group of rows. `T.caption` weight semibold,
+ * The small grey heading above a group of rows. `T.bodySmall` weight semibold,
  * muted — the group's *name*, not a title competing with the rows under it.
  *
  * `action` is the design system's own second slot (`SectionHeader.jsx` takes
@@ -347,7 +347,7 @@ export function RamahPrimaryButton({
   disabled = false,
   busy = false,
   height = L.controlH,
-  fontSize,
+  type = 'titleTiny',
 }: {
   label: string;
   icon?: FeatherName;
@@ -356,12 +356,17 @@ export function RamahPrimaryButton({
   busy?: boolean;
   /**
    * 52 everywhere except the till, where `LayarKasir.dc.html` draws the pay
-   * button at 96 with a 22px label. A cashier hits that button with a queue
+   * button at 96 with a larger label. A cashier hits that button with a queue
    * waiting and without looking down at it, which is the one place in this app
    * where a control earns more than its standard height.
    */
   height?: number;
-  fontSize?: number;
+  /**
+   * The label's step on the type scale. Title Tiny everywhere except that same
+   * pay button. A bundle name rather than a raw size, so a label can only ever
+   * be a size the scale has — and carries the line height that goes with it.
+   */
+  type?: RamahTypeName;
 }) {
   const [down, setDown] = useState(false);
   const off = disabled || busy;
@@ -385,7 +390,7 @@ export function RamahPrimaryButton({
       ) : (
         <>
           {icon ? <Feather name={icon} size={RamahIcon.row} color={C.textOnBrand} /> : null}
-          <Text style={[styles.primaryLabel, fontSize ? { fontSize } : null]}>{label}</Text>
+          <Text style={[styles.primaryLabel, T[type]]}>{label}</Text>
         </>
       )}
     </Pressable>
@@ -820,7 +825,7 @@ export function RamahSearchSheet({
 const searchSheetStyles = StyleSheet.create({
   wrap: { paddingHorizontal: L.gutter, gap: L.space3 },
   center: { paddingVertical: L.space6, alignItems: 'center' },
-  empty: { ...T.caption, color: C.textBody, paddingVertical: L.space3 },
+  empty: { ...T.bodySmall, color: C.textBody, paddingVertical: L.space3 },
 });
 
 /**
@@ -947,7 +952,7 @@ export function RamahTile({
       </View>
       {/* Two lines allowed and never truncated: the guide is explicit that a
           tile label wraps rather than becoming "Penerimaan…". */}
-      <Text style={[styles.tileLabel, disabled && { color: C.textMuted }]} numberOfLines={2}>
+      <Text style={[styles.tileLabel, disabled && { color: C.textDisabled }]} numberOfLines={2}>
         {label}
       </Text>
     </Pressable>
@@ -1115,7 +1120,8 @@ export function RamahBadge({ label, tone }: { label: string; tone: RamahBadgeTon
 const BADGE_TONE: Record<RamahBadgeTone, { bg: string; fg: string }> = {
   neutral: { bg: C.grey200, fg: C.textTitle },
   info: { bg: C.accentBlueTint, fg: C.accentBlueInk },
-  warn: { bg: C.amber50, fg: C.amber600 },
+  // amber700: a status pill is 12px text, and amber600 is 3.0:1 on its tint.
+  warn: { bg: C.amber50, fg: C.amber700 },
   success: { bg: C.brand, fg: C.textOnBrand },
   danger: { bg: C.danger, fg: C.white },
 };
@@ -1145,17 +1151,17 @@ export function RamahInlineError({ message, onRetry }: { message: string; onRetr
  * A form field, drawn upside down from the usual one.
  *
  * Revision 2 of the guide inverts the hierarchy every form library ships with:
- * the **label** is small, grey and semibold (`T.fieldLabel`) and the **value**
- * is large, dark and bold (`T.fieldValue`), sitting on a 1px underline rather
+ * the **label** is small, grey and semibold (`T.caption`) and the **value**
+ * is large, dark and bold (`T.titleSmall`), sitting on a 1px underline rather
  * than inside a box.
  * The reason is what a filled form then looks like — a summary. A boxed field
  * makes every row the same weight whether it holds anything or not, so a form
  * somebody has finished reads exactly like a form nobody has started; this way
  * the answers are the loudest thing on the screen and the questions recede.
  *
- * Focus is 1.5px of `borderFocus` on that same line and nothing else. The guide
- * bans the outer glow along with every other shadow: depth in this system is
- * hairline, tint and the sheet scrim, full stop.
+ * Focus is 1.5px of `borderFocus` on that same line and nothing else — no outer
+ * glow. A shadow in this system says a surface floats (`RamahElevation`), and a
+ * field is part of the page.
  *
  * **Required is a red asterisk after the label, never the word "(wajib)".**
  * Three of those down a column is three lines of text nobody acts on, and the
@@ -1247,7 +1253,7 @@ export function RamahField({
           style={[
             styles.fieldInput,
             multiline && styles.fieldInputMulti,
-            !editable && { color: C.textMuted },
+            !editable && { color: C.textDisabled },
           ]}
         />
         {trailing}
@@ -1318,7 +1324,7 @@ export function RamahPickerField({
           style={[
             styles.fieldInput,
             !value && { color: C.textMuted },
-            locked && { color: C.textMuted },
+            locked && { color: C.textDisabled },
           ]}
           numberOfLines={1}>
           {value || placeholder}
@@ -1487,7 +1493,7 @@ export function RamahStatCard({
         {value}
       </Text>
       {note ? (
-        <Text style={[styles.statNote, warn && { color: C.orange600 }]} numberOfLines={2}>
+        <Text style={[styles.statNote, warn && { color: C.textWarning }]} numberOfLines={2}>
           {note}
         </Text>
       ) : null}
@@ -1529,7 +1535,7 @@ export function RamahBarrierCard({
   onAction?: () => void;
 }) {
   const paint =
-    tone === 'danger' ? { bg: C.red50, ink: C.textDanger } : { bg: C.orange50, ink: C.orange600 };
+    tone === 'danger' ? { bg: C.red50, ink: C.textDanger } : { bg: C.orange50, ink: C.textWarning };
   return (
     <View style={[styles.barrier, { backgroundColor: paint.bg }]}>
       <Text style={[styles.barrierLabel, { color: paint.ink }]}>{title}</Text>
@@ -1555,46 +1561,57 @@ const styles = StyleSheet.create({
     gap: L.space2,
     paddingHorizontal: L.gutter,
   },
-  headerTitle: { ...T.groupTitle, color: C.textTitle, flexShrink: 1 },
+  headerTitle: { ...T.titleSmall, color: C.textTitle, flexShrink: 1 },
 
   iconButton: { alignItems: 'center', justifyContent: 'center', borderRadius: R.pill },
-  // -10, so the 24pt glyph lands on the gutter rather than the 44pt box around it.
-  iconButtonInset: { marginLeft: -10 },
+  // Half of what the 44pt tap box is wider than the 24pt glyph inside it, so
+  // the glyph lands on the gutter rather than the box around it. Derived, not
+  // a spacing choice: it is the glyph's own offset and moves with either size.
+  iconButtonInset: { marginLeft: -(L.tapMin - RamahIcon.header) / 2 },
 
   search: {
     height: 48,
     flexDirection: 'row',
     alignItems: 'center',
     gap: L.space2,
-    paddingHorizontal: 14,
+    // 16, the card padding: the glyph sits on the same vertical line as the
+    // text in every card underneath the field.
+    paddingHorizontal: L.space4,
     backgroundColor: C.white,
     borderWidth: 1.5,
     borderColor: C.borderStrong,
     borderRadius: R.field,
   },
-  searchInput: { flex: 1, minWidth: 0, padding: 0, ...T.body, color: C.textTitle },
+  searchInput: { flex: 1, minWidth: 0, padding: 0, ...T.bodyModerate, color: C.textTitle },
 
   chip: {
     height: L.controlHSm,
     flexDirection: 'row',
     alignItems: 'center',
     gap: L.space2,
-    paddingHorizontal: 14,
+    paddingHorizontal: L.space3,
     borderRadius: R.pill,
     borderWidth: 1.5,
   },
-  chipLabel: { ...T.caption, ...W.medium },
+  chipLabel: { ...T.caption },
 
+  /*
+    No padding of its own, above or below. It used to carry 20 over and 8
+    under, which only came out right in the one container it was first drawn
+    in: dropped into a body with a 16pt gap it sat 24 from its own card and 36
+    from the group before — nearly as far from what it names as from what it
+    does not. Distance is a relationship between two neighbours, so the
+    container that holds both owns it: a heading sits in a group
+    (`gap: L.related` or `L.stack`), and groups sit `L.group` apart.
+  */
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'baseline',
     justifyContent: 'space-between',
     gap: L.space3,
-    paddingTop: L.space5,
-    paddingBottom: L.space2,
   },
-  sectionHeaderText: { ...T.caption, ...W.semibold, color: C.textMuted },
-  sectionHeaderAction: { ...T.caption, ...W.semibold, color: C.textLink },
+  sectionHeaderText: { ...T.caption, color: C.textMuted },
+  sectionHeaderAction: { ...T.caption, color: C.textLink },
 
   primary: {
     flexDirection: 'row',
@@ -1620,7 +1637,9 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: C.brand,
   },
-  secondaryLabel: { fontSize: 14, lineHeight: 18, ...W.semibold, color: C.brandInk },
+  // All three button labels are Title Tiny: a control's label is text that
+  // matters, and the three differ by colour and border, not by size.
+  secondaryLabel: { ...T.titleTiny, color: C.brandInk },
   tertiary: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1631,14 +1650,12 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: C.borderStrong,
   },
-  tertiaryLabel: { fontSize: 15, lineHeight: 20, ...W.medium, color: C.textTitle },
+  tertiaryLabel: { ...T.titleTiny, color: C.textTitle },
   // Shrinks, so a label too long for its pill wraps inside it rather than
   // running out of both ends of it.
   primaryLabel: {
     flexShrink: 1,
-    fontSize: 16,
-    lineHeight: 20,
-    ...W.semibold,
+    ...T.titleTiny,
     color: C.textOnBrand,
     textAlign: 'center',
   },
@@ -1657,7 +1674,7 @@ const styles = StyleSheet.create({
     the top of the body — see the note above `RamahSheet`.
   */
   sheetTitle: {
-    ...T.groupTitle,
+    ...T.titleSmall,
     color: C.textTitle,
     paddingHorizontal: L.gutter,
     // A little more above than the handle needed: the platform's indicator sits
@@ -1673,12 +1690,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: L.gutter,
     paddingVertical: L.space3,
   },
-  sheetOptionLabel: { ...T.rowTitle, color: C.textTitle },
-  sheetOptionSub: { ...T.caption, color: C.textMuted },
+  sheetOptionLabel: { ...T.titleTiny, color: C.textTitle },
+  sheetOptionSub: { ...T.bodySmall, color: C.textMuted },
 
-  // 4 columns, 14 vertical / 8 horizontal — the grid geometry is the guide's,
-  // and it is never five columns.
-  tile: { width: `${100 / L.tileColumns}%`, alignItems: 'center', gap: 7, paddingHorizontal: L.tileGapX / 2 },
+  // 4 columns, 16 vertical / 8 horizontal — the guide's grid snapped to 4 (see
+  // `tileGapY`), and it is never five columns.
+  tile: { width: `${100 / L.tileColumns}%`, alignItems: 'center', gap: L.space2, paddingHorizontal: L.tileGapX / 2 },
   // 52, bare. `RamahLayout.tileIcon` exists for exactly this number.
   tileArt: { width: L.tileIcon, height: L.tileIcon },
   tileSquircle: {
@@ -1704,14 +1721,16 @@ const styles = StyleSheet.create({
     left: -6,
     minWidth: 20,
     height: 20,
-    paddingHorizontal: 6,
+    paddingHorizontal: L.space1,
     borderRadius: R.pill,
     backgroundColor: C.black,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tileBadgeText: { ...T.micro, color: C.white, lineHeight: 20 },
-  tileLabel: { ...T.micro, color: C.textTitle, textAlign: 'center' },
+  // Centred by the pill's own `justifyContent`, not by a line height stretched
+  // to the pill's height — the bundle's 16 stays on the grid.
+  tileBadgeText: { ...T.caption, color: C.white },
+  tileLabel: { ...T.caption, color: C.textTitle, textAlign: 'center' },
   // The system's one dimming value, shared by a disabled tile and a muted stack
   // row. Not a colour change: a 3D render is never recoloured, only dimmed.
   tileOff: { opacity: 0.55 },
@@ -1719,25 +1738,26 @@ const styles = StyleSheet.create({
   score: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: L.cardGap,
+    gap: L.space3,
     padding: L.cardPad,
     borderRadius: R.card,
     borderWidth: 1,
   },
-  scoreLabel: { ...T.caption, color: C.textBody },
+  scoreLabel: { ...T.bodySmall, color: C.textBody },
   scoreLine: {
     flexDirection: 'row',
     alignItems: 'baseline',
     flexWrap: 'wrap',
-    gap: 6,
+    // "94" and "/ 100" are one figure read in two sizes.
+    gap: L.inline,
     marginTop: L.space1,
   },
   // `metric`, the scale's top tier: on this card the score is the entire
   // subject rather than one of a pair, which is the same reasoning a stat
   // card's own figure gets.
-  scoreValue: { ...T.metric },
-  scoreOutOf: { ...T.subtitle, ...W.semibold, color: C.textMuted },
-  scoreNote: { ...T.caption, ...W.semibold },
+  scoreValue: { ...T.titleLarge },
+  scoreOutOf: { ...T.titleTiny, color: C.textMuted },
+  scoreNote: { ...T.caption },
 
   stackRow: {
     flexDirection: 'row',
@@ -1753,23 +1773,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stackTitle: { ...T.rowTitle, color: C.textTitle },
-  stackSub: { ...T.caption, color: C.textMuted, marginTop: 2 },
+  stackTitle: { ...T.titleTiny, color: C.textTitle },
+  stackSub: { ...T.bodySmall, color: C.textMuted, marginTop: L.inline },
   stackRight: { flexShrink: 0, maxWidth: 140, alignItems: 'flex-end' },
-  stackValue: { ...T.rowTitle, color: C.textTitle, textAlign: 'right' },
-  stackMeta: { ...T.caption, color: C.textMuted, textAlign: 'right', marginTop: 2 },
+  stackValue: { ...T.titleTiny, color: C.textTitle, textAlign: 'right' },
+  stackMeta: { ...T.bodySmall, color: C.textMuted, textAlign: 'right', marginTop: L.inline },
 
   badge: {
     alignSelf: 'flex-start',
     height: 24,
     justifyContent: 'center',
-    paddingHorizontal: 10,
+    paddingHorizontal: L.space2,
     borderRadius: R.pill,
   },
   // 11px is allowed here for the reason the guide allows it on a tile label: the
   // eye lands on a status pill because it already knows where it is, not because
   // it is reading a sentence.
-  badgeText: { ...T.micro, lineHeight: 24 },
+  badgeText: { ...T.caption },
 
   inlineError: {
     flexDirection: 'row',
@@ -1777,35 +1797,38 @@ const styles = StyleSheet.create({
     gap: L.space2,
     paddingVertical: L.space2,
   },
-  inlineErrorText: { ...T.caption, color: C.textDanger, flex: 1, minWidth: 0 },
-  inlineErrorAction: { ...T.caption, ...W.semibold, color: C.textLink },
+  inlineErrorText: { ...T.bodySmall, color: C.textDanger, flex: 1, minWidth: 0 },
+  inlineErrorAction: { ...T.caption, color: C.textLink },
 
-  field: { gap: 6 },
-  fieldLabel: { ...T.fieldLabel, color: C.textBody },
-  fieldStar: { color: C.danger },
+  // Label over value over helper: three parts of one answer, so `inline`.
+  field: { gap: L.inline },
+  fieldLabel: { ...T.caption, color: C.textBody },
+  // The asterisk is text too, so it takes the text red, not the fill red.
+  fieldStar: { color: C.textDanger },
   fieldLine: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: L.space3,
-    // 7 under the value and nothing above it: the label's own line height is
+    // 8 under the value and nothing above it: the label's own line height is
     // what separates the two, so a boxed field's symmetric padding would open a
     // gap the underline no longer looks attached to.
-    paddingBottom: 7,
+    paddingBottom: L.space2,
   },
   // `minHeight` rather than `height`, so a raised system font size grows the
   // row instead of clipping the value inside it.
-  fieldInput: { flex: 1, minWidth: 0, padding: 0, minHeight: 23, ...T.fieldValue, color: C.textTitle },
+  fieldInput: { flex: 1, minWidth: 0, padding: 0, minHeight: T.titleSmall.lineHeight, ...T.titleSmall, color: C.textTitle },
   // Three lines of the 23pt value, then it scrolls. `maxHeight` rather than a
   // fixed height so a one-line answer still sits on the line like every other
   // field on the screen.
-  fieldInputMulti: { maxHeight: 23 * 3 },
-  fieldPrefix: { ...T.fieldValue, color: C.textMuted, flexShrink: 0 },
-  fieldHelper: { ...T.caption, color: C.textBody },
-  fieldError: { ...T.caption, color: C.textDanger },
+  fieldInputMulti: { maxHeight: T.titleSmall.lineHeight * 3 },
+  fieldPrefix: { ...T.titleSmall, color: C.textMuted, flexShrink: 0 },
+  fieldHelper: { ...T.bodySmall, color: C.textBody },
+  fieldError: { ...T.bodySmall, color: C.textDanger },
 
-  steps: { gap: 10 },
-  stepsLabel: { ...T.micro, color: C.textMuted },
-  stepsBars: { flexDirection: 'row', gap: 6 },
+  steps: { gap: L.related },
+  stepsLabel: { ...T.caption, color: C.textMuted },
+  // The bars are one indicator in N pieces, not N things.
+  stepsBars: { flexDirection: 'row', gap: L.inline },
   stepsBar: { height: 4, flex: 1, borderRadius: R.pill },
 
   stackCard: {
@@ -1823,39 +1846,39 @@ const styles = StyleSheet.create({
     backgroundColor: C.grey50,
     borderRadius: R.card,
     padding: L.cardPad,
-    gap: L.cardGap,
+    gap: L.space3,
   },
-  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', gap: L.cardGap },
-  summaryLabel: { ...T.caption, color: C.textBody, flexShrink: 1 },
-  summaryValue: { ...T.rowTitle, color: C.textTitle, textAlign: 'right', flexShrink: 1 },
+  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', gap: L.space3 },
+  summaryLabel: { ...T.bodySmall, color: C.textBody, flexShrink: 1 },
+  summaryValue: { ...T.titleTiny, color: C.textTitle, textAlign: 'right', flexShrink: 1 },
 
   note: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: L.cardGap,
+    gap: L.space3,
     backgroundColor: C.grey50,
     borderRadius: R.card,
     paddingVertical: L.cardPadDense,
     paddingHorizontal: L.cardPad,
   },
-  noteText: { ...T.micro, ...W.regular, color: C.textBody, flex: 1, minWidth: 0 },
+  noteText: { ...T.bodySmall, color: C.textBody, flex: 1, minWidth: 0 },
 
   stat: {
     flex: 1,
     minWidth: 0,
-    gap: 2,
+    gap: L.inline,
     padding: L.cardPadDense,
     borderRadius: R.cardSm,
     borderWidth: 1,
   },
-  statLabel: { ...T.caption, color: C.textBody },
+  statLabel: { ...T.bodySmall, color: C.textBody },
   // The figure, and it is never toned — see the note on the component.
-  statValue: { ...T.groupTitle, color: C.textTitle },
-  statNote: { ...T.micro, ...W.regular, color: C.textMuted },
+  statValue: { ...T.titleSmall, color: C.textTitle },
+  statNote: { ...T.bodySmall, color: C.textMuted },
 
   barrier: { borderRadius: R.card, padding: L.cardPad, gap: L.space1 },
-  barrierLabel: { ...T.rowTitle },
-  barrierText: { ...T.caption, color: C.textTitle },
-  barrierNote: { ...T.micro, ...W.regular, color: C.textBody, marginTop: L.space2 },
+  barrierLabel: { ...T.titleTiny },
+  barrierText: { ...T.bodySmall, color: C.textTitle },
+  barrierNote: { ...T.bodySmall, color: C.textBody, marginTop: L.space2 },
   barrierAction: { paddingTop: L.space2, flexDirection: 'row' },
 });

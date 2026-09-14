@@ -63,11 +63,11 @@ import {
 } from '@/components/shell/ramah';
 import {
   RamahColors as C,
+  RamahElevation as E,
   RamahIcon,
   RamahLayout as L,
   RamahRadius as R,
   RamahType as T,
-  RamahWeight as W,
 } from '@/constants/theme-ramah';
 import { messageOf } from '@/services/api';
 import { deleteDokumen, uploadDokumen } from '@/services/dokumen';
@@ -100,7 +100,8 @@ const MAX_LAMPIRAN = 10;
 
 /** Three tiles to a row, and the 10pt gaps between and around them. */
 const TILE_COLUMNS = 3;
-const TILE_GAP = 10;
+// `related`: the pages of one nota, side by side.
+const TILE_GAP = L.related;
 
 /**
  * Quality, not size.
@@ -395,11 +396,11 @@ const styles = StyleSheet.create({
     gap: L.space4,
   },
   countRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  // `T.caption`, not `T.micro`. Guide §7 puts the 11px floor under *tile
+  // `T.bodySmall`, not `T.caption`. Guide §7 puts the 11px floor under *tile
   // labels and character counters only* — "teks yang harus dibaca tidak
   // pernah di bawah 13px" — and how many pages are in hand is read, not
   // glanced at.
-  countLabel: { ...T.caption, color: C.textMuted },
+  countLabel: { ...T.bodySmall, color: C.textMuted },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: TILE_GAP },
   tile: {
@@ -414,17 +415,17 @@ const styles = StyleSheet.create({
   thumbGlyph: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   tileCaption: {
     paddingHorizontal: L.space2,
-    paddingVertical: 6,
-    gap: 1,
+    // No gap between the two lines: 11px on a 14pt line height already leaves
+    // the leading that separates them.
+    paddingVertical: L.space2,
     backgroundColor: C.white,
     borderTopWidth: 1,
     borderTopColor: C.borderHairline,
   },
-  // These two *are* a tile label, which is the one place 11/14 is allowed.
-  // The second line drops to regular weight so the block still has one
-  // emphasis rather than two.
-  tileLabel: { ...T.micro, color: C.textTitle },
-  tileKind: { fontSize: 11, lineHeight: 14, ...W.regular, color: C.textMuted },
+  // A tile label is Caption; the second line is the same size in Book, so the
+  // block still has one emphasis rather than two.
+  tileLabel: { ...T.caption, color: C.textTitle },
+  tileKind: { ...T.bodySmall, color: C.textMuted },
   tileRemove: {
     position: 'absolute',
     top: 6,
@@ -443,18 +444,17 @@ const styles = StyleSheet.create({
     borderColor: C.borderStrong,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: L.space2,
   },
   tileBusy: { opacity: 0.6 },
   // A tile's own label, so it matches the tiles beside it rather than
   // sitting on a size the scale does not define.
-  tileAddLabel: { ...T.micro, color: C.textTitle },
+  tileAddLabel: { ...T.caption, color: C.textTitle },
 
   dock: {
     paddingHorizontal: L.gutter,
-    paddingTop: L.cardGap,
+    paddingTop: L.dockPad,
     backgroundColor: C.surfacePage,
-    borderTopWidth: 1,
-    borderTopColor: C.borderHairline,
+    ...E.low,
   },
 });

@@ -337,7 +337,9 @@ function LineRow({
 
   const cariProduk = useCallback(async (term: string): Promise<RamahSearchOption[]> => {
     const page = await listProducts({ search: term || undefined, size: CARI_SIZE, is_aktif: true });
-    return page.data.map((p) => ({ value: String(p.id), label: p.nama, sub: p.kode }));
+    // No `sub`: the product code is how the server finds a row, not how a
+    // person recognises one. The search still matches it.
+    return page.data.map((p) => ({ value: String(p.id), label: p.nama }));
   }, []);
 
   /**
@@ -420,12 +422,11 @@ function LineRow({
   return (
     <View style={styles.lineBox}>
       <View style={styles.lineTop}>
-        <Text style={styles.lineNo}>{`#${index + 1}`}</Text>
         <View style={styles.grow}>
           <RamahPickerField
             label="Produk"
-            value={line.idProduct === null ? '' : `${line.kode} · ${line.nama}`}
-            placeholder="Cari nama atau kode barang"
+            value={line.idProduct === null ? '' : line.nama || line.kode}
+            placeholder="Cari nama barang"
             locked={!editable}
             onPress={() => setProductSheet(true)}
           />
@@ -538,7 +539,7 @@ function LineRow({
         onClose={() => setProductSheet(false)}
         search={cariProduk}
         onPick={(o) => void pickProduct(o)}
-        placeholder="Cari nama atau kode barang"
+        placeholder="Cari nama barang"
         emptyHint="Tidak ada produk aktif yang cocok."
       />
 
@@ -592,7 +593,7 @@ function SatuanChip({
 
 const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
-  group: { gap: L.cardGap },
+  group: { gap: L.stack },
 
   emptyCard: {
     backgroundColor: C.surfaceCard,
@@ -602,8 +603,8 @@ const styles = StyleSheet.create({
     padding: L.cardPad,
     gap: L.space1,
   },
-  emptyTitle: { ...T.rowTitle, color: C.textTitle },
-  emptySub: { ...T.caption, color: C.textBody },
+  emptyTitle: { ...T.titleTiny, color: C.textTitle },
+  emptySub: { ...T.bodySmall, color: C.textBody },
 
   lineBox: {
     backgroundColor: C.surfaceCard,
@@ -614,27 +615,27 @@ const styles = StyleSheet.create({
     gap: L.space3,
   },
   lineTop: { flexDirection: 'row', alignItems: 'flex-end', gap: L.space2 },
-  lineNo: { ...T.caption, color: C.textMuted, paddingBottom: 10 },
 
   fieldRow: { flexDirection: 'row', flexWrap: 'wrap', gap: L.space3 },
   fieldCell: { flexGrow: 1, flexBasis: 130 },
-  miniLabel: { ...T.fieldLabel, color: C.textBody, marginBottom: 6 },
+  miniLabel: { ...T.caption, color: C.textBody, marginBottom: L.inline },
   satuanLoading: { alignSelf: 'flex-start' },
 
   satuanChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: L.space2,
     alignSelf: 'flex-start',
     height: L.controlHSm,
-    paddingHorizontal: 14,
+    // The same insides as `RamahChip`, which this chip sits beside.
+    paddingHorizontal: L.space3,
     borderRadius: R.pill,
     borderWidth: 1.5,
     borderColor: C.borderHairline,
     backgroundColor: C.white,
   },
   satuanChipDown: { backgroundColor: C.surfaceStack },
-  satuanChipText: { ...T.caption, color: C.textTitle },
+  satuanChipText: { ...T.bodySmall, color: C.textTitle },
 
   lineFoot: {
     flexDirection: 'row',
@@ -645,8 +646,8 @@ const styles = StyleSheet.create({
     borderTopColor: C.borderHairline,
     paddingTop: L.space2,
   },
-  lineFootLabel: { ...T.caption, color: C.textBody },
-  lineFootValue: { ...T.rowTitle, color: C.textTitle },
+  lineFootLabel: { ...T.bodySmall, color: C.textBody },
+  lineFootValue: { ...T.titleTiny, color: C.textTitle },
 
   addBar: { alignItems: 'flex-start' },
 });

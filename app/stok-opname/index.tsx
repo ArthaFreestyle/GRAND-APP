@@ -39,6 +39,7 @@ import { DOKUMEN_RAMAH } from '@/components/shell/status-dokumen';
 import { formatTanggal } from '@/constants/produk';
 import {
   RamahColors as C,
+  RamahElevation as E,
   RamahLayout as L,
   RamahRadius as R,
   RamahType as T,
@@ -66,7 +67,7 @@ export default function StokOpnameListScreen() {
   const router = useRouter();
   const canWrite = useCanWrite('opname');
   const insets = useSafeAreaInsets();
-  const dockPad = useDockPadding(insets.bottom, L.cardGap);
+  const dockPad = useDockPadding(insets.bottom, L.dockPad);
 
   const [terbuka, setTerbuka] = useState<OpnameRow[]>([]);
   const [terbukaErr, setTerbukaErr] = useState('');
@@ -194,7 +195,12 @@ export default function StokOpnameListScreen() {
 
   const renderEntry = useCallback(
     ({ item }: { item: Entry }) => {
-      if (item.kind === 'header') return <RamahSectionHeader>{item.label}</RamahSectionHeader>;
+      if (item.kind === 'header')
+        return (
+          <View style={styles.listHeading}>
+            <RamahSectionHeader>{item.label}</RamahSectionHeader>
+          </View>
+        );
       return (
         <OpnameRowCard
           row={item.row}
@@ -329,15 +335,18 @@ const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
   list: { flex: 1 },
   listContent: { paddingHorizontal: L.gutter, paddingTop: L.space2, paddingBottom: L.space8 },
-  controls: { gap: L.cardGap },
+  controls: { gap: L.stack, paddingBottom: L.stack },
 
   card: { backgroundColor: C.surfaceCard, borderColor: C.borderHairline, borderWidth: 1 },
   cardFirst: { borderTopLeftRadius: R.card, borderTopRightRadius: R.card },
   cardLast: {
     borderBottomLeftRadius: R.card,
     borderBottomRightRadius: R.card,
-    marginBottom: L.groupGap,
+    marginBottom: L.stack,
   },
+  // A heading opens a group: `group` above it (this, plus the `stack` under the
+  // card or controls before it) and `related` down to the rows it names.
+  listHeading: { paddingTop: L.group - L.stack, paddingBottom: L.related },
   divider: { height: 1, backgroundColor: C.borderHairline, marginHorizontal: L.cardPad },
   row: {
     flexDirection: 'row',
@@ -347,18 +356,17 @@ const styles = StyleSheet.create({
     minHeight: L.rowH,
   },
   rowDown: { backgroundColor: C.grey50 },
-  rowTitle: { ...T.rowTitle, color: C.textTitle },
-  rowSub: { ...T.caption, color: C.textBody },
+  rowTitle: { ...T.titleTiny, color: C.textTitle },
+  rowSub: { ...T.bodySmall, color: C.textBody },
 
   placeholder: { paddingVertical: L.space8, paddingHorizontal: L.space4, alignItems: 'center' },
-  placeholderText: { ...T.caption, color: C.textBody, textAlign: 'center' },
+  placeholderText: { ...T.bodySmall, color: C.textBody, textAlign: 'center' },
   footer: { paddingVertical: L.space5, alignItems: 'center' },
 
   dock: {
     paddingHorizontal: L.gutter,
-    paddingTop: L.cardGap,
+    paddingTop: L.dockPad,
     backgroundColor: C.surfacePage,
-    borderTopWidth: 1,
-    borderTopColor: C.borderHairline,
+    ...E.low,
   },
 });

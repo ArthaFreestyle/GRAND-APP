@@ -21,7 +21,7 @@ import {
   type UnitKerjaValues,
 } from '@/components/pengaturan/unit-kerja-form';
 import { RamahHeader, RamahInlineError, RamahPrimaryButton } from '@/components/shell/ramah';
-import { RamahColors as C, RamahLayout as L } from '@/constants/theme-ramah';
+import { RamahColors as C, RamahElevation as E, RamahLayout as L } from '@/constants/theme-ramah';
 import { useDockPadding } from '@/hooks/use-keyboard-height';
 import { messageOf } from '@/services/api';
 import { createUnitKerja, unitKerjaBus } from '@/services/unit-kerja';
@@ -29,7 +29,7 @@ import { createUnitKerja, unitKerjaBus } from '@/services/unit-kerja';
 export default function PengaturanBaruScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const dockPad = useDockPadding(insets.bottom, L.cardGap);
+  const dockPad = useDockPadding(insets.bottom, L.dockPad);
 
   const [values, setValues] = useState<UnitKerjaValues>(EMPTY_UNIT_KERJA);
   const [err, setErr] = useState('');
@@ -103,10 +103,9 @@ const styles = StyleSheet.create({
   },
   dock: {
     paddingHorizontal: L.gutter,
-    paddingTop: L.cardGap,
+    paddingTop: L.dockPad,
     gap: L.space2,
     backgroundColor: C.surfacePage,
-    borderTopWidth: 1,
-    borderTopColor: C.borderHairline,
+    ...E.low,
   },
 });

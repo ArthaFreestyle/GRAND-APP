@@ -81,6 +81,7 @@ import {
 import { formatNumber, formatRupiah, todayISO } from '@/constants/produk';
 import {
   RamahColors as C,
+  RamahElevation as E,
   RamahLayout as L,
   RamahRadius as R,
   RamahType as T,
@@ -115,7 +116,7 @@ export default function ProdukBaruScreen() {
    * while it is up — the two are alternatives, never a sum, because the
    * gesture bar that inset pays for is itself behind the keyboard.
    */
-  const dockPad = useDockPadding(insets.bottom, L.cardGap);
+  const dockPad = useDockPadding(insets.bottom, L.dockPad);
   const canWrite = useCanWrite('produk');
 
   const [step, setStep] = useState<1 | 2 | 3 | 'done'>(1);
@@ -731,11 +732,13 @@ const styles = StyleSheet.create({
     gap: L.space5,
   },
 
-  intro: { gap: 10 },
-  introTitle: { ...T.metric, color: C.textTitle, letterSpacing: -0.2 },
-  introSub: { ...T.body, color: C.textBody },
+  intro: { gap: L.related },
+  // Title Moderate, not Large: this is a question in words, and Large is for a
+  // figure. The bundle already carries the heading tracking.
+  introTitle: { ...T.titleModerate, color: C.textTitle },
+  introSub: { ...T.bodyModerate, color: C.textBody },
 
-  group: { gap: L.cardGap },
+  group: { gap: L.stack },
 
   emptyCard: {
     backgroundColor: C.surfaceCard,
@@ -745,13 +748,13 @@ const styles = StyleSheet.create({
     padding: L.cardPad,
     gap: L.space1,
   },
-  emptyTitle: { ...T.rowTitle, color: C.textTitle },
-  emptySub: { ...T.caption, color: C.textBody },
+  emptyTitle: { ...T.titleTiny, color: C.textTitle },
+  emptySub: { ...T.bodySmall, color: C.textBody },
 
   turunanCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: L.cardGap,
+    gap: L.space3,
     backgroundColor: C.surfaceCard,
     borderWidth: 1,
     borderColor: C.borderHairline,
@@ -760,8 +763,8 @@ const styles = StyleSheet.create({
     paddingRight: L.space3,
     paddingVertical: L.space3,
   },
-  turunanNama: { ...T.rowTitle, color: C.textTitle },
-  turunanKonversi: { ...T.caption, color: C.textBody, marginTop: 2 },
+  turunanNama: { ...T.titleTiny, color: C.textTitle },
+  turunanKonversi: { ...T.bodySmall, color: C.textBody, marginTop: L.inline },
 
   hargaCard: {
     backgroundColor: C.surfaceCard,
@@ -770,20 +773,20 @@ const styles = StyleSheet.create({
     borderRadius: R.card,
     paddingVertical: L.cardPadDense,
     paddingHorizontal: L.cardPad,
-    gap: 10,
+    gap: L.space3,
   },
   hargaHead: {
     flexDirection: 'row',
     alignItems: 'baseline',
     justifyContent: 'space-between',
-    gap: L.cardGap,
+    gap: L.space3,
   },
-  hargaNama: { ...T.rowTitle, color: C.textTitle, flexShrink: 1 },
-  hargaKonversi: { ...T.caption, color: C.textBody, flexShrink: 0 },
+  hargaNama: { ...T.titleTiny, color: C.textTitle, flexShrink: 1 },
+  hargaKonversi: { ...T.bodySmall, color: C.textBody, flexShrink: 0 },
 
   doneContent: {
     paddingHorizontal: L.gutter,
-    paddingTop: 56,
+    paddingTop: L.space12,
     paddingBottom: L.space6,
     gap: L.space5,
     alignItems: 'stretch',
@@ -797,28 +800,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   doneHead: { gap: L.space2 },
-  doneTitle: { ...T.metric, color: C.textTitle, letterSpacing: -0.2 },
-  doneSub: { ...T.body, color: C.textBody },
+  doneTitle: { ...T.titleModerate, color: C.textTitle },
+  doneSub: { ...T.bodyModerate, color: C.textBody },
 
-  saveNote: { ...T.caption, color: C.textBody, paddingBottom: L.space2 },
+  saveNote: { ...T.bodySmall, color: C.textBody, paddingBottom: L.space2 },
 
   dock: {
     paddingHorizontal: L.gutter,
-    paddingTop: 10,
+    paddingTop: L.dockPad,
     backgroundColor: C.surfacePage,
-    borderTopWidth: 1,
-    borderTopColor: C.borderHairline,
+    ...E.low,
   },
   // The confirmation page has two buttons and no hairline above them: nothing is
   // scrolling underneath it to be separated from.
-  dockDone: { paddingHorizontal: L.gutter, paddingTop: L.space3, gap: 10 },
+  dockDone: { paddingHorizontal: L.gutter, paddingTop: L.dockPad, gap: L.related },
 
-  sheetBody: { paddingHorizontal: L.gutter, gap: L.cardGap, paddingBottom: L.space2 },
-  sheetLead: { ...T.caption, color: C.textBody },
-  sheetEmpty: { ...T.caption, color: C.textMuted, paddingVertical: L.space4 },
+  sheetBody: { paddingHorizontal: L.gutter, gap: L.stack, paddingBottom: L.space2 },
+  sheetLead: { ...T.bodySmall, color: C.textBody },
+  sheetEmpty: { ...T.bodySmall, color: C.textMuted, paddingVertical: L.space4 },
   sheetForm: { paddingHorizontal: L.gutter, gap: L.space5, paddingBottom: L.space2 },
 
-  preview: { backgroundColor: C.grey50, borderRadius: R.card, padding: L.cardPad, gap: 2 },
-  previewLabel: { ...T.caption, color: C.textBody },
-  previewValue: { ...T.rowTitle, color: C.textTitle },
+  preview: { backgroundColor: C.grey50, borderRadius: R.card, padding: L.cardPad, gap: L.inline },
+  previewLabel: { ...T.bodySmall, color: C.textBody },
+  previewValue: { ...T.titleTiny, color: C.textTitle },
 });

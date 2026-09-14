@@ -43,6 +43,7 @@ import {
 import { formatRupiah, formatTanggal } from '@/constants/produk';
 import {
   RamahColors as C,
+  RamahElevation as E,
   RamahLayout as L,
   RamahRadius as R,
   RamahType as T,
@@ -88,9 +89,7 @@ export function PilihPemasokStep({
   picked,
   onPick,
   onBack,
-  onBuat,
-  membuat,
-  buatErr,
+  onLanjut,
   dockPad,
 }: {
   jumlahBarang: number;
@@ -101,9 +100,8 @@ export function PilihPemasokStep({
   picked: Supplier | null;
   onPick: (s: Supplier) => void;
   onBack: () => void;
-  onBuat: () => void;
-  membuat: boolean;
-  buatErr: string;
+  /** Goes on to the price step; the nota is created from there. */
+  onLanjut: () => void;
   dockPad: number;
 }) {
   const [query, setQuery] = useState('');
@@ -237,7 +235,12 @@ export function PilihPemasokStep({
 
   const renderEntry = useCallback(
     ({ item }: { item: Entry }) => {
-      if (item.kind === 'header') return <RamahSectionHeader>{item.label}</RamahSectionHeader>;
+      if (item.kind === 'header')
+        return (
+          <View style={styles.listHeading}>
+            <RamahSectionHeader>{item.label}</RamahSectionHeader>
+          </View>
+        );
       return (
         <PemasokRow
           supplier={item.supplier}
@@ -271,7 +274,7 @@ export function PilihPemasokStep({
             <RamahSearchField
               value={query}
               onChangeText={setQuery}
-              placeholder="Cari nama atau kode pemasok"
+              placeholder="Cari nama pemasok"
             />
             {riwayatLoading ? (
               <View style={styles.riwayatLoading}>
@@ -299,14 +302,12 @@ export function PilihPemasokStep({
       />
 
       <View style={[styles.dock, { paddingBottom: dockPad }]}>
-        {buatErr ? <RamahInlineError message={buatErr} /> : null}
         <RamahNote icon="lock">Tidak bisa diubah setelah nota dibuat.</RamahNote>
         <RamahPrimaryButton
-          label={membuat ? 'Membuat nota…' : 'Buat nota pembelian'}
-          icon="file-plus"
-          onPress={onBuat}
-          disabled={!picked || membuat}
-          busy={membuat}
+          label="Lanjut isi harga"
+          icon="arrow-right"
+          onPress={onLanjut}
+          disabled={!picked}
         />
       </View>
     </View>
@@ -338,12 +339,12 @@ function PemasokRow({
    * is choosing a supplier, not grading one.
    */
   const ringkas = useMemo(() => {
-    if (!riwayat || riwayat.perProduk.size === 0) return supplier.kode || 'Belum pernah dibeli';
+    if (!riwayat || riwayat.perProduk.size === 0) return 'Belum pernah dibeli';
     const entries = [...riwayat.perProduk.values()];
     const terbaru = entries.reduce((a, b) => (a.tanggal >= b.tanggal ? a : b));
     const cakupan = `${riwayat.perProduk.size} dari ${jumlahBarang} barang`;
     return `${cakupan} · terakhir ${formatTanggal(terbaru.tanggal)}`;
-  }, [riwayat, supplier.kode, jumlahBarang]);
+  }, [riwayat, jumlahBarang]);
 
   // Only meaningful for a single-product list, where one price is *the* price
   // rather than one of several. With more than one, the figure would invite a
@@ -435,18 +436,21 @@ const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
   list: { flex: 1 },
   listContent: { paddingHorizontal: L.gutter, paddingTop: L.space2, paddingBottom: L.space8 },
-  controls: { gap: L.cardGap, paddingBottom: L.space4 },
+  controls: { gap: L.stack, paddingBottom: L.stack },
 
   riwayatLoading: { flexDirection: 'row', alignItems: 'center', gap: L.space2 },
-  riwayatLoadingText: { ...T.caption, color: C.textBody },
+  riwayatLoadingText: { ...T.bodySmall, color: C.textBody },
 
   card: { backgroundColor: C.surfaceCard, borderColor: C.borderHairline, borderWidth: 1 },
   cardFirst: { borderTopLeftRadius: R.card, borderTopRightRadius: R.card },
   cardLast: {
     borderBottomLeftRadius: R.card,
     borderBottomRightRadius: R.card,
-    marginBottom: L.groupGap,
+    marginBottom: L.stack,
   },
+  // A heading opens a group: `group` above it (this, plus the `stack` under the
+  // card or controls before it) and `related` down to the rows it names.
+  listHeading: { paddingTop: L.group - L.stack, paddingBottom: L.related },
   divider: { height: 1, backgroundColor: C.borderHairline, marginHorizontal: L.cardPad },
   row: {
     flexDirection: 'row',
@@ -463,23 +467,24 @@ const styles = StyleSheet.create({
     borderColor: C.borderStrong,
     alignItems: 'center',
     justifyContent: 'center',
+    // An optical nudge onto the title's first line, not a gap — one of the
+    // exceptions `RamahLayout` lists to the 4px grid.
     marginTop: 1,
   },
   radioOn: { backgroundColor: C.brand, borderColor: C.brand },
-  rowTitle: { ...T.rowTitle, color: C.textTitle },
-  rowSub: { ...T.caption, color: C.textBody },
-  rowValue: { ...T.caption, color: C.textTitle, textAlign: 'right', maxWidth: 130 },
+  rowTitle: { ...T.titleTiny, color: C.textTitle },
+  rowSub: { ...T.bodySmall, color: C.textBody },
+  rowValue: { ...T.bodySmall, color: C.textTitle, textAlign: 'right', maxWidth: 130 },
 
   placeholder: { paddingVertical: L.space8, paddingHorizontal: L.space4, alignItems: 'center' },
-  placeholderText: { ...T.caption, color: C.textBody, textAlign: 'center' },
+  placeholderText: { ...T.bodySmall, color: C.textBody, textAlign: 'center' },
   footer: { paddingVertical: L.space5, alignItems: 'center' },
 
   dock: {
     paddingHorizontal: L.gutter,
-    paddingTop: L.cardGap,
+    paddingTop: L.dockPad,
     gap: L.space2,
     backgroundColor: C.surfacePage,
-    borderTopWidth: 1,
-    borderTopColor: C.borderHairline,
+    ...E.low,
   },
 });

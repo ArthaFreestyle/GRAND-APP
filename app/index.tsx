@@ -522,11 +522,11 @@ const styles = StyleSheet.create({
     letterSpacing: -0.28,
     color: D.textTitle,
   },
-  lede: { fontSize: 15, lineHeight: 22, ...W.regular, color: D.textBody },
+  lede: { fontSize: 15, lineHeight: 22, ...W.book, color: D.textBody },
 
   fields: { gap: 16 },
   // `--type-caption` at `--fw-medium`, 8pt clear of its field.
-  label: { fontSize: 13, lineHeight: 18, ...W.medium, color: D.textBody, marginBottom: 8 },
+  label: { fontSize: 13, lineHeight: 18, ...W.demi, color: D.textBody, marginBottom: 8 },
   /**
    * The filled field. `minHeight` rather than `height` so a raised system font
    * size grows it instead of being clipped by it, and the border is always 1.5
@@ -548,10 +548,10 @@ const styles = StyleSheet.create({
     minWidth: 0,
     paddingVertical: 12,
     fontSize: 16,
-    ...W.medium,
+    ...W.book,
     color: D.textTitle,
   },
-  fieldError: { fontSize: 13, lineHeight: 18, ...W.regular, marginTop: 8, color: D.danger },
+  fieldError: { fontSize: 13, lineHeight: 18, ...W.book, marginTop: 8, color: D.danger },
 
   // One control left in this row now that the checkbox is gone, so it ranges
   // right — a lone ghost button on the left would read as a heading for the
@@ -570,7 +570,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   ghostPressed: { backgroundColor: D.brandTintSoft },
-  ghostText: { fontSize: 14, lineHeight: 20, ...W.semibold, color: D.brandInk },
+  ghostText: { fontSize: 14, lineHeight: 20, ...W.demi, color: D.brandInk },
 
   notice: {
     flexDirection: 'row',
@@ -582,7 +582,7 @@ const styles = StyleSheet.create({
   },
   noticeDanger: { backgroundColor: D.dangerTint },
   noticeInfo: { backgroundColor: D.accentBlueTint },
-  noticeText: { flex: 1, fontSize: 13, lineHeight: 18, ...W.regular, color: D.textBody },
+  noticeText: { flex: 1, fontSize: 13, lineHeight: 18, ...W.book, color: D.textBody },
 
   submit: {
     minHeight: CONTROL_H,
@@ -598,7 +598,7 @@ const styles = StyleSheet.create({
   submitText: {
     fontSize: 16,
     lineHeight: 20,
-    ...W.semibold,
+    ...W.demi,
     letterSpacing: -0.16,
     color: D.textOnBrand,
   },

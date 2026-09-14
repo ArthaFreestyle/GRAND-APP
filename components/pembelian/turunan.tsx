@@ -70,7 +70,6 @@ import {
   RamahLayout as L,
   RamahRadius as R,
   RamahType as T,
-  RamahWeight as W,
 } from '@/constants/theme-ramah';
 import { decimalToNumber, numericToDecimal } from '@/services/decimal';
 import type { PembelianDoc } from '@/services/pembelian';
@@ -635,7 +634,7 @@ export function BarisTerpasang({
 
 const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
-  group: { gap: L.cardGap },
+  group: { gap: L.stack },
 
   emptyCard: {
     backgroundColor: C.surfaceCard,
@@ -645,8 +644,8 @@ const styles = StyleSheet.create({
     padding: L.cardPad,
     gap: L.space1,
   },
-  emptyTitle: { ...T.rowTitle, color: C.textTitle },
-  emptySub: { ...T.caption, color: C.textBody },
+  emptyTitle: { ...T.titleTiny, color: C.textTitle },
+  emptySub: { ...T.bodySmall, color: C.textBody },
 
   card: {
     backgroundColor: C.surfaceCard,
@@ -661,39 +660,39 @@ const styles = StyleSheet.create({
   // candidate the reader scrolled past. Border and tint, never a shadow.
   cardAktif: { borderColor: C.borderBrand, backgroundColor: C.brandTintSoft },
 
-  head: { flexDirection: 'row', alignItems: 'flex-start', gap: L.cardGap },
-  nama: { ...T.rowTitle, color: C.textTitle },
-  ringkas: { ...T.caption, color: C.textBody, marginTop: 2 },
+  head: { flexDirection: 'row', alignItems: 'flex-start', gap: L.space3 },
+  nama: { ...T.titleTiny, color: C.textTitle },
+  ringkas: { ...T.bodySmall, color: C.textBody, marginTop: L.inline },
   batasBox: { flexShrink: 0, maxWidth: 132, alignItems: 'flex-end' },
-  batasLabel: { ...T.micro, color: C.textMuted },
-  batasValue: { ...T.rowTitle, color: C.textTitle, textAlign: 'right', marginTop: 2 },
+  batasLabel: { ...T.caption, color: C.textMuted },
+  batasValue: { ...T.titleTiny, color: C.textTitle, textAlign: 'right', marginTop: L.inline },
 
-  qtyBlock: { gap: 6 },
-  fieldLabel: { ...T.fieldLabel, color: C.textBody },
-  stepRow: { flexDirection: 'row', alignItems: 'center', gap: L.cardGap },
-  qtyLine: { flex: 1, minWidth: 0, borderBottomWidth: 1.5, paddingBottom: 7 },
+  qtyBlock: { gap: L.inline },
+  fieldLabel: { ...T.caption, color: C.textBody },
+  stepRow: { flexDirection: 'row', alignItems: 'center', gap: L.space3 },
+  qtyLine: { flex: 1, minWidth: 0, borderBottomWidth: 1.5, paddingBottom: L.space2 },
   qtyInput: {
     padding: 0,
-    minHeight: 23,
-    ...T.fieldValue,
+    minHeight: T.titleSmall.lineHeight,
+    ...T.titleSmall,
     color: C.textTitle,
     textAlign: 'center',
   },
-  satuanRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingTop: L.space1 },
-  faktorNote: { ...T.caption, color: C.textMuted },
-  lineNote: { ...T.caption, color: C.textBody },
-  lineErr: { ...T.caption, color: C.textDanger, ...W.semibold },
+  satuanRow: { flexDirection: 'row', alignItems: 'center', gap: L.space2, paddingTop: L.space1 },
+  faktorNote: { ...T.bodySmall, color: C.textMuted },
+  lineNote: { ...T.bodySmall, color: C.textBody },
+  lineErr: { ...T.caption, color: C.textDanger },
 
   sheetLead: { paddingHorizontal: L.gutter, paddingBottom: L.space3 },
-  sheetLeadText: { ...T.caption, color: C.textBody },
+  sheetLeadText: { ...T.bodySmall, color: C.textBody },
 
   terpasang: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: L.cardGap,
+    gap: L.space3,
     paddingVertical: L.space3,
     paddingHorizontal: L.cardPad,
     minHeight: L.rowH,
   },
-  terpasangNilai: { ...T.rowTitle, color: C.textTitle, textAlign: 'right', flexShrink: 0 },
+  terpasangNilai: { ...T.titleTiny, color: C.textTitle, textAlign: 'right', flexShrink: 0 },
 });

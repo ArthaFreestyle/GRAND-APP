@@ -94,10 +94,10 @@ import { DOKUMEN_RAMAH } from '@/components/shell/status-dokumen';
 import { formatRupiah, formatTanggal } from '@/constants/produk';
 import {
   RamahColors as C,
+  RamahElevation as E,
   RamahLayout as L,
   RamahRadius as R,
   RamahType as T,
-  RamahWeight as W,
 } from '@/constants/theme-ramah';
 import type { AksiDokumen } from '@/services/alur-dokumen';
 import { messageOf } from '@/services/api';
@@ -127,7 +127,7 @@ export default function PenerimaanSusulanDetailScreen() {
    * while it is up — the two are alternatives, never a sum, because the
    * gesture bar that inset pays for is itself behind the keyboard.
    */
-  const dockPad = useDockPadding(insets.bottom, L.cardGap);
+  const dockPad = useDockPadding(insets.bottom, L.dockPad);
   const params = useLocalSearchParams<{ id: string; ubah?: string; baru?: string }>();
   const id = Number(params.id);
 
@@ -723,29 +723,29 @@ function jejakRows(doc: SusulanDoc): { label: string; value: string }[] {
  */
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: C.surfaceSunken },
-  headerActions: { flexDirection: 'row', alignItems: 'center', marginRight: -8 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', marginRight: -L.space2 },
 
   body: { flex: 1 },
   bodyContent: {
     paddingHorizontal: L.gutter,
     paddingTop: L.space1,
     paddingBottom: L.space6,
-    gap: L.groupGap,
+    gap: L.group,
   },
 
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: L.space8, gap: L.space2 },
-  centerTitle: { ...T.groupTitle, color: C.textTitle, textAlign: 'center' },
-  centerSub: { ...T.caption, color: C.textBody, textAlign: 'center' },
+  centerTitle: { ...T.titleSmall, color: C.textTitle, textAlign: 'center' },
+  centerSub: { ...T.bodySmall, color: C.textBody, textAlign: 'center' },
   centerAction: { paddingTop: L.space4 },
 
   identity: { gap: L.space1 },
   identityTop: { flexDirection: 'row', alignItems: 'center', gap: L.space3 },
-  identityName: { ...T.identity, color: C.textTitle, flexShrink: 1 },
-  identitySub: { ...T.caption, color: C.textBody },
+  identityName: { ...T.titleModerate, color: C.textTitle, flexShrink: 1 },
+  identitySub: { ...T.bodySmall, color: C.textBody },
 
-  statRow: { flexDirection: 'row', gap: 10 },
+  statRow: { flexDirection: 'row', gap: L.stack },
 
-  group: { gap: L.space2 },
+  group: { gap: L.related },
   emptyCard: {
     backgroundColor: C.surfaceCard,
     borderWidth: 1,
@@ -754,20 +754,19 @@ const styles = StyleSheet.create({
     padding: L.cardPad,
     gap: L.space1,
   },
-  emptyTitle: { ...T.rowTitle, color: C.textTitle },
-  emptySub: { ...T.caption, color: C.textBody },
+  emptyTitle: { ...T.titleTiny, color: C.textTitle },
+  emptySub: { ...T.bodySmall, color: C.textBody },
 
-  ledgerNote: { ...T.micro, ...W.regular, color: C.textBody, paddingTop: L.space1 },
-  editNote: { ...T.micro, ...W.regular, color: C.textBody },
-  noAksi: { ...T.caption, color: C.textMuted, textAlign: 'center', paddingVertical: L.space2 },
+  ledgerNote: { ...T.bodySmall, color: C.textBody, paddingTop: L.space1 },
+  editNote: { ...T.bodySmall, color: C.textBody },
+  noAksi: { ...T.bodySmall, color: C.textMuted, textAlign: 'center', paddingVertical: L.space2 },
 
   dock: {
     paddingHorizontal: L.gutter,
-    paddingTop: 10,
-    gap: 10,
+    paddingTop: L.dockPad,
+    gap: L.related,
     backgroundColor: C.surfacePage,
-    borderTopWidth: 1,
-    borderTopColor: C.borderHairline,
+    ...E.low,
   },
 
   sheetBody: { paddingHorizontal: L.gutter, gap: L.space5, paddingBottom: L.space2 },

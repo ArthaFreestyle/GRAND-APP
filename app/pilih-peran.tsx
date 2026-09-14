@@ -397,7 +397,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 18,
     lineHeight: 24,
-    ...W.semibold,
+    ...W.demi,
     letterSpacing: -0.18,
     color: D.textTitle,
   },
@@ -410,11 +410,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     lineHeight: 28,
-    ...W.semibold,
+    ...W.demi,
     letterSpacing: -0.22,
     color: D.textTitle,
   },
-  lede: { fontSize: 15, lineHeight: 22, ...W.regular, color: D.textBody },
+  lede: { fontSize: 15, lineHeight: 22, ...W.book, color: D.textBody },
 
   /**
    * `minHeight` rather than `height`, so a raised system font size grows the
@@ -444,13 +444,13 @@ const styles = StyleSheet.create({
   },
   rowText: { flex: 1, minWidth: 0 },
   // `--type-body-strong`.
-  rowTitle: { fontSize: 15, lineHeight: 22, ...W.semibold, color: D.textTitle },
+  rowTitle: { fontSize: 15, lineHeight: 22, ...W.demi, color: D.textTitle },
   // `--type-caption`, `--text-muted`.
-  rowSubtitle: { fontSize: 13, lineHeight: 18, ...W.regular, color: D.textMuted },
+  rowSubtitle: { fontSize: 13, lineHeight: 18, ...W.book, color: D.textMuted },
   // A hint, not a status: `--fs-micro` in the accent blue the note at the foot
   // of the screen already speaks in, so it reads as the app remembering rather
   // than as something being wrong with the row.
-  rowHint: { fontSize: 11, lineHeight: 14, ...W.semibold, color: D.accentBlueInk, marginTop: 2 },
+  rowHint: { fontSize: 11, lineHeight: 14, ...W.demi, color: D.accentBlueInk, marginTop: 2 },
   divider: { height: 1, backgroundColor: D.borderHairline },
 
   notice: {
@@ -462,7 +462,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: D.dangerTint,
   },
-  noticeText: { flex: 1, fontSize: 13, lineHeight: 18, ...W.regular, color: D.textBody },
+  noticeText: { flex: 1, fontSize: 13, lineHeight: 18, ...W.book, color: D.textBody },
 
   info: {
     flexDirection: 'row',
@@ -474,5 +474,5 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: D.accentBlueTint,
   },
-  infoText: { flex: 1, fontSize: 13, lineHeight: 18, ...W.regular, color: D.textBody },
+  infoText: { flex: 1, fontSize: 13, lineHeight: 18, ...W.book, color: D.textBody },
 });

@@ -1,44 +1,54 @@
 /**
- * E1 of `Papan Layar.dc.html` — "Stok minimum", drawn as `LayarGudang.dc.html`
- * draws it at `screen: 'minimum'`, and the screen `Papan Layar OCR.dc.html`
- * adds its new entry point to.
+ * E1 of `Papan Layar.dc.html` — "Pilih barang", the first step of a new nota.
  *
- * **One question: what do I need to buy, and how much of it.** The reorder queue
- * comes from `GET /product/stok-minimum`, which *is* the definition of "below
- * minimum" — membership in that list, not a comparison this screen makes. It is
- * pre-sorted worst-first and never includes a product still at the
- * `stok_minimum = 0` default, because zero is the column default meaning "not
- * set" rather than "may run out".
+ * **One question: what am I buying, and how much of it.** Any active product in
+ * the gudang can be ticked. The board draws this screen as the reorder queue
+ * (`screen: 'minimum'`), and it shipped that way — which meant a nota could
+ * only ever be started for something already below its minimum. That is not
+ * how a shop buys: stock is bought ahead, for a promotion, for a new line, or
+ * because the supplier's truck is here today. So the queue is a **filter** on
+ * this screen now ("Stok menipis"), not the screen itself.
+ *
+ * ## Two reads, one row shape
+ *
+ * - **"Semua barang"** reads `GET /pos/product`: every active product in the
+ *   ruang with its units and its balance, three queries per page whatever the
+ *   row count. It carries the base unit, so a ticked row needs no second read.
+ * - **"Stok menipis"** reads `GET /product/stok-minimum`, whose membership *is*
+ *   the definition of "di bawah minimum". It carries the shortfall but no unit,
+ *   so ticking one of its rows still costs one `GET /product/{id}` — the flow
+ *   does that, see `app/pembelian/baru.tsx`.
+ *
+ * Both are folded into `Kandidat` so the row, the selection and the dock do not
+ * care which list a product was ticked from. Switching filter keeps the
+ * selection: it lives in the flow, keyed by product id.
+ *
+ * ## Quantity and unit
+ *
+ * A row from the full catalogue opens at 1 in the product's default input unit
+ * (`is_default_input`) — a shop buys paper by the rim, not by the sheet. A row
+ * from the reorder queue opens at its shortfall (`selisih`) in the base unit,
+ * because that is the unit the shortfall is counted in; no endpoint carries a
+ * reorder suggestion, and inventing one would be a figure somebody acts on.
+ * Either way the unit chip beside the stepper switches to any unit the product
+ * registers, and the flow converts the quantity so the amount stays the same.
+ *
+ * ## No product code on screen
+ *
+ * `kode_barang` is how the server and a scanner find a product, not how
+ * somebody in a storeroom recognises one. The search still matches it; the rows
+ * never print it.
  *
  * ## The green card at the top is the OCR board's whole contribution to E1
  *
- * `Papan Layar OCR.dc.html` adds one element to this screen and nothing else:
- * a card that opens the photo step. Its own note says the card "bypasses the
- * list" — with OCR the lines would come off the faktur and no box here would
- * need ticking. Without `/ocr/faktur` it cannot bypass anything, so it does the
- * honest version of the same thing: the photos are collected, they ride along
- * with the flow, and they end up attached to the nota this screen is on its way
- * to creating. The card says how many pages it is holding once it holds any,
- * because a flow carrying three photographs invisibly is a flow that loses them.
- *
- * ## Quantity is the shortfall, and that is a decision the board explains
- *
- * A checked row fills with `selisih` — `stok_minimum - total_stok` — not with a
- * reorder suggestion, because **no endpoint carries one**. The board says this
- * outright ("bukan angka saran: data itu tidak ada di API"), and inventing an
- * economic order quantity to fill the field would be a number somebody acts on.
- *
- * ## What appending pages costs here, stated rather than hidden
- *
- * The two group headings partition *what is loaded*. The queue is sorted by
- * shortfall, so the worst rows are on page one and the grouping only ever
- * re-files rows already in hand — but a product whose stock is zero while its
- * shortfall is small sits further down the list than the heading "Habis"
- * suggests, and is not under it until its page is.
+ * `Papan Layar OCR.dc.html` adds a card that opens the photo step. Without
+ * `/ocr/faktur` it cannot fill the lines, so the photos are collected, ride
+ * along with the flow, and end up attached to the nota. The card says how many
+ * pages it is holding once it holds any.
  */
 import Feather from '@expo/vector-icons/Feather';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -58,52 +68,118 @@ import {
   RamahPrimaryButton,
   RamahSearchField,
   RamahSecondaryButton,
-  RamahSectionHeader,
   RamahSheet,
   RamahSheetOption,
 } from '@/components/shell/ramah';
 import { formatNumber } from '@/constants/produk';
 import {
   RamahColors as C,
+  RamahElevation as E,
   RamahIcon,
   RamahLayout as L,
   RamahRadius as R,
   RamahType as T,
 } from '@/constants/theme-ramah';
-import { messageOf } from '@/services/api';
-import { listStokMinimum, type StokMinimumRow } from '@/services/produk';
+import { messageOf, type Paged } from '@/services/api';
+import { listPosProducts, listStokMinimum } from '@/services/produk';
 import type { RuangRow } from '@/services/ruang';
+
+/** One unit a product is registered in. `faktor` is how many base units it holds. */
+export interface SatuanPilihan {
+  id: number;
+  nama: string;
+  faktor: number;
+}
 
 /** One line of the nota being assembled, as this flow carries it. */
 export interface BarangDipilih {
   id: number;
   nama: string;
-  /**
-   * In **base units**, always. `stok_minimum`, `total_stok` and `selisih` are
-   * all counted in the product's base unit, so the shortfall this is seeded
-   * from is too — and the line is later sent against `id_satuan_dasar` for the
-   * same reason. Sending the shortfall against a DUS of twelve would order
-   * twelve times what was asked for.
-   */
+  /** In the chosen unit (`idSatuan`), which is what goes out as `qty_faktur`. */
   qty: number;
   /**
-   * `id_satuan_dasar`, resolved by the flow with one `GET /product/{id}` when
-   * the row is ticked. Zero until that answers: `StokMinimum` carries no unit
-   * at all, and no endpoint in the contract reports the base unit for a set of
-   * arbitrary product ids in one read.
+   * Every unit the product registers — `id_satuan_input` has no foreign key
+   * behind it and an unregistered one answers 400, so the choice is only ever
+   * made from this list. Empty for a reorder-queue row until the flow's
+   * `GET /product/{id}` answers, because `StokMinimum` carries no unit.
    */
-  idSatuanDasar: number;
-  /** Empty until the same read answers; the stepper says "satuan dasar" meanwhile. */
-  namaSatuanDasar: string;
+  satuan: SatuanPilihan[];
+  /** Zero until the units are known; `buat()` refuses to send it. */
+  idSatuan: number;
+  namaSatuan: string;
+  faktor: number;
 }
+
+/** A product that can be ticked, whichever list it came from. */
+export interface Kandidat {
+  id: number;
+  nama: string;
+  /** Balance in the base unit, in the chosen gudang. */
+  stok: number;
+  /** Name of the unit `stok` is counted in, or '' when the list did not carry it. */
+  namaDasar: string;
+  /** `null` when the list did not carry units (the reorder queue). */
+  satuan: SatuanPilihan[] | null;
+  /** The unit a fresh tick opens in: the product's default input unit. */
+  idSatuanAwal: number | null;
+  /** The quantity a fresh tick opens at, in `idSatuanAwal`. */
+  saran: number;
+  /** Shortfall below minimum, or `null` when the list does not know it. */
+  kurang: number | null;
+}
+
+export type FilterBarang = 'semua' | 'menipis';
 
 const PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_MS = 350;
 
-/** The list, flattened — same reasoning as `app/produk/index.tsx`'s `Entry`. */
-type Entry =
-  | { kind: 'header'; key: string; label: string }
-  | { kind: 'row'; key: string; row: StokMinimumRow; first: boolean; last: boolean };
+async function bacaHalaman(
+  filter: FilterBarang,
+  query: { page: number; search: string; idRuang: number }
+): Promise<Paged<Kandidat>> {
+  const common = {
+    page: query.page,
+    size: PAGE_SIZE,
+    search: query.search || undefined,
+    id_ruang: query.idRuang,
+  };
+  if (filter === 'menipis') {
+    const answer = await listStokMinimum(common);
+    return {
+      paging: answer.paging,
+      data: answer.data.map((r) => ({
+        id: r.id,
+        nama: r.nama,
+        stok: r.totalStok,
+        namaDasar: '',
+        satuan: null,
+        idSatuanAwal: null,
+        // In base units, which is what the line opens in until the units are
+        // read. At least one: a product exactly at its minimum has a shortfall
+        // of zero and is still on this list.
+        saran: Math.max(1, r.selisih),
+        kurang: r.selisih,
+      })),
+    };
+  }
+  const answer = await listPosProducts(common);
+  return {
+    paging: answer.paging,
+    data: answer.data.map((p) => {
+      const awal = p.satuan.find((s) => s.def) ?? p.dasar;
+      return {
+        id: p.id,
+        nama: p.nama,
+        stok: p.stokAkhir,
+        namaDasar: p.dasar?.nama ?? '',
+        satuan: p.satuan.map((s) => ({ id: s.idSatuan, nama: s.nama, faktor: s.faktor })),
+        idSatuanAwal: awal?.idSatuan ?? null,
+        saran: 1,
+        kurang: null,
+      };
+    }),
+  };
+}
 
 export function PilihBarangStep({
   ruangList,
@@ -113,6 +189,7 @@ export function PilihBarangStep({
   selection,
   onToggle,
   onQty,
+  onSatuan,
   jumlahHalaman,
   onFoto,
   onBack,
@@ -124,8 +201,9 @@ export function PilihBarangStep({
   onPickRuang: (id: number) => void;
   ruangErr: string;
   selection: ReadonlyMap<number, BarangDipilih>;
-  onToggle: (row: StokMinimumRow) => void;
+  onToggle: (item: Kandidat) => void;
   onQty: (id: number, qty: number) => void;
+  onSatuan: (id: number, idSatuan: number) => void;
   jumlahHalaman: number;
   onFoto: () => void;
   onBack: () => void;
@@ -135,34 +213,32 @@ export function PilihBarangStep({
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState<FilterBarang>('semua');
   const [sheetOpen, setSheetOpen] = useState(false);
+  /** The product whose unit sheet is open. One sheet for the screen, not one per row. */
+  const [satuanUntuk, setSatuanUntuk] = useState<number | null>(null);
 
-  const [rows, setRows] = useState<StokMinimumRow[]>([]);
+  const [rows, setRows] = useState<Kandidat[]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [moreErr, setMoreErr] = useState('');
   const [listErr, setListErr] = useState('');
   /**
-   * Loading is derived, never stored: the key the screen *wants* loaded is built
-   * during render, the key it *has* loaded is written once when a read settles,
-   * and the spinner is the two disagreeing. A `setLoading(true)` at the head of
-   * the fetch effect is what `react-hooks/set-state-in-effect` promotes to an
-   * error, and the rule is right — it forces a second render before a byte has
-   * been asked for, and a stale response can un-set a flag the next request just
-   * set. `app/produk/index.tsx` is where this shape was worked out.
+   * Loading is derived, never stored: the key wanted is built during render, the
+   * key loaded is written once when a read settles, and the spinner is the two
+   * disagreeing — the shape `app/produk/index.tsx` worked out.
    */
   const [loadedKey, setLoadedKey] = useState('');
   const [reloadToken, setReloadToken] = useState(0);
 
-  const requestKey = ruangId === null ? '' : `${ruangId}|${search}|${reloadToken}`;
+  const requestKey = ruangId === null ? '' : `${filter}|${ruangId}|${search}|${reloadToken}`;
   const loading = ruangId !== null && loadedKey !== requestKey;
 
   const reload = useCallback(() => setReloadToken((n) => n + 1), []);
 
-  // The endpoint filters in SQL — `search` was added to it on this branch — so
-  // the field is debounced rather than filtering an array a few pages deep,
-  // which would only ever find the items that happened to be loaded.
+  // Both endpoints filter in SQL, so the field is debounced rather than
+  // filtering an array a few pages deep.
   useEffect(() => {
     const t = setTimeout(() => setSearch(query.trim()), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(t);
@@ -173,12 +249,7 @@ export function PilihBarangStep({
     let alive = true;
     (async () => {
       try {
-        const answer = await listStokMinimum({
-          page: 1,
-          size: PAGE_SIZE,
-          search: search || undefined,
-          id_ruang: ruangId,
-        });
+        const answer = await bacaHalaman(filter, { page: 1, search, idRuang: ruangId });
         if (!alive) return;
         setRows(answer.data);
         setPage(1);
@@ -188,11 +259,9 @@ export function PilihBarangStep({
         if (!alive) return;
         setRows([]);
         setHasMore(false);
-        setListErr(messageOf(e, 'Gagal memuat daftar stok minimum.'));
+        setListErr(messageOf(e, 'Gagal memuat daftar barang.'));
       } finally {
         if (!alive) return;
-        // Page one is what just landed, so any halted append belongs to a query
-        // that no longer exists.
         setMoreErr('');
         setLoadedKey(requestKey);
       }
@@ -200,12 +269,11 @@ export function PilihBarangStep({
     return () => {
       alive = false;
     };
-  }, [ruangId, search, reloadToken, requestKey]);
+  }, [filter, ruangId, search, reloadToken, requestKey]);
 
   /**
    * `onEndReached` fires more than once on one approach, so the in-flight flag
-   * is the guard and the threshold is not one. A failed page halts the loop
-   * behind a "Coba lagi" rather than a spinner that never ends.
+   * is the guard. A failed page halts the loop behind a "Coba lagi".
    */
   const loadMore = useCallback(
     async (force = false) => {
@@ -214,15 +282,9 @@ export function PilihBarangStep({
       setLoadingMore(true);
       const next = page + 1;
       try {
-        const answer = await listStokMinimum({
-          page: next,
-          size: PAGE_SIZE,
-          search: search || undefined,
-          id_ruang: ruangId,
-        });
-        // Paging is offset-based with no cursor, so a posting that lands while
-        // somebody is scrolling shifts the window and the same row can arrive
-        // twice. Merging by id keeps that from becoming a duplicate key.
+        const answer = await bacaHalaman(filter, { page: next, search, idRuang: ruangId });
+        // Offset paging with no cursor: merge by id so a shifted window cannot
+        // produce a duplicate key.
         setRows((list) => {
           const seen = new Set(list.map((x) => x.id));
           return [...list, ...answer.data.filter((x) => !seen.has(x.id))];
@@ -236,62 +298,36 @@ export function PilihBarangStep({
         setLoadingMore(false);
       }
     },
-    [ruangId, loadingMore, loading, hasMore, moreErr, page, search]
+    [ruangId, loadingMore, loading, hasMore, moreErr, page, search, filter]
   );
 
-  const entries = useMemo<Entry[]>(() => {
-    const groups = [
-      { label: 'Habis', rows: rows.filter((r) => r.totalStok <= 0) },
-      { label: 'Di bawah minimum', rows: rows.filter((r) => r.totalStok > 0) },
-    ];
-    const out: Entry[] = [];
-    for (const g of groups) {
-      // An empty group is dropped rather than drawn as a heading over nothing:
-      // "Habis" with no rows under it reads as a list that failed to render.
-      if (g.rows.length === 0) continue;
-      out.push({ kind: 'header', key: `h-${g.label}`, label: g.label });
-      g.rows.forEach((row, i) =>
-        out.push({
-          kind: 'row',
-          key: `r-${row.id}`,
-          row,
-          first: i === 0,
-          last: i === g.rows.length - 1,
-        })
-      );
-    }
-    return out;
-  }, [rows]);
-
-  const renderEntry = useCallback(
-    ({ item }: { item: Entry }) => {
-      if (item.kind === 'header') return <RamahSectionHeader>{item.label}</RamahSectionHeader>;
-      const picked = selection.get(item.row.id);
-      return (
-        <BarangRow
-          row={item.row}
-          picked={picked}
-          first={item.first}
-          last={item.last}
-          onToggle={() => onToggle(item.row)}
-          onQty={(q) => onQty(item.row.id, q)}
-        />
-      );
-    },
-    [selection, onToggle, onQty]
+  const renderRow = useCallback(
+    ({ item, index }: { item: Kandidat; index: number }) => (
+      <BarangRow
+        item={item}
+        picked={selection.get(item.id)}
+        first={index === 0}
+        last={index === rows.length - 1}
+        onToggle={() => onToggle(item)}
+        onQty={(q) => onQty(item.id, q)}
+        onGantiSatuan={() => setSatuanUntuk(item.id)}
+      />
+    ),
+    [selection, onToggle, onQty, rows.length]
   );
 
   const activeRuang = ruangList.find((r) => r.id === ruangId) ?? null;
   const dipilih = [...selection.values()];
+  const barangSatuan = satuanUntuk === null ? undefined : selection.get(satuanUntuk);
 
   return (
     <View style={styles.screen}>
       <RamahHeader title="Pilih barang" onBack={onBack} />
 
       <FlatList
-        data={entries}
-        keyExtractor={(e) => e.key}
-        renderItem={renderEntry}
+        data={rows}
+        keyExtractor={(r) => String(r.id)}
+        renderItem={renderRow}
         style={styles.list}
         contentContainerStyle={styles.listContent}
         keyboardShouldPersistTaps="handled"
@@ -299,16 +335,13 @@ export function PilihBarangStep({
         onEndReachedThreshold={0.4}
         ListHeaderComponent={
           <View style={styles.controls}>
-            <RamahSearchField
-              value={query}
-              onChangeText={setQuery}
-              placeholder="Cari nama barang"
-            />
+            <FotoNotaCard jumlah={jumlahHalaman} onPress={onFoto} />
+
+            <RamahSearchField value={query} onChangeText={setQuery} placeholder="Cari nama barang" />
             <View style={styles.chipRow}>
-              {/* A shortfall means nothing without the room it was counted in,
-                  and this is also the `id_ruang` every line of the nota will
-                  land in — so the chip is load-bearing twice over. It stops
-                  being a button when there is only one room to choose. */}
+              {/* The gudang is where the balance is read *and* the `id_ruang`
+                  every line lands in. It stops being a button when there is
+                  only one room to choose. */}
               <RamahChip
                 label={activeRuang?.nama ?? 'Gudang'}
                 selected
@@ -320,9 +353,17 @@ export function PilihBarangStep({
                     : `Gudang ${activeRuang?.nama ?? ''}`
                 }
               />
+              <RamahChip
+                label="Semua barang"
+                selected={filter === 'semua'}
+                onPress={() => setFilter('semua')}
+              />
+              <RamahChip
+                label="Stok menipis"
+                selected={filter === 'menipis'}
+                onPress={() => setFilter('menipis')}
+              />
             </View>
-
-            <FotoNotaCard jumlah={jumlahHalaman} onPress={onFoto} />
 
             {ruangErr ? (
               <View style={styles.ruangErrBox}>
@@ -344,17 +385,18 @@ export function PilihBarangStep({
             loading={loading}
             error={listErr}
             searching={search !== ''}
+            filter={filter}
             onRetry={reload}
           />
         }
-        ListFooterComponent={<Footer loading={loadingMore} error={moreErr} onRetry={() => loadMore(true)} />}
+        ListFooterComponent={
+          <Footer loading={loadingMore} error={moreErr} onRetry={() => loadMore(true)} />
+        }
       />
 
       <View style={[styles.dock, { paddingBottom: dockPad }]}>
-        {/* The chips *are* the summary. A count line beside them would say
-            again what four visible chips already say, and the money the board
-            puts on the right cannot be computed here — no price is known until
-            a supplier has been picked, which is the very next step. */}
+        {/* The chips *are* the summary; no price is known until a supplier is
+            picked, which is the very next step. */}
         {dipilih.length ? (
           <ScrollView
             horizontal
@@ -363,7 +405,7 @@ export function PilihBarangStep({
             {dipilih.map((b) => (
               <View key={b.id} style={styles.selChip}>
                 <Text style={styles.selChipText} numberOfLines={1}>
-                  {`${b.nama} · ${formatNumber(b.qty)}`}
+                  {`${b.nama} · ${formatNumber(b.qty)}${b.namaSatuan ? ` ${b.namaSatuan}` : ''}`}
                 </Text>
               </View>
             ))}
@@ -385,17 +427,30 @@ export function PilihBarangStep({
             key={r.id}
             label={r.nama}
             // An open stock take makes the `kartu_stok` trigger refuse every
-            // posting into that room, and finding that out at posting time is
-            // the worst place to find it.
-            sub={
-              r.nomorOpnameBeku
-                ? `Beku oleh opname ${r.nomorOpnameBeku}`
-                : r.namaUnitKerja || undefined
-            }
+            // posting into that room; better found out here than at posting.
+            sub={r.nomorOpnameBeku ? 'Beku karena stok opname' : r.namaUnitKerja || undefined}
             selected={r.id === ruangId}
             onPress={() => {
               setSheetOpen(false);
               onPickRuang(r.id);
+            }}
+          />
+        ))}
+      </RamahSheet>
+
+      <RamahSheet
+        visible={barangSatuan !== undefined}
+        title={barangSatuan ? `Satuan ${barangSatuan.nama}` : 'Satuan'}
+        onClose={() => setSatuanUntuk(null)}>
+        {(barangSatuan?.satuan ?? []).map((s) => (
+          <RamahSheetOption
+            key={s.id}
+            label={s.nama}
+            sub={s.faktor === 1 ? undefined : `Isi ${formatNumber(s.faktor)}`}
+            selected={s.id === barangSatuan?.idSatuan}
+            onPress={() => {
+              if (barangSatuan) onSatuan(barangSatuan.id, s.id);
+              setSatuanUntuk(null);
             }}
           />
         ))}
@@ -405,71 +460,67 @@ export function PilihBarangStep({
 }
 
 /**
- * The OCR board's one addition to this screen.
- *
- * Brand-tinted rather than a plain row because it is a second way *in*, not a
- * row of the list below it — the board draws it as the one coloured block on an
- * otherwise grey-and-white screen, and the separator under it is what says the
- * two paths reach the same nota.
+ * The OCR board's one addition to this screen — a second way *in*, which is
+ * why it is the one tinted block and sits above the search rather than among
+ * the rows.
  */
 function FotoNotaCard({ jumlah, onPress }: { jumlah: number; onPress: () => void }) {
   const [down, setDown] = useState(false);
   return (
-    <>
-      <Pressable
-        onPress={onPress}
-        onPressIn={() => setDown(true)}
-        onPressOut={() => setDown(false)}
-        accessibilityRole="button"
-        accessibilityLabel={
-          jumlah
-            ? `Foto nota pemasok, ${jumlah} halaman sudah diambil`
-            : 'Foto nota pemasok'
-        }
-        style={[styles.ocrCard, down && styles.ocrCardDown]}>
-        <View style={styles.ocrIcon}>
-          <Feather name="camera" size={RamahIcon.row} color={C.brandInk} />
-        </View>
-        <View style={styles.grow}>
-          <Text style={styles.ocrTitle}>Foto nota pemasok</Text>
-          {jumlah ? (
-            <Text style={styles.ocrSub}>{`${jumlah} halaman siap dilampirkan`}</Text>
-          ) : null}
-        </View>
-        <Feather name="chevron-right" size={RamahIcon.row} color={C.brandInk} />
-      </Pressable>
-      <Text style={styles.ocrSeparator}>atau pilih manual</Text>
-    </>
+    <Pressable
+      onPress={onPress}
+      onPressIn={() => setDown(true)}
+      onPressOut={() => setDown(false)}
+      accessibilityRole="button"
+      accessibilityLabel={
+        jumlah ? `Foto nota pemasok, ${jumlah} halaman sudah diambil` : 'Foto nota pemasok'
+      }
+      style={[styles.ocrCard, down && styles.ocrCardDown]}>
+      <View style={styles.ocrIcon}>
+        <Feather name="camera" size={RamahIcon.row} color={C.brandInk} />
+      </View>
+      <View style={styles.grow}>
+        <Text style={styles.ocrTitle}>Foto nota pemasok</Text>
+        {jumlah ? <Text style={styles.ocrSub}>{`${jumlah} halaman siap dilampirkan`}</Text> : null}
+      </View>
+      <Feather name="chevron-right" size={RamahIcon.row} color={C.brandInk} />
+    </Pressable>
   );
 }
 
 /**
- * One reorder row: what it is, how bad it is, and — once ticked — how many to
- * order.
+ * One product: its name, one line on its stock, and — once ticked — how many
+ * to order.
  *
  * The stepper is inside the row rather than in a sheet because this is the only
- * thing anybody does on this screen, and a sheet per line for a queue of twelve
- * is twelve dismissals. Typing past the shortfall is allowed and deliberately
- * not corrected: buying ahead is ordinary, and a field that refuses to hold what
- * somebody meant to type is worse than one that holds it.
+ * thing anybody does on this screen. Typing past a shortfall is allowed:
+ * buying ahead is ordinary.
  */
 function BarangRow({
-  row,
+  item,
   picked,
   first,
   last,
   onToggle,
   onQty,
+  onGantiSatuan,
 }: {
-  row: StokMinimumRow;
+  item: Kandidat;
   picked: BarangDipilih | undefined;
   first: boolean;
   last: boolean;
   onToggle: () => void;
   onQty: (qty: number) => void;
+  onGantiSatuan: () => void;
 }) {
-  const habis = row.totalStok <= 0;
-  const satuan = picked?.namaSatuanDasar || 'satuan dasar';
+  const habis = item.stok <= 0;
+  const namaDasar =
+    item.namaDasar || picked?.satuan.find((s) => s.faktor === 1)?.nama || '';
+  const status = habis
+    ? 'Stok habis'
+    : item.kurang !== null
+      ? `Sisa ${formatNumber(item.stok)} · kurang ${formatNumber(item.kurang)} dari minimum`
+      : `Sisa ${formatNumber(item.stok)}${namaDasar ? ` ${namaDasar}` : ''}`;
 
   return (
     <View style={[styles.card, first && styles.cardFirst, last && styles.cardLast]}>
@@ -478,29 +529,31 @@ function BarangRow({
         onPress={onToggle}
         accessibilityRole="checkbox"
         accessibilityState={{ checked: !!picked }}
-        accessibilityLabel={`${row.nama}, sisa ${formatNumber(row.totalStok)}, minimum ${formatNumber(row.stokMin)}`}
+        accessibilityLabel={`${item.nama}, ${status}`}
         style={styles.row}>
         <View style={[styles.box, picked && styles.boxOn]}>
           {picked ? <Feather name="check" size={14} color={C.white} /> : null}
         </View>
         <View style={styles.grow}>
           <Text style={styles.rowTitle} numberOfLines={2}>
-            {row.nama}
+            {item.nama}
           </Text>
-          <Text style={[styles.rowStatus, habis && styles.rowStatusHabis]} numberOfLines={1}>
-            {habis ? 'Habis' : `Kurang ${formatNumber(row.selisih)} dari minimum`}
+          <Text
+            style={[
+              styles.rowStatus,
+              habis ? styles.rowStatusHabis : item.kurang !== null && styles.rowStatusKurang,
+            ]}
+            numberOfLines={1}>
+            {status}
           </Text>
         </View>
-        <Text style={styles.rowValue} numberOfLines={1}>
-          {formatNumber(row.totalStok)}
-        </Text>
       </Pressable>
 
       {picked ? (
         <View style={styles.stepper}>
           <RamahIconButton
             icon="minus"
-            label={`Kurangi jumlah beli ${row.nama}`}
+            label={`Kurangi jumlah beli ${item.nama}`}
             variant="outline"
             size={44}
             disabled={picked.qty <= 1}
@@ -509,25 +562,23 @@ function BarangRow({
           <TextInput
             value={String(picked.qty)}
             onChangeText={(v) => {
-              // Digits only, and an empty field reads as 1 rather than 0: zero
-              // is not a quantity anybody means to order, and a line of zero
-              // would be sent as one.
+              // Digits only, and an empty field reads as 1: zero is not a
+              // quantity anybody means to order.
               const n = Number(v.replace(/[^0-9]/g, ''));
               onQty(Number.isFinite(n) && n > 0 ? n : 1);
             }}
             inputMode="numeric"
             keyboardType="number-pad"
             selectTextOnFocus
-            accessibilityLabel={`Jumlah beli ${row.nama}`}
+            accessibilityLabel={`Jumlah beli ${item.nama}`}
             style={styles.qtyInput}
           />
-          <Text style={styles.stepLabel} numberOfLines={1}>
-            {satuan}
-          </Text>
-          <View style={styles.grow} />
+          <View style={styles.grow}>
+            <SatuanChip barang={picked} onPress={onGantiSatuan} />
+          </View>
           <RamahIconButton
             icon="plus"
-            label={`Tambah jumlah beli ${row.nama}`}
+            label={`Tambah jumlah beli ${item.nama}`}
             variant="tint"
             size={44}
             onPress={() => onQty(picked.qty + 1)}
@@ -538,22 +589,53 @@ function BarangRow({
   );
 }
 
+/**
+ * The unit beside the quantity. A button only when there is a second unit to
+ * choose; a product registered in one unit gets plain text, and a reorder row
+ * still waiting for its units gets a spinner rather than a chip that opens an
+ * empty sheet.
+ */
+function SatuanChip({ barang, onPress }: { barang: BarangDipilih; onPress: () => void }) {
+  const [down, setDown] = useState(false);
+  if (barang.idSatuan === 0) return <ActivityIndicator color={C.brand} style={styles.satuanWait} />;
+  if (barang.satuan.length < 2)
+    return (
+      <Text style={styles.stepLabel} numberOfLines={1}>
+        {barang.namaSatuan}
+      </Text>
+    );
+  return (
+    <Pressable
+      onPress={onPress}
+      onPressIn={() => setDown(true)}
+      onPressOut={() => setDown(false)}
+      accessibilityRole="button"
+      accessibilityLabel={`Satuan ${barang.namaSatuan}. Ganti satuan`}
+      style={[styles.satuanChip, down && styles.satuanChipDown]}>
+      <Text style={styles.satuanChipText} numberOfLines={1}>
+        {barang.namaSatuan}
+      </Text>
+      <Feather name="chevron-down" size={RamahIcon.meta} color={C.iconMuted} />
+    </Pressable>
+  );
+}
+
 function Placeholder({
   blocked,
   loading,
   error,
   searching,
+  filter,
   onRetry,
 }: {
   blocked: boolean;
   loading: boolean;
   error: string;
   searching: boolean;
+  filter: FilterBarang;
   onRetry: () => void;
 }) {
-  // With no gudang there is nothing to be empty *of*: the chip above already
-  // carries the reason, and a line about an empty reorder queue would name a
-  // gudang that does not exist.
+  // With no gudang there is nothing to be empty *of*; the error above says why.
   if (blocked) return null;
   if (error) return <RamahInlineError message={error} onRetry={onRetry} />;
   if (loading)
@@ -566,8 +648,10 @@ function Placeholder({
     <View style={styles.placeholder}>
       <Text style={styles.placeholderText}>
         {searching
-          ? 'Tidak ada barang yang cocok. Kosongkan pencarian untuk melihat seluruh daftar.'
-          : 'Tidak ada barang yang sudah menyentuh stok minimumnya di gudang ini.'}
+          ? 'Tidak ada barang yang cocok.'
+          : filter === 'menipis'
+            ? 'Tidak ada stok yang menipis di gudang ini.'
+            : 'Belum ada barang aktif.'}
       </Text>
     </View>
   );
@@ -596,8 +680,8 @@ const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
   list: { flex: 1 },
   listContent: { paddingHorizontal: L.gutter, paddingTop: L.space2, paddingBottom: L.space8 },
-  controls: { gap: L.cardGap, paddingBottom: L.space4 },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: L.space2 },
+  controls: { gap: L.stack, paddingBottom: L.stack },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: L.related },
   ruangErrBox: { gap: L.space2, alignItems: 'flex-start' },
 
   ocrCard: {
@@ -621,16 +705,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.green200,
   },
-  ocrTitle: { ...T.rowTitle, color: C.textTitle },
-  ocrSub: { ...T.caption, color: C.brandInk },
-  ocrSeparator: { ...T.caption, color: C.textMuted, textAlign: 'center', paddingTop: L.space1 },
+  ocrTitle: { ...T.titleTiny, color: C.textTitle },
+  ocrSub: { ...T.bodySmall, color: C.brandInk },
 
   card: { backgroundColor: C.surfaceCard, borderColor: C.borderHairline, borderWidth: 1 },
   cardFirst: { borderTopLeftRadius: R.card, borderTopRightRadius: R.card },
   cardLast: {
     borderBottomLeftRadius: R.card,
     borderBottomRightRadius: R.card,
-    marginBottom: L.groupGap,
+    marginBottom: L.stack,
   },
   divider: { height: 1, backgroundColor: C.borderHairline, marginHorizontal: L.cardPad },
   row: {
@@ -648,13 +731,15 @@ const styles = StyleSheet.create({
     borderColor: C.borderStrong,
     alignItems: 'center',
     justifyContent: 'center',
+    // An optical nudge onto the title's first line, not a gap — one of the
+    // exceptions `RamahLayout` lists to the 4px grid.
     marginTop: 1,
   },
   boxOn: { backgroundColor: C.brand, borderColor: C.brand },
-  rowTitle: { ...T.rowTitle, color: C.textTitle },
-  rowStatus: { ...T.caption, color: C.textBody },
+  rowTitle: { ...T.titleTiny, color: C.textTitle },
+  rowStatus: { ...T.bodySmall, color: C.textBody },
+  rowStatusKurang: { color: C.textWarning },
   rowStatusHabis: { color: C.textDanger },
-  rowValue: { ...T.rowTitle, color: C.textTitle, textAlign: 'right', maxWidth: 120 },
 
   stepper: {
     flexDirection: 'row',
@@ -672,33 +757,46 @@ const styles = StyleSheet.create({
     backgroundColor: C.surfacePage,
     textAlign: 'center',
     color: C.textTitle,
-    ...T.rowTitle,
+    ...T.titleTiny,
     paddingVertical: 0,
   },
-  stepLabel: { ...T.caption, color: C.textBody },
+  stepLabel: { ...T.bodySmall, color: C.textBody },
+  satuanWait: { alignSelf: 'flex-start' },
+  satuanChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: L.space2,
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+    height: L.controlHSm,
+    paddingHorizontal: L.space3,
+    borderRadius: R.pill,
+    borderWidth: 1.5,
+    borderColor: C.borderHairline,
+    backgroundColor: C.white,
+  },
+  satuanChipDown: { backgroundColor: C.surfaceStack },
+  satuanChipText: { ...T.bodySmall, color: C.textTitle, flexShrink: 1 },
 
   placeholder: { paddingVertical: L.space8, paddingHorizontal: L.space4, alignItems: 'center' },
-  placeholderText: { ...T.caption, color: C.textBody, textAlign: 'center' },
+  placeholderText: { ...T.bodySmall, color: C.textBody, textAlign: 'center' },
   footer: { paddingVertical: L.space5, alignItems: 'center' },
 
   dock: {
     paddingHorizontal: L.gutter,
-    paddingTop: L.cardGap,
+    paddingTop: L.dockPad,
     gap: L.space2,
     backgroundColor: C.surfacePage,
-    borderTopWidth: 1,
-    borderTopColor: C.borderHairline,
+    ...E.low,
   },
-  dockHint: { ...T.caption, color: C.textBody },
-  selChips: { gap: 6, paddingBottom: 2 },
+  dockHint: { ...T.bodySmall, color: C.textBody },
+  selChips: { gap: L.related },
   selChip: {
     maxWidth: 200,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: L.space2,
+    paddingVertical: L.space1,
     borderRadius: R.pill,
     backgroundColor: C.grey100,
   },
-  // Guide §7: 11px is for tile labels and counters. These chips are the
-  // summary of what is going on the nota, which is read.
-  selChipText: { ...T.caption, color: C.textBody },
+  selChipText: { ...T.bodySmall, color: C.textBody },
 });

@@ -82,11 +82,11 @@ import {
 import { formatNumber, formatRupiah } from '@/constants/produk';
 import {
   RamahColors as C,
+  RamahElevation as E,
   RamahIcon,
   RamahLayout as L,
   RamahRadius as R,
   RamahType as T,
-  RamahWeight as W,
   stempelPembaruan,
 } from '@/constants/theme-ramah';
 import { useRecordBus } from '@/hooks/use-record-bus';
@@ -162,7 +162,7 @@ export default function KatalogScreen() {
    * while it is up — the two are alternatives, never a sum, because the
    * gesture bar that inset pays for is itself behind the keyboard.
    */
-  const dockPad = useDockPadding(insets.bottom, L.cardGap);
+  const dockPad = useDockPadding(insets.bottom, L.dockPad);
 
   // ---- which gudang ----
   const [ruangList, setRuangList] = useState<RuangRow[]>([]);
@@ -515,7 +515,12 @@ export default function KatalogScreen() {
 
   const renderEntry = useCallback(
     ({ item }: { item: Entry }) => {
-      if (item.kind === 'header') return <RamahSectionHeader>{item.label}</RamahSectionHeader>;
+      if (item.kind === 'header')
+        return (
+          <View style={styles.listHeading}>
+            <RamahSectionHeader>{item.label}</RamahSectionHeader>
+          </View>
+        );
       return (
         <KatalogRow
           row={item.row}
@@ -802,13 +807,13 @@ const styles = StyleSheet.create({
   list: { flex: 1 },
   listContent: { paddingHorizontal: L.gutter, paddingBottom: L.space6 },
 
-  controls: { gap: L.cardGap, paddingTop: L.space1 },
-  chipRow: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
+  controls: { gap: L.stack, paddingTop: L.space1, paddingBottom: L.stack },
+  chipRow: { flexDirection: 'row', gap: L.related, flexWrap: 'wrap' },
   ruangErrBox: { gap: L.space2, alignItems: 'flex-start' },
 
   stamp: { flexDirection: 'row', alignItems: 'center', gap: L.space2 },
-  stampText: { ...T.caption, color: C.textMuted, flexShrink: 1 },
-  stampAction: { ...T.caption, ...W.semibold, color: C.textLink },
+  stampText: { ...T.bodySmall, color: C.textMuted, flexShrink: 1 },
+  stampAction: { ...T.caption, color: C.textLink },
 
   // The group card. Each row draws the edges it owns, so the two groups read as
   // two white blocks on the grey canvas without either being one element — see
@@ -829,7 +834,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomLeftRadius: R.card,
     borderBottomRightRadius: R.card,
+    marginBottom: L.stack,
   },
+  // A heading opens a group: `group` above it (this, plus the `stack` the group
+  // before leaves under its last card, or the controls leave under themselves)
+  // and `related` down to the rows it names.
+  listHeading: { paddingTop: L.group - L.stack, paddingBottom: L.related },
   // Inset by the card's own padding, so the divider separates the text rather
   // than cutting the card in half.
   divider: { height: 1, backgroundColor: C.borderHairline, marginHorizontal: L.cardPad },
@@ -837,30 +847,29 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: L.cardGap,
+    gap: L.space3,
     padding: L.cardPad,
     minHeight: L.rowH,
   },
   rowDown: { backgroundColor: C.surfaceStack },
-  rowTitle: { ...T.rowTitle, color: C.textTitle, flex: 1, minWidth: 0 },
+  rowTitle: { ...T.titleTiny, color: C.textTitle, flex: 1, minWidth: 0 },
   // Capped, so a long product name keeps the width it needs on a ~354pt phone.
-  rowValues: { flexShrink: 0, maxWidth: 140, alignItems: 'flex-end', gap: 2 },
-  rowValue: { ...T.rowTitle, color: C.textTitle, textAlign: 'right' },
+  rowValues: { flexShrink: 0, maxWidth: 140, alignItems: 'flex-end', gap: L.inline },
+  rowValue: { ...T.titleTiny, color: C.textTitle, textAlign: 'right' },
   rowValueLow: { color: C.textDanger },
-  rowCaption: { ...T.caption, color: C.textMuted, textAlign: 'right' },
+  rowCaption: { ...T.bodySmall, color: C.textMuted, textAlign: 'right' },
 
   placeholder: { paddingTop: L.space10, gap: L.space2, alignItems: 'center' },
-  placeholderTitle: { ...T.groupTitle, color: C.textTitle, textAlign: 'center' },
-  placeholderSub: { ...T.caption, color: C.textBody, textAlign: 'center' },
+  placeholderTitle: { ...T.titleSmall, color: C.textTitle, textAlign: 'center' },
+  placeholderSub: { ...T.bodySmall, color: C.textBody, textAlign: 'center' },
   placeholderAction: { paddingTop: L.space2 },
 
   footer: { paddingVertical: L.space4, alignItems: 'center' },
 
   dock: {
     paddingHorizontal: L.gutter,
-    paddingTop: 10,
+    paddingTop: L.dockPad,
     backgroundColor: C.surfacePage,
-    borderTopWidth: 1,
-    borderTopColor: C.borderHairline,
+    ...E.low,
   },
 });

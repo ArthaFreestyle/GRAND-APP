@@ -231,7 +231,9 @@ export default function PergerakanScreen() {
               />
             </View>
             {baris.length ? (
-              <RamahSectionHeader>{`${baris.length} barang bergerak`}</RamahSectionHeader>
+              <View style={styles.groupStart}>
+                <RamahSectionHeader>{`${baris.length} barang bergerak`}</RamahSectionHeader>
+              </View>
             ) : null}
           </View>
         }
@@ -333,11 +335,15 @@ const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
   list: { flex: 1 },
   listContent: { paddingHorizontal: L.gutter, paddingTop: L.space2 },
-  controls: { gap: L.cardGap, paddingBottom: L.space3 },
+  // `related` under the controls, because the last of them is the heading of
+  // the cards that follow.
+  controls: { gap: L.stack, paddingBottom: L.related },
+  // The heading opens the cards' group: `group` above it with the column's gap.
+  groupStart: { paddingTop: L.group - L.stack },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: L.space2 },
 
   loadingBox: { paddingVertical: L.space8, alignItems: 'center' },
-  kosong: { ...T.caption, color: C.textBody, textAlign: 'center', paddingVertical: L.space8 },
+  kosong: { ...T.bodySmall, color: C.textBody, textAlign: 'center', paddingVertical: L.space8 },
 
   card: { backgroundColor: C.surfaceCard, borderColor: C.borderHairline, borderWidth: 1 },
   cardFirst: { borderTopLeftRadius: R.card, borderTopRightRadius: R.card },
@@ -345,24 +351,24 @@ const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: C.borderHairline, marginHorizontal: L.cardPad },
   cardBody: { padding: L.cardPad, gap: L.space2 },
   head: { flexDirection: 'row', alignItems: 'flex-start', gap: L.space3 },
-  nama: { ...T.rowTitle, color: C.textTitle },
-  sub: { ...T.caption, color: C.textBody },
+  nama: { ...T.titleTiny, color: C.textTitle },
+  sub: { ...T.bodySmall, color: C.textBody },
   totals: { alignItems: 'flex-end' },
   /* In and out are the one place a figure carries colour on an operational
      screen, and it is not a tone judgement: they are two directions, and the
      sign alone is easy to miss in a column of numbers. */
-  masuk: { ...T.rowTitle, color: C.brandInk },
-  keluar: { ...T.rowTitle, color: C.orange600 },
+  masuk: { ...T.titleTiny, color: C.brandInk },
+  keluar: { ...T.titleTiny, color: C.textWarning },
 
-  jenisRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  jenisRow: { flexDirection: 'row', flexWrap: 'wrap', gap: L.related },
   jenisChip: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: L.space2,
+    paddingVertical: L.space1,
     borderRadius: R.pill,
     backgroundColor: C.grey100,
     maxWidth: '100%',
   },
   // These chips carry the actual in/out figures per document kind, which is
   // the answer to "keluar ke mana saja" — read, not glanced at.
-  jenisText: { ...T.caption, color: C.textBody },
+  jenisText: { ...T.bodySmall, color: C.textBody },
 });

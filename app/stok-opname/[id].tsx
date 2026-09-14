@@ -77,6 +77,7 @@ import { DOKUMEN_RAMAH } from '@/components/shell/status-dokumen';
 import { formatNumber, formatTanggal } from '@/constants/produk';
 import {
   RamahColors as C,
+  RamahElevation as E,
   RamahIcon,
   RamahLayout as L,
   RamahRadius as R,
@@ -105,7 +106,7 @@ export default function StokOpnameDetailScreen() {
   const canWrite = useCanWrite('opname');
   const role = useActiveRole();
   const insets = useSafeAreaInsets();
-  const dockPad = useDockPadding(insets.bottom, L.cardGap);
+  const dockPad = useDockPadding(insets.bottom, L.dockPad);
 
   const [doc, setDoc] = useState<OpnameDoc | null>(null);
   const [loadErrState, setLoadErr] = useState('');
@@ -341,9 +342,11 @@ export default function StokOpnameDetailScreen() {
                   onChangeText={setQuery}
                   placeholder="Cari nama atau kode barang"
                 />
-                <RamahSectionHeader>
-                  {query ? `${lines.length} dari ${doc.jumlahBaris} baris` : 'Baris hitung'}
-                </RamahSectionHeader>
+                <View style={styles.groupStart}>
+                  <RamahSectionHeader>
+                    {query ? `${lines.length} dari ${doc.jumlahBaris} baris` : 'Baris hitung'}
+                  </RamahSectionHeader>
+                </View>
               </>
             )}
           </View>
@@ -588,7 +591,11 @@ const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
   list: { flex: 1 },
   listContent: { paddingHorizontal: L.gutter, paddingTop: L.space2, paddingBottom: L.space8 },
-  controls: { gap: L.cardGap, paddingBottom: L.space3 },
+  // `related` under the controls, because the last of them is the heading of
+  // the rows that follow.
+  controls: { gap: L.stack, paddingBottom: L.related },
+  // The heading opens the rows' group: `group` above it with the column's gap.
+  groupStart: { paddingTop: L.group - L.stack },
 
   center: {
     flex: 1,
@@ -597,15 +604,15 @@ const styles = StyleSheet.create({
     padding: L.space6,
     gap: L.space2,
   },
-  centerTitle: { ...T.groupTitle, color: C.textTitle },
-  centerSub: { ...T.caption, color: C.textBody, textAlign: 'center' },
+  centerTitle: { ...T.titleSmall, color: C.textTitle },
+  centerSub: { ...T.bodySmall, color: C.textBody, textAlign: 'center' },
   centerAction: { paddingTop: L.space4 },
 
-  identity: { gap: 2, paddingVertical: L.space2 },
+  identity: { gap: L.inline, paddingVertical: L.space2 },
   identityHead: { flexDirection: 'row', alignItems: 'center', gap: L.space2 },
-  identityName: { ...T.identity, color: C.textTitle, flex: 1, minWidth: 0 },
-  identitySub: { ...T.caption, color: C.textBody },
-  uraian: { ...T.caption, color: C.textBody, paddingTop: L.space1 },
+  identityName: { ...T.titleModerate, color: C.textTitle, flex: 1, minWidth: 0 },
+  identitySub: { ...T.bodySmall, color: C.textBody },
+  uraian: { ...T.bodySmall, color: C.textBody, paddingTop: L.space1 },
 
   tarikCard: {
     padding: L.cardPad,
@@ -615,8 +622,8 @@ const styles = StyleSheet.create({
     borderColor: C.borderHairline,
     gap: L.space3,
   },
-  tarikTitle: { ...T.rowTitle, color: C.textTitle },
-  tarikText: { ...T.caption, color: C.textBody },
+  tarikTitle: { ...T.titleTiny, color: C.textTitle },
+  tarikText: { ...T.bodySmall, color: C.textBody },
 
   progress: {
     padding: L.cardPad,
@@ -626,8 +633,8 @@ const styles = StyleSheet.create({
     borderColor: C.borderHairline,
     gap: L.space1,
   },
-  progressLabel: { ...T.fieldLabel, color: C.textBody },
-  progressValue: { ...T.metric, color: C.textTitle },
+  progressLabel: { ...T.caption, color: C.textBody },
+  progressValue: { ...T.titleLarge, color: C.textTitle },
   bar: {
     height: 4,
     borderRadius: 2,
@@ -643,8 +650,8 @@ const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: C.borderHairline, marginHorizontal: L.cardPad },
   baris: { padding: L.cardPad, gap: L.space2 },
   barisHead: { flexDirection: 'row', alignItems: 'center', gap: L.space3 },
-  barisNama: { ...T.rowTitle, color: C.textTitle },
-  barisSub: { ...T.caption, color: C.textBody },
+  barisNama: { ...T.titleTiny, color: C.textTitle },
+  barisSub: { ...T.bodySmall, color: C.textBody },
   input: {
     width: 88,
     height: 48,
@@ -654,26 +661,25 @@ const styles = StyleSheet.create({
     backgroundColor: C.surfacePage,
     textAlign: 'center',
     color: C.textTitle,
-    ...T.fieldValue,
+    ...T.titleSmall,
     paddingVertical: 0,
   },
   inputLocked: { backgroundColor: C.grey100, color: C.textBody },
 
-  selisihRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  selisihText: { ...T.caption, color: C.brandInk },
+  selisihRow: { flexDirection: 'row', alignItems: 'center', gap: L.related },
+  selisihText: { ...T.bodySmall, color: C.brandInk },
   selisihLebih: { color: C.accentBlueInk },
-  selisihKurang: { color: C.orange600 },
+  selisihKurang: { color: C.textWarning },
 
   placeholder: { paddingVertical: L.space8, paddingHorizontal: L.space4, alignItems: 'center' },
-  placeholderText: { ...T.caption, color: C.textBody, textAlign: 'center' },
+  placeholderText: { ...T.bodySmall, color: C.textBody, textAlign: 'center' },
   footNote: { paddingTop: L.space4 },
 
   dock: {
     paddingHorizontal: L.gutter,
-    paddingTop: L.cardGap,
+    paddingTop: L.dockPad,
     gap: L.space2,
     backgroundColor: C.surfacePage,
-    borderTopWidth: 1,
-    borderTopColor: C.borderHairline,
+    ...E.low,
   },
 });

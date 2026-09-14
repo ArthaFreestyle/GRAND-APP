@@ -31,7 +31,8 @@ import { Colors as C } from '@/constants/theme-erp';
 // raised over ported and unported screens alike. The *typeface* is not
 // palette: a switcher opened from the till in one font and from an invoice
 // in another is one control that looks like two, so it takes Poppins now.
-import { RamahWeight as W } from '@/constants/theme-ramah';
+// The spacing grid is not palette either, for the same reason.
+import { RamahElevation as E, RamahLayout as L, RamahType as T } from '@/constants/theme-ramah';
 import { reloadAllRecords } from '@/hooks/use-record-bus';
 import { ApiError } from '@/services/api';
 import { switchContext } from '@/services/auth';
@@ -99,7 +100,7 @@ export function RoleSwitcherSheet({ visible, onClose }: { visible: boolean; onCl
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
-          <ScrollView style={styles.list} contentContainerStyle={{ gap: 8 }}>
+          <ScrollView style={styles.list} contentContainerStyle={{ gap: L.related }}>
             {grants.map((g) => {
               const isActive = g.id_user_role === activeId;
               return (
@@ -187,30 +188,33 @@ export function RoleChip() {
 
 const styles = StyleSheet.create({
   backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(14,36,51,0.35)' },
-  sheetWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
+  sheetWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: L.space5 },
   sheet: {
     width: '100%',
     maxWidth: 420,
-    gap: 10,
-    padding: 18,
+    gap: L.space3,
+    padding: L.space4,
     borderRadius: 20,
     backgroundColor: C.card,
-    borderWidth: 1,
-    borderColor: C.borderCard,
+    // `high`, in place of the border it had: this is the one sheet in the app
+    // drawn by hand rather than by the platform, and it floats clear of every
+    // screen it is raised over — the same height the native sheets sit at.
+    ...E.high,
   },
-  sheetTitle: { fontSize: 17, ...W.bold, letterSpacing: -0.2, color: C.text },
-  sheetSub: { fontSize: 13, lineHeight: 19, ...W.regular, color: C.muted2 },
-  error: { fontSize: 13, ...W.medium, color: '#B03434' },
+  sheetTitle: { ...T.titleSmall, color: C.text },
+  // muted3, not muted2: muted2 is 3.19:1 on white and this is a sentence.
+  sheetSub: { ...T.bodySmall, color: C.muted3 },
+  error: { ...T.bodySmall, color: '#B03434' },
   // Capped rather than free-growing: an account with many grants must not push
   // the Batal button off a phone in landscape, which is where kasir lives.
   list: { maxHeight: 260 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: L.space3,
     minHeight: 56,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    paddingVertical: L.space3,
+    paddingHorizontal: L.space4,
     borderRadius: 14,
     borderWidth: 1.5,
     borderColor: C.border,
@@ -219,10 +223,11 @@ const styles = StyleSheet.create({
   rowActive: { borderColor: C.primary, backgroundColor: C.bg },
   rowPressed: { borderColor: C.primary },
   rowBusy: { opacity: 0.6 },
-  rowText: { flex: 1, gap: 2 },
-  rowRole: { fontSize: 15.5, ...W.bold, color: C.text },
-  rowUnit: { fontSize: 12.5, ...W.regular, color: C.muted2 },
-  rowMark: { fontSize: 18, ...W.bold, color: C.primary },
+  rowText: { flex: 1, gap: L.inline },
+  rowRole: { ...T.titleTiny, color: C.text },
+  rowUnit: { ...T.bodySmall, color: C.muted3 },
+  // primaryDark: primary is 4.27:1 on the active row's `bg`.
+  rowMark: { ...T.titleSmall, color: C.primaryDark },
   cancel: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  cancelText: { fontSize: 14, ...W.semibold, color: C.muted3 },
+  cancelText: { ...T.titleTiny, color: C.muted3 },
 });

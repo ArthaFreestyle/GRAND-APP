@@ -18,7 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EMPTY_RUANG, RuangFields, ruangBody, ruangError, type RuangValues } from '@/components/pengaturan/ruang-form';
 import { RamahHeader, RamahInlineError, RamahNote, RamahPrimaryButton } from '@/components/shell/ramah';
-import { RamahColors as C, RamahLayout as L } from '@/constants/theme-ramah';
+import { RamahColors as C, RamahElevation as E, RamahLayout as L } from '@/constants/theme-ramah';
 import { useDockPadding } from '@/hooks/use-keyboard-height';
 import { messageOf } from '@/services/api';
 import { createRuang, ruangBus } from '@/services/ruang';
@@ -29,7 +29,7 @@ export default function RuangBaruScreen() {
   const idUnitKerja = Number(params.idUnitKerja);
   const namaUnitKerja = params.namaUnitKerja ?? '';
   const insets = useSafeAreaInsets();
-  const dockPad = useDockPadding(insets.bottom, L.cardGap);
+  const dockPad = useDockPadding(insets.bottom, L.dockPad);
 
   const [values, setValues] = useState<RuangValues>(EMPTY_RUANG);
   const [err, setErr] = useState('');
@@ -126,10 +126,9 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: L.space6 },
   dock: {
     paddingHorizontal: L.gutter,
-    paddingTop: L.cardGap,
+    paddingTop: L.dockPad,
     gap: L.space2,
     backgroundColor: C.surfacePage,
-    borderTopWidth: 1,
-    borderTopColor: C.borderHairline,
+    ...E.low,
   },
 });

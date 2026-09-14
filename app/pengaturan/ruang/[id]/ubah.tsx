@@ -20,7 +20,7 @@ import {
   RamahPrimaryButton,
   RamahSecondaryButton,
 } from '@/components/shell/ramah';
-import { RamahColors as C, RamahLayout as L, RamahType as T } from '@/constants/theme-ramah';
+import { RamahColors as C, RamahElevation as E, RamahLayout as L, RamahType as T } from '@/constants/theme-ramah';
 import { useDockPadding } from '@/hooks/use-keyboard-height';
 import { messageOf } from '@/services/api';
 import { getRuang, ruangBus, updateRuang } from '@/services/ruang';
@@ -30,7 +30,7 @@ export default function RuangUbahScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const id = Number(params.id);
   const insets = useSafeAreaInsets();
-  const dockPad = useDockPadding(insets.bottom, L.cardGap);
+  const dockPad = useDockPadding(insets.bottom, L.dockPad);
 
   const [values, setValues] = useState<RuangValues | null>(null);
   const [loadErrState, setLoadErr] = useState('');
@@ -154,15 +154,14 @@ const styles = StyleSheet.create({
     padding: L.space6,
     gap: L.space2,
   },
-  centerTitle: { ...T.groupTitle, color: C.textTitle },
-  centerSub: { ...T.caption, color: C.textBody, textAlign: 'center' },
+  centerTitle: { ...T.titleSmall, color: C.textTitle },
+  centerSub: { ...T.bodySmall, color: C.textBody, textAlign: 'center' },
   centerAction: { paddingTop: L.space4 },
   dock: {
     paddingHorizontal: L.gutter,
-    paddingTop: L.cardGap,
+    paddingTop: L.dockPad,
     gap: L.space2,
     backgroundColor: C.surfacePage,
-    borderTopWidth: 1,
-    borderTopColor: C.borderHairline,
+    ...E.low,
   },
 });

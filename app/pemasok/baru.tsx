@@ -28,7 +28,7 @@ import {
   RamahInlineError,
   RamahPrimaryButton,
 } from '@/components/shell/ramah';
-import { RamahColors as C, RamahLayout as L } from '@/constants/theme-ramah';
+import { RamahColors as C, RamahElevation as E, RamahLayout as L } from '@/constants/theme-ramah';
 import { useDockPadding } from '@/hooks/use-keyboard-height';
 import { messageOf } from '@/services/api';
 import { createSupplier, supplierBus } from '@/services/supplier';
@@ -43,7 +43,7 @@ export default function PemasokBaruScreen() {
    * the keyboard's height while it is up, because the two are alternatives — the
    * gesture bar that inset pays for is itself behind the keyboard.
    */
-  const dockPad = useDockPadding(insets.bottom, L.cardGap);
+  const dockPad = useDockPadding(insets.bottom, L.dockPad);
 
   const [values, setValues] = useState<PemasokValues>(EMPTY_PEMASOK);
   const [err, setErr] = useState('');
@@ -133,10 +133,9 @@ const styles = StyleSheet.create({
   },
   dock: {
     paddingHorizontal: L.gutter,
-    paddingTop: L.cardGap,
+    paddingTop: L.dockPad,
     gap: L.space2,
     backgroundColor: C.surfacePage,
-    borderTopWidth: 1,
-    borderTopColor: C.borderHairline,
+    ...E.low,
   },
 });

@@ -32,6 +32,7 @@ import {
 } from '@/components/shell/ramah';
 import {
   RamahColors as C,
+  RamahElevation as E,
   RamahIcon,
   RamahLayout as L,
   RamahRadius as R,
@@ -50,7 +51,7 @@ export default function PengaturanListScreen() {
   const router = useRouter();
   const canWrite = useCanWrite('unit-kerja');
   const insets = useSafeAreaInsets();
-  const dockPad = useDockPadding(insets.bottom, L.cardGap);
+  const dockPad = useDockPadding(insets.bottom, L.dockPad);
 
   const [query, setQuery] = useState('');
   const [search, setSearch] = useState('');
@@ -308,7 +309,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: C.surfaceSunken },
   list: { flex: 1 },
   listContent: { paddingHorizontal: L.gutter, paddingTop: L.space2, paddingBottom: L.space8 },
-  controls: { gap: L.cardGap, paddingBottom: L.space4 },
+  controls: { gap: L.stack, paddingBottom: L.space4 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: L.space2 },
 
   card: { backgroundColor: C.surfaceCard, borderColor: C.borderHairline, borderWidth: 1 },
@@ -323,17 +324,16 @@ const styles = StyleSheet.create({
     minHeight: L.rowH,
   },
   rowDown: { backgroundColor: C.grey50 },
-  rowTitle: { ...T.rowTitle, color: C.textTitle, flex: 1, minWidth: 0 },
+  rowTitle: { ...T.titleTiny, color: C.textTitle, flex: 1, minWidth: 0 },
 
   placeholder: { paddingVertical: L.space8, paddingHorizontal: L.space4, alignItems: 'center' },
-  placeholderText: { ...T.caption, color: C.textBody, textAlign: 'center' },
+  placeholderText: { ...T.bodySmall, color: C.textBody, textAlign: 'center' },
   footer: { paddingVertical: L.space5, alignItems: 'center' },
 
   dock: {
     paddingHorizontal: L.gutter,
-    paddingTop: L.cardGap,
+    paddingTop: L.dockPad,
     backgroundColor: C.surfacePage,
-    borderTopWidth: 1,
-    borderTopColor: C.borderHairline,
+    ...E.low,
   },
 });
