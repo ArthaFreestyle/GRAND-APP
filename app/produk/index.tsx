@@ -74,6 +74,7 @@ import {
   RamahInlineError,
   RamahPrimaryButton,
   RamahSearchField,
+  RamahSecondaryButton,
   RamahSectionHeader,
   RamahSheet,
   RamahSheetOption,
@@ -582,7 +583,20 @@ export default function KatalogScreen() {
                 <Text style={styles.stampAction}>Muat ulang</Text>
               </Pressable>
             ) : null}
-            {ruangErr ? <RamahInlineError message={ruangErr} /> : null}
+            {ruangErr ? (
+              <View style={styles.ruangErrBox}>
+                <RamahInlineError message={ruangErr} />
+                {/* Issue #23: a unit kerja with no ruang used to be a dead end
+                    with no way out of this screen. This is the fix — every
+                    such stop now points at the settings section that can
+                    actually add one. */}
+                <RamahSecondaryButton
+                  label="Atur gudang"
+                  icon="settings"
+                  onPress={() => router.push('/pengaturan')}
+                />
+              </View>
+            ) : null}
             {lowErr ? <RamahInlineError message={lowErr} /> : null}
           </View>
         }
@@ -790,6 +804,7 @@ const styles = StyleSheet.create({
 
   controls: { gap: L.cardGap, paddingTop: L.space1 },
   chipRow: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
+  ruangErrBox: { gap: L.space2, alignItems: 'flex-start' },
 
   stamp: { flexDirection: 'row', alignItems: 'center', gap: L.space2 },
   stampText: { ...T.caption, color: C.textMuted, flexShrink: 1 },

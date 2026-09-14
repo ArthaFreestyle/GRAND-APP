@@ -1,0 +1,75 @@
+/**
+ * The two fields a ruang has, shared by the create route and the edit one.
+ *
+ * `id_unit_kerja` is not here: `POST /ruang` requires it but `PATCH /ruang/{id}`
+ * refuses to touch it at all — the contract has no way to move a ruang between
+ * units once it exists, because a `faktor` and a `stok_akhir` already recorded
+ * against `(barang, ruang)` mean the room's identity is fixed the moment
+ * something is posted into it. So the unit is chosen once, on `baru`, by
+ * whichever unit kerja screen this was opened from — not typed here.
+ */
+import { StyleSheet, View } from 'react-native';
+
+import { RamahField, RamahNote } from '@/components/shell/ramah';
+import { RamahLayout as L } from '@/constants/theme-ramah';
+
+export interface RuangValues {
+  kode: string;
+  nama: string;
+}
+
+export const EMPTY_RUANG: RuangValues = { kode: '', nama: '' };
+
+export function ruangBody(v: RuangValues) {
+  const kosong = (s: string) => (s.trim() === '' ? null : s.trim());
+  return {
+    kode: kosong(v.kode),
+    nama_ruang: v.nama.trim(),
+  };
+}
+
+export function ruangError(v: RuangValues): string {
+  if (v.nama.trim() === '') return 'Nama ruang wajib diisi.';
+  return '';
+}
+
+export function RuangFields({
+  values,
+  onChange,
+  autoFocus = false,
+}: {
+  values: RuangValues;
+  onChange: (patch: Partial<RuangValues>) => void;
+  autoFocus?: boolean;
+}) {
+  return (
+    <View style={styles.fields}>
+      <RamahField
+        label="Nama ruang"
+        required
+        value={values.nama}
+        onChangeText={(nama) => onChange({ nama })}
+        placeholder="Gudang Utama"
+        autoCapitalize="words"
+        autoFocus={autoFocus}
+        maxLength={255}
+      />
+      <RamahField
+        label="Kode"
+        value={values.kode}
+        onChangeText={(kode) => onChange({ kode })}
+        placeholder="GD-UTM"
+        autoCapitalize="characters"
+        maxLength={32}
+      />
+      <RamahNote icon="info">
+        Kode boleh dikosongkan. Kalau diisi, ia harus unik — huruf besar dan kecil dianggap
+        sama.
+      </RamahNote>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  fields: { gap: L.space5 },
+});

@@ -43,6 +43,14 @@
         }
       ],
       "with-rn-bluetooth-classic",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Foto nota faktur dari pemasok dipilih dari galeri dan dilampirkan ke nota pembelian.",
+          "cameraPermission": "Kamera dipakai untuk memotret nota faktur dari pemasok dan melampirkannya ke nota pembelian.",
+          "microphonePermission": false
+        }
+      ],
       "expo-secure-store",
       "expo-font",
       "expo-image",

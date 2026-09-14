@@ -53,6 +53,7 @@ import {
   PembelianLineEditor,
   type LineDraft,
 } from '@/components/pembelian/lines';
+import { LampiranCard } from '@/components/pembelian/lampiran';
 import { TERIMA_META } from '@/components/pembelian/status';
 import { AppShell } from '@/components/shell/AppShell';
 import { AksiDialog } from '@/components/shell/aksi-dialog';
@@ -115,7 +116,12 @@ type UtangState = 'nihil' | 'memuat' | 'ada' | 'takTerjangkau' | 'gagal';
 
 export default function PembelianDetailScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ id: string; ubah?: string; baru?: string }>();
+  const params = useLocalSearchParams<{
+    id: string;
+    ubah?: string;
+    baru?: string;
+    lampiranGagal?: string;
+  }>();
   const id = Number(params.id);
 
   const [doc, setDoc] = useState<PembelianDoc | null>(null);
@@ -163,6 +169,18 @@ export default function PembelianDetailScreen() {
   // driving it, so closing the dialog does not have to rewrite the URL.
   const openEditOnLoad = useRef(params.ubah === '1');
   const announceCreated = useRef(params.baru === '1');
+  /**
+   * How many faktur photographs the create flow could not stick to this nota.
+   * Frozen on the way in, like the two flags above: it describes the *arrival*,
+   * not the document, and re-reading the parameter every render would keep
+   * reporting a failure long after the attachments were sorted out.
+   *
+   * `useState` with an initializer and not `useRef(...).current` — the two are
+   * the same idea, but a ref read during render is what `react-hooks/refs`
+   * forbids, and the two flags above get away with it only because they are read
+   * inside effects.
+   */
+  const [lampiranGagal] = useState(() => Number(params.lampiranGagal) || 0);
 
   const toast = useCallback((msg: string) => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -632,6 +650,15 @@ export default function PembelianDetailScreen() {
               {doc.postedAt && <Text style={styles.jejakText}>· diposting {tanggal(doc.postedAt)}</Text>}
             </View>
           </Card>
+
+          {/* The faktur this nota was typed from, when it was photographed.
+              Draws nothing at all on a nota with no attachments, which is most
+              of them — see the component. */}
+          <LampiranCard
+            refTable="pembelian"
+            refId={doc.id}
+            gagalSaatDibuat={lampiranGagal}
+          />
 
           {koliTimpang && (
             <Card className="border-amber-line bg-amber-bg p-4">

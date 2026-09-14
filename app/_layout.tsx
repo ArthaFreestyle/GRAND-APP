@@ -179,6 +179,37 @@ function RootNavigator() {
           from rather than to a susulan index they never visited.
         */}
         <Stack.Screen name="penerimaan-susulan" />
+        {/*
+          Pemasok sits **beside** the tabs for the same hard reason as the two
+          above: native tabs register a route only through a
+          `NativeTabs.Trigger`, and the bar has exactly three roots. It is
+          reached from Beranda's feature grid — twice, in fact, since the
+          "Utang pemasok" tile lands on the same list with `?utang=1` and only
+          changes where a row goes. See `app/pemasok/index.tsx` for why the
+          contract cannot give that second tile a screen of its own.
+        */}
+        <Stack.Screen name="pemasok" />
+        {/*
+          Laporan, beside the tabs for the same reason as the three above. It is
+          two screens rather than one because `GET /laporan/pergerakan` has no
+          paging and no natural bound — see `app/laporan/index.tsx`.
+        */}
+        <Stack.Screen name="laporan" />
+        {/*
+          Stok opname, beside the tabs like the four above. Opening one freezes
+          a whole room against every module, so its own screens say so loudly —
+          see `app/stok-opname/baru.tsx`.
+        */}
+        <Stack.Screen name="stok-opname" />
+        {/*
+          Pengaturan unit kerja & ruang, beside the tabs for the same hard
+          reason as the five above. Issue #23: it exists so five screens across
+          the app — kasir, pembelian's nota baru, produk's katalog and detail,
+          stok opname's buka sesi — have somewhere to send someone the moment a
+          unit kerja has no ruang at all, rather than stopping dead with a
+          sentence and nowhere to go. See `app/pengaturan/_layout.tsx`.
+        */}
+        <Stack.Screen name="pengaturan" />
       </Stack.Protected>
     </Stack>
   );

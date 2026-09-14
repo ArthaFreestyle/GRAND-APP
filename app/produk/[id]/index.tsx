@@ -556,7 +556,18 @@ export default function ProdukDetailScreen() {
           />
         </View>
 
-        {figuresErr ? <RamahInlineError message={figuresErr} /> : null}
+        {figuresErr ? (
+          <View style={styles.figuresErrBox}>
+            <RamahInlineError message={figuresErr} />
+            {/* Issue #23: a unit kerja with no ruang used to leave this screen
+                permanently unable to read stock, with nowhere to go. */}
+            <RamahSecondaryButton
+              label="Atur gudang"
+              icon="settings"
+              onPress={() => router.push('/pengaturan')}
+            />
+          </View>
+        ) : null}
 
         <View style={styles.group}>
           <RamahSectionHeader
@@ -766,6 +777,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: L.space8, gap: L.space2 },
   centerTitle: { ...T.groupTitle, color: C.textTitle, textAlign: 'center' },
   centerSub: { ...T.caption, color: C.textBody, textAlign: 'center' },
+  figuresErrBox: { gap: L.space2, alignItems: 'flex-start' },
   centerAction: { paddingTop: L.space4 },
 
   identity: { gap: L.space1 },

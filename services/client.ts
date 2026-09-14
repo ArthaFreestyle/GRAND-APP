@@ -11,8 +11,10 @@ import {
   ApiError,
   apiRequest,
   apiRequestPaged,
+  apiUpload,
   type Paged,
   type RequestOptions,
+  type UploadFile,
 } from '@/services/api';
 import { refresh } from '@/services/auth';
 import { clearSession, getSession, hasActiveContext, type Session } from '@/services/session';
@@ -138,4 +140,18 @@ export function authedList<T>(
   options: Omit<RequestOptions, 'token'> = {}
 ): Promise<Paged<T>> {
   return withFreshToken((token) => apiRequestPaged<T>(path, { ...options, token }));
+}
+
+/**
+ * An authenticated multipart upload returning the `data` payload.
+ *
+ * It goes through `withFreshToken` like every other call rather than reading
+ * the session directly, and that matters more here than anywhere else: an
+ * upload can be in flight for a minute, which is long enough for the token to
+ * expire *during* it. The proactive renewal above happens before the file
+ * starts moving, and the 401 retry below re-sends it — the one case in this app
+ * where a retry costs real bytes, and the reason the skew window exists at all.
+ */
+export function authedUpload<T>(path: string, field: string, file: UploadFile): Promise<T> {
+  return withFreshToken((token) => apiUpload<T>(path, field, file, token));
 }

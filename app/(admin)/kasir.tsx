@@ -1432,8 +1432,15 @@ export default function KasirScreen() {
           looking.
         */
         ruangErr ? (
-          <View style={styles.listNote}>
+          <View style={[styles.listNote, styles.listNoteGap]}>
             <RamahInlineError message={ruangErr} />
+            {/* Issue #23: a unit kerja with no ruang used to strand the till
+                here permanently, with nothing on screen to fix it. */}
+            <RamahSecondaryButton
+              label="Atur gudang"
+              icon="settings"
+              onPress={() => router.push('/pengaturan')}
+            />
           </View>
         ) : katalogLoading ? (
           <View style={styles.listNote}>
@@ -2470,6 +2477,7 @@ const styles = StyleSheet.create({
   },
   produkNama: { ...T.rowTitle, color: C.textTitle, flex: 1, minWidth: 0 },
   listNote: { paddingVertical: L.space5, paddingHorizontal: L.gutter, alignItems: 'center' },
+  listNoteGap: { gap: L.space3 },
   produkHarga: { ...T.body, color: C.textBody, flexShrink: 1 },
   kosongCari: { ...T.caption, color: C.textMuted, padding: L.gutter },
 

@@ -31,9 +31,13 @@ export default function PembelianLayout() {
         name="[id]"
         options={{ title: 'Detail Faktur', animation: 'slide_from_right' }}
       />
+      {/* One route holding the board's whole create flow — pick the goods, pick
+          the supplier, and optionally photograph the faktur on the way. The
+          title names the route to accessibility and the web document title;
+          nothing draws it. */}
       <Stack.Screen
         name="baru"
-        options={{ title: 'Faktur Baru', animation: 'slide_from_right' }}
+        options={{ title: 'Nota pembelian baru', animation: 'slide_from_right' }}
       />
     </Stack>
   );

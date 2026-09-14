@@ -191,7 +191,12 @@ const FITUR: readonly Fitur[] = [
   // A parcel on a weighing platform: opname is the count you take of what is
   // physically on the shelf, and the scale is what says "measured", where a
   // plain stack of boxes would only repeat Katalog.
-  { key: 'opname', label: 'Stok opname', art: { kind: 'art3d', source: ART.opname } },
+  {
+    key: 'opname',
+    label: 'Stok opname',
+    art: { kind: 'art3d', source: ART.opname },
+    route: '/stok-opname',
+  },
   {
     key: 'pembelian',
     label: 'Pembelian',
@@ -200,7 +205,12 @@ const FITUR: readonly Fitur[] = [
   },
   // A warehouse, which is where a supplier is reached from here — and not the
   // shop, which is the first tile and is *this* business.
-  { key: 'pemasok', label: 'Pemasok', art: { kind: 'art3d', source: ART.pemasok } },
+  {
+    key: 'pemasok',
+    label: 'Pemasok',
+    art: { kind: 'art3d', source: ART.pemasok },
+    route: '/pemasok',
+  },
   // "Persetujuan" is a filter on the Nota list rather than a place of its own,
   // so it lands on that list. The glyph is the guide's own suggestion for the
   // gap it calls "Pesanan masuk".
@@ -211,8 +221,29 @@ const FITUR: readonly Fitur[] = [
     art: { kind: 'art3d', source: ART.persetujuan },
     route: '/pembelian',
   },
-  { key: 'laporan', label: 'Laporan', art: { kind: 'art3d', source: ART.laporan } },
-  { key: 'utang', label: 'Utang pemasok', art: { kind: 'art3d', source: ART.utang } },
+  {
+    key: 'laporan',
+    label: 'Laporan',
+    art: { kind: 'art3d', source: ART.laporan },
+    route: '/laporan',
+  },
+  /*
+    The same list as the tile above, entered in a different mode — not a
+    duplicate, and not laziness.
+
+    There is no cross-supplier debt read in the contract: `Supplier` carries no
+    outstanding total and `GET /supplier/{id}/utang` answers one supplier at a
+    time, so a screen ranking suppliers by what is owed would be one request per
+    supplier over the whole master. `?utang=1` sends every row of the list
+    straight to that supplier's open invoices instead, and the list says so at
+    the top rather than leaving it to be discovered.
+  */
+  {
+    key: 'utang',
+    label: 'Utang pemasok',
+    art: { kind: 'art3d', source: ART.utang },
+    route: '/pemasok?utang=1',
+  },
   /*
     The board labels this one "Penjualan"; here it is the till, and "Kasir" is
     what everyone in the shop calls it.

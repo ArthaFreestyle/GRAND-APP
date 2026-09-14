@@ -50,6 +50,15 @@ export interface Supplier {
   alamat: string;
   npwp: string;
   aktif: boolean;
+  /**
+   * The trail, for the detail screen only. A list row that printed who created
+   * a supplier and when would be two grey lines on every one of thirty rows
+   * that nobody scans a list to read — reference data belongs on the record.
+   */
+  createdAt: string;
+  updatedAt: string;
+  /** Null on the wire while a row predates the auth module; empty here. */
+  namaPembuat: string;
 }
 
 function toSupplier(s: ApiSupplier): Supplier {
@@ -61,6 +70,9 @@ function toSupplier(s: ApiSupplier): Supplier {
     alamat: s.alamat ?? '',
     npwp: s.npwp ?? '',
     aktif: s.is_aktif ?? true,
+    createdAt: s.created_at ?? '',
+    updatedAt: s.updated_at ?? s.created_at ?? '',
+    namaPembuat: s.nama_pembuat ?? '',
   };
 }
 
@@ -70,6 +82,20 @@ function toSupplier(s: ApiSupplier): Supplier {
  * `hooks/use-record-bus.ts`.
  */
 export const supplierBus = createRecordBus<Supplier>();
+
+/**
+ * The detail's own channel, separate from the list's — the same split
+ * `produkDetailBus` makes, and for the same reason even though both buses here
+ * happen to carry the same shape.
+ *
+ * Without it the detail would have to subscribe to `supplierBus`, and its own
+ * publish on retiring a supplier would come straight back to it as somebody
+ * else's change: the sentence it had just put on screen ("Pemasok
+ * dinonaktifkan") would be overwritten by the generic one a moment later. Two
+ * buses means the edit route can announce itself to the detail underneath and
+ * to the list under *that* without either hearing its own echo.
+ */
+export const supplierDetailBus = createRecordBus<Supplier>();
 
 /** `search` matches part of the kode or the nama — not the address, not the NPWP. */
 export async function listSupplier(query: ListQuery): Promise<Paged<Supplier>> {
