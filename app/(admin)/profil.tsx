@@ -257,11 +257,7 @@ export default function ProfilScreen() {
             required
           />
           {pwErr ? <RamahInlineError message={pwErr} /> : null}
-          <RamahNote icon="info">
-            Berhasil mengganti password mencabut seluruh sesi lain akun ini — device dan browser
-            lain kehilangan akses begitu token mereka kedaluwarsa, bukan seketika. Sesi ini ikut
-            tercabut juga dan perlu masuk ulang setelah token yang sedang dipakai kedaluwarsa.
-          </RamahNote>
+          <RamahNote icon="info">Perangkat lain akan keluar otomatis.</RamahNote>
           <RamahPrimaryButton label="Simpan password baru" onPress={() => void simpanPassword()} busy={pwBusy} disabled={pwBusy} />
         </View>
       </RamahSheet>

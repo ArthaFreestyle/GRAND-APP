@@ -300,13 +300,7 @@ export function PilihPemasokStep({
 
       <View style={[styles.dock, { paddingBottom: dockPad }]}>
         {buatErr ? <RamahInlineError message={buatErr} /> : null}
-        {/* The board puts the warning immediately above the button, and the
-            reason is in the file header: this is the field the nota cannot be
-            edited out of afterwards. */}
-        <RamahNote icon="lock">
-          Pemasok dan gudang terkunci begitu nota dibuat. Mengubahnya berarti membatalkan nota
-          lalu membuatnya ulang.
-        </RamahNote>
+        <RamahNote icon="lock">Tidak bisa diubah setelah nota dibuat.</RamahNote>
         <RamahPrimaryButton
           label={membuat ? 'Membuat nota…' : 'Buat nota pembelian'}
           icon="file-plus"

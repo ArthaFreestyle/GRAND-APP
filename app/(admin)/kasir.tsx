@@ -183,7 +183,6 @@ import {
   RamahField,
   RamahIconButton,
   RamahInlineError,
-  RamahNote,
   RamahPrimaryButton,
   RamahSecondaryButton,
   RamahSheet,
@@ -2097,10 +2096,6 @@ export default function KasirScreen() {
               maxLength={6}
               accessibilityLabel="Tarif PPN dalam persen"
             />
-            <RamahNote>
-              Yang dikirim ke server adalah rupiahnya, bukan tarifnya — {formatRupiah(ppn)} untuk
-              keranjang ini. Nota lama tidak ikut berubah kalau tarifnya diganti.
-            </RamahNote>
           </View>
         ) : null}
       </RamahSheet>

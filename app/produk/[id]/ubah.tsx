@@ -462,7 +462,6 @@ function UbahProdukForm({
           }}
           placeholder="Map plastik kancing A4"
           error={namaErr}
-          helper="Tulis seperti yang tertera di kemasan pemasok."
           autoCapitalize="words"
         />
 
@@ -477,11 +476,7 @@ function UbahProdukForm({
           keyboardType="number-pad"
           placeholder="0"
           error={minErr}
-          // The zero is a real fact about this endpoint and not a placeholder
-          // value: `GET /product/stok-minimum` never returns a product whose
-          // threshold is 0, because 0 is the column default and means "belum
-          // diatur" rather than "boleh habis".
-          helper={`Dalam ${product.namaSatuanDasar || 'satuan dasar'}. Nol berarti belum diatur — barang tidak akan pernah muncul di daftar pesan ulang.`}
+          helper={`Dalam ${product.namaSatuanDasar || 'satuan dasar'}.`}
         />
 
         <View style={styles.group}>
@@ -519,12 +514,7 @@ function UbahProdukForm({
           ))}
         </View>
 
-        <RamahNote>
-          Kode barang {product.kode} dan satuan dasar {product.namaSatuanDasar} tidak bisa diubah.
-          Kode itu yang menyebut barang ini di setiap dokumen yang pernah mencatatnya, dan mengganti
-          satuan dasar akan membatalkan arti setiap faktor dan setiap jumlah yang sudah masuk kartu
-          stok.
-        </RamahNote>
+        <RamahNote>Kode barang dan satuan dasar tidak bisa diubah.</RamahNote>
 
         {saveErr ? <RamahInlineError message={saveErr} /> : null}
       </ScrollView>

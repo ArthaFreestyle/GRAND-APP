@@ -208,10 +208,7 @@ export function PembelianHeaderSheet({
   return (
     <RamahSheet visible={visible} title="Ubah header faktur" onClose={onCancel}>
       <View style={styles.body}>
-        <Text style={styles.lead}>
-          Hanya selama DRAFT. Supplier dan ruang tidak ada di sini — keduanya menentukan utang dan
-          saldo stok mana yang tersentuh, jadi keliru di situ berarti batalkan dan input ulang.
-        </Text>
+        <Text style={styles.lead}>Hanya bisa diubah selama DRAFT.</Text>
 
         <View style={styles.fieldRow}>
           <View style={styles.fieldCell}>
@@ -220,7 +217,6 @@ export function PembelianHeaderSheet({
               value={v.tanggal}
               onChangeText={(t) => onChange({ tanggal: t })}
               placeholder="YYYY-MM-DD"
-              helper="Menentukan bulan penomoran dan periodenya."
               autoCapitalize="none"
               maxLength={10}
             />
@@ -242,7 +238,7 @@ export function PembelianHeaderSheet({
           value={v.noFaktur}
           onChangeText={(t) => onChange({ noFaktur: t })}
           placeholder="INV/2026/VIII/1180"
-          helper="Unik per supplier. Tanpa purchase order ini satu-satunya penjaga agar satu nota tidak diinput dua kali."
+          helper="Unik per supplier."
           autoCapitalize="characters"
         />
 
@@ -297,10 +293,7 @@ export function PembelianHeaderSheet({
 
         <View style={styles.divider} />
         <RamahSectionHeader>Ongkos angkut</RamahSectionHeader>
-        <Text style={styles.sectionNote}>
-          Tagihan ekspedisi, bukan utang ke supplier — biaya angkut tidak pernah masuk total
-          faktur. Ia masuk ke harga pokok lewat alokasi per baris saat posting.
-        </Text>
+        <Text style={styles.sectionNote}>Di luar total faktur.</Text>
 
         <RamahPickerField
           label="Ekspedisi"
@@ -348,7 +341,7 @@ export function PembelianHeaderSheet({
           ]}
           value={v.metode}
           onChange={(val) => onChange({ metode: val as MetodeAlokasiAngkut })}
-          helper="KOLI jatuh ke QTY sendiri kalau seluruh koli baris nol."
+          helper="Jatuh ke QTY kalau koli semua nol."
         />
 
         <CheckRow

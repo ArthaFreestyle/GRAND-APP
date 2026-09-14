@@ -274,13 +274,8 @@ export default function PemasokListScreen() {
                 }
               />
             </View>
-            {/* Says out loud where a row goes, because in this mode it is not
-                where the reader would assume. */}
             {modeUtang ? (
-              <RamahNote icon="info">
-                Pilih pemasok untuk melihat faktur yang masih punya sisa. Tidak ada bacaan yang
-                menjumlahkan utang seluruh pemasok sekaligus, jadi daftarnya per pemasok.
-              </RamahNote>
+              <RamahNote icon="info">Pilih pemasok untuk lihat utang.</RamahNote>
             ) : null}
           </View>
         }

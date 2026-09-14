@@ -47,7 +47,7 @@ export default function RuangUbahScreen() {
       try {
         const r = await getRuang(id);
         if (!alive) return;
-        setValues({ kode: r.kode, nama: r.nama });
+        setValues({ nama: r.nama });
         setLoadErr('');
       } catch (e) {
         if (alive) setLoadErr(messageOf(e, 'Gagal memuat ruang.'));

@@ -198,12 +198,6 @@ export default function LaporanScreen() {
                 </View>
               ))}
             </RamahStackCard>
-            {/* Explained where it bites: a room nobody can pick in any other
-                screen can still appear in this list. */}
-            <RamahNote icon="info">
-              Gudang yang sudah dinonaktifkan tetap dihitung selama masih memegang barang —
-              nilainya masih nilai toko.
-            </RamahNote>
           </>
         )}
 
@@ -224,10 +218,7 @@ export default function LaporanScreen() {
             {(laba ?? []).map((b) => (
               <BulanCard key={b.bulan} row={b} />
             ))}
-            <RamahNote icon="info">
-              Omzet sudah bersih dari PPN keluaran — pajak yang dipungut di kasir itu uang
-              negara yang lewat di nota, bukan pendapatan toko, jadi ia ditulis sendiri.
-            </RamahNote>
+            <RamahNote icon="info">Omzet tanpa PPN.</RamahNote>
           </>
         )}
 

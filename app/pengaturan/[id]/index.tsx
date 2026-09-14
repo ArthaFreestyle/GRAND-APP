@@ -294,9 +294,7 @@ export default function PengaturanDetailScreen() {
 
         {!ruangVisible ? (
           <RamahNote icon="eye-off">
-            Sesi ini sedang bekerja di unit kerja lain, dan hanya bisa melihat ruang di unit yang
-            sedang aktif. Ganti konteks ke &quot;{unitKerja.nama}&quot; dulu untuk melihat atau
-            mengelola ruangnya di sini.
+            {`Ganti ke unit ${unitKerja.nama} untuk melihat ruang.`}
           </RamahNote>
         ) : ruangErr ? (
           <RamahInlineError message={ruangErr} onRetry={reloadRuang} />

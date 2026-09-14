@@ -53,7 +53,6 @@ import {
   RamahField,
   RamahHeader,
   RamahInlineError,
-  RamahNote,
   RamahPrimaryButton,
   RamahSearchField,
   RamahSecondaryButton,
@@ -231,15 +230,6 @@ export default function PenerimaanSusulanBaruScreen() {
         style={styles.body}
         contentContainerStyle={styles.bodyContent}
         keyboardShouldPersistTaps="handled">
-        {/* Three facts about this document that are true before anything is typed,
-            and all three surprise somebody the first time. It adds stock without
-            adding debt; it saves as a draft rather than posting; and its number
-            comes from the server, so there is no field for one. */}
-        <RamahNote icon="info">
-          Tersimpan sebagai draf — nomornya dibuat server. Dokumen ini menambah stok dan tidak
-          menambah utang: fakturnya sudah terbit penuh di kiriman pertama.
-        </RamahNote>
-
         <View style={styles.group}>
           <RamahSectionHeader
             action={sumber ? 'Ganti' : undefined}
@@ -264,10 +254,7 @@ export default function PenerimaanSusulanBaruScreen() {
           ) : (
             <View style={styles.sumberEmpty}>
               <Text style={styles.emptyTitle}>Belum ada faktur dipilih</Text>
-              <Text style={styles.emptySub}>
-                Hanya faktur POSTED yang bisa dipilih — sebelum diposting, barisnya belum punya
-                harga pokok untuk disalin dan sisanya belum pasti.
-              </Text>
+              <Text style={styles.emptySub}>Hanya faktur yang sudah diposting bisa dipilih.</Text>
               <View style={styles.emptyAction}>
                 <RamahSecondaryButton
                   label="Pilih faktur"
@@ -294,7 +281,6 @@ export default function PenerimaanSusulanBaruScreen() {
                 setTanggalErr('');
               }}
               placeholder="YYYY-MM-DD"
-              helper="Menentukan bulan penomoran dan periodenya. Periode yang sudah ditutup menolak posting."
               error={tanggalErr}
               autoCapitalize="none"
               maxLength={10}
@@ -304,8 +290,7 @@ export default function PenerimaanSusulanBaruScreen() {
               label="Keterangan"
               value={keterangan}
               onChangeText={setKeterangan}
-              placeholder="Sisa 5 dus datang menyusul, SJ 00214"
-              helper="Opsional. Nomor surat jalan kiriman kedua biasanya yang paling dicari nanti."
+              placeholder="Opsional"
               multiline
             />
 

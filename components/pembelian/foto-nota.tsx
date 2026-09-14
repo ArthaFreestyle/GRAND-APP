@@ -303,7 +303,7 @@ export function FotoNotaStep({
 
         {penuh ? (
           <RamahNote icon="alert-circle">
-            {`Satu nota boleh membawa ${MAX_LAMPIRAN} lampiran. Hapus satu halaman dulu kalau masih ada yang perlu difoto.`}
+            {`Maksimal ${MAX_LAMPIRAN} lampiran — hapus satu dulu.`}
           </RamahNote>
         ) : (
           <RamahSecondaryButton
@@ -318,14 +318,7 @@ export function FotoNotaStep({
 
         {err ? <RamahInlineError message={err} /> : null}
 
-        {/* The one place the missing endpoint is said out loud, and it is said
-            where somebody is looking at the photos and expecting them to be
-            read. The file header carries the long version. */}
-        <RamahNote icon="info">
-          Server ini belum bisa membaca isi foto, jadi barang dan harganya tetap diisi sendiri.
-          Fotonya ikut menempel di nota — bisa dibuka lagi sambil mengetik, dan ikut terbaca oleh
-          yang menyetujui.
-        </RamahNote>
+        <RamahNote icon="info">Foto tidak mengisi barang atau harga otomatis.</RamahNote>
       </ScrollView>
 
       <View style={[styles.dock, { paddingBottom: dockPad }]}>

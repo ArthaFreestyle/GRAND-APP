@@ -84,7 +84,6 @@ export default function PemasokUbahScreen() {
         const s = await getSupplier(id);
         if (!alive) return;
         setValues({
-          kode: s.kode,
           nama: s.nama,
           telepon: s.telepon,
           alamat: s.alamat,

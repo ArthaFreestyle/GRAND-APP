@@ -59,7 +59,7 @@ export default function PengaturanUbahScreen() {
       try {
         const u = await getUnitKerja(id);
         if (!alive) return;
-        setValues({ kode: u.kode, nama: u.nama });
+        setValues({ nama: u.nama });
         setLoadErr('');
       } catch (e) {
         if (alive) setLoadErr(messageOf(e, 'Gagal memuat unit kerja.'));

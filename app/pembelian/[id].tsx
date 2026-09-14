@@ -607,12 +607,7 @@ export default function PembelianDetailScreen() {
           />
         ) : null}
         {doc.status === 'BATAL' && doc.alasanBatal ? (
-          <RamahBarrierCard
-            tone="danger"
-            title="Dokumen dibatalkan"
-            description={doc.alasanBatal}
-            note="Baris pembaliknya bertanggal hari pembatalan, bukan tanggal dokumen — laporan per periode harus dibaca dari kartu stok, bukan dari status ini."
-          />
+          <RamahBarrierCard tone="danger" title="Dokumen dibatalkan" description={doc.alasanBatal} />
         ) : null}
         {koliTimpang ? (
           <RamahBarrierCard
@@ -754,9 +749,7 @@ export default function PembelianDetailScreen() {
               editable
             />
             <Text style={styles.editNote}>
-              Menyimpan mengganti seluruh baris dokumen sekaligus — itu satu-satunya bentuk yang
-              ditawarkan kontrak, karena baris satu dokumen adalah satu kesatuan yang diketik dari
-              satu lembar kertas.
+              Menyimpan mengganti seluruh baris sekaligus.
               {totalKoli > 0
                 ? ` Koli baris saat ini ${formatDesimal(String(linesKoli(lines)))} dari ${formatDesimal(doc.totalKoli)}.`
                 : ''}
