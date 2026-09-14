@@ -195,6 +195,13 @@ function RootNavigator() {
         */}
         <Stack.Screen name="laporan" />
         {/*
+          Tutup buku (issue #12), beside the tabs like the rest. Reached from
+          Laporan, and from any posting the server rejected because its month
+          is closed — `components/shell/aksi-dialog.tsx` links straight to that
+          month. See `app/periode/index.tsx`.
+        */}
+        <Stack.Screen name="periode" />
+        {/*
           Stok opname, beside the tabs like the four above. Opening one freezes
           a whole room against every module, so its own screens say so loudly —
           see `app/stok-opname/baru.tsx`.

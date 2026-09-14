@@ -74,7 +74,8 @@ export type WriteArea =
   | 'pemakaian'
   | 'opname'
   | 'ruang'
-  | 'unit-kerja';
+  | 'unit-kerja'
+  | 'periode';
 
 /**
  * The role that owns each area's writes. `SUPERADMIN` is not listed because it
@@ -102,6 +103,10 @@ const OWNER: Record<WriteArea, RoleName> = {
   pelanggan: 'CASHIER',
   penjualan: 'CASHIER',
   'unit-kerja': 'SUPERADMIN',
+  // Unlike unit kerja this one is not a reading: the contract names
+  // `SUPERADMIN` on both `tutup` and `buka` — "a month anybody could open was
+  // never really closed" — and closing one stops every other role's postings.
+  periode: 'SUPERADMIN',
 };
 
 /** Narrows a role name off the wire; anything unrecognized authorizes nothing. */

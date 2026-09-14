@@ -243,6 +243,22 @@ export default function LaporanScreen() {
           </View>
           <Feather name="chevron-right" size={RamahIcon.row} color={C.iconMuted} />
         </Pressable>
+
+        {/* ---- Tutup buku (issue #12) ---- */}
+        <View style={styles.groupStart}>
+          <RamahSectionHeader>Tutup buku</RamahSectionHeader>
+        </View>
+        <Pressable
+          onPress={() => router.push('/periode')}
+          accessibilityRole="button"
+          accessibilityLabel="Buka tutup buku per bulan"
+          style={styles.linkCard}>
+          <View style={styles.grow}>
+            <Text style={styles.linkTitle}>Bulan yang sudah ditutup</Text>
+            <Text style={styles.linkSub}>Bulan tertutup menolak posting baru.</Text>
+          </View>
+          <Feather name="chevron-right" size={RamahIcon.row} color={C.iconMuted} />
+        </Pressable>
       </ScrollView>
     </View>
   );
