@@ -58,14 +58,6 @@
  *   pemasok have no screens in this repo. They are drawn *disabled* — 55%, the
  *   board's own treatment for a tile that does not open — rather than dropped,
  *   because the grid is also a map of what this app is going to be.
- * - **One of the eight renders.** §8 restricts the grid to Iqonic Design's
- *   *Ulta Bizz* and *Bizzy Vol.2* and a second, IconScout-vetted logistics pack
- *   (see `ART` below); nothing in either covers "unit kerja & ruang" — a
- *   settings screen, not a stock or delivery concept — so that tile holds a
- *   Feather line glyph on the matching tint, which is the guide's documented
- *   stopgap. Borrowing a lookalike render from a third pack is what it
- *   forbids, because one contributor is what keeps camera angle, bevel and
- *   light identical across the grid.
  */
 import Feather from '@expo/vector-icons/Feather';
 import { useRouter, type Href } from 'expo-router';
@@ -127,10 +119,11 @@ const ART = {
   nota: require('@/assets/icons-3d/finance-report.png'),
   laporan: require('@/assets/icons-3d/growth-graph.png'),
   utang: require('@/assets/icons-3d/deposit-box.png'),
-  // The three below are the second family — see the note under this block.
+  // The four below are the second family — see the note under this block.
   opname: require('@/assets/icons-3d/package-scale.png'),
-  pemasok: require('@/assets/icons-3d/warehouse.png'),
-  susulan: require('@/assets/icons-3d/fast-delivery.png'),
+  pemasok: require('@/assets/icons-3d/fast-delivery.png'),
+  unitKerja: require('@/assets/icons-3d/warehouse.png'),
+  susulan: require('@/assets/icons-3d/delivery-schedule.png'),
 } as const;
 
 /**
@@ -155,17 +148,31 @@ const ART = {
  * third, `package-list`, is a clipboard with a parcel and a check, and reads as
  * well on "Persetujuan" as the board intended.
  *
- * **The other two come from that same asset's pack** — Semusim Kreatif's
- * ten-item logistics set, the one `package-list` itself belongs to. Taking
- * both from one pack is §8's own rule applied rather than abandoned: one
+ * **The rest come from that same asset's pack** — Semusim Kreatif's ten-item
+ * logistics set, the one `package-list` itself belongs to. Taking them all
+ * from one pack is §8's own rule applied rather than abandoned: one
  * contributor is one render language, so what the grid holds is two coherent
  * families (Iqonic's matte blue-and-orange, Semusim's glossy red-and-yellow)
  * instead of the board's three. The pack also happens to be about exactly the
- * concepts this app was missing — counting stock, a supplier's warehouse, a
- * delivery — which is why nothing here is a lookalike standing in for
- * something else.
+ * concepts this app was missing — counting stock, the van a supplier's goods
+ * arrive in, the gudang stock sits in, a delivery that comes on a later date —
+ * which is why nothing here is a lookalike standing in for something else.
  *
- * All three are 3000×3000 square, free for commercial use, no attribution
+ * ### Unit kerja, the last tile to get one
+ *
+ * Unit kerja sat on a Feather `settings` glyph because it read as a settings
+ * screen, and a gear is what neither family draws in its own style: Iqonic's
+ * free `Setting` is a glossy cyan cog from a third pack, and *Bizzy Vol.2*'s
+ * management cogs are purple and pink — both a different language from the
+ * grid beside them. What changed is the question: every `ruang` that section
+ * manages is a gudang, so a **warehouse is its subject**, not a picture
+ * standing in for "settings". That render was Pemasok's, so the three tiles
+ * moved together to keep one concept per icon — Pemasok onto the delivery van
+ * (whoever brings the stock is what a supplier *is* to this shop), and
+ * Kiriman susulan off the van onto `delivery-schedule`, a calendar beside a
+ * parcel, which is precisely what a susulan is.
+ *
+ * All four are 3000×3000 square, free for commercial use, no attribution
  * required, pulled as 500px PNG on a transparent ground (`png` asked for
  * explicitly — the default download format for a 3D asset is `compressed-glb`,
  * which is a model, not an image).
@@ -221,8 +228,8 @@ const FITUR: readonly Fitur[] = [
     art: { kind: 'art3d', source: ART.nota },
     route: '/pembelian',
   },
-  // A warehouse, which is where a supplier is reached from here — and not the
-  // shop, which is the first tile and is *this* business.
+  // The delivery van: to this shop a supplier is whoever brings the stock. The
+  // warehouse it used to wear is Unit kerja's now — see `ART`.
   {
     key: 'pemasok',
     label: 'Pemasok',
@@ -239,12 +246,9 @@ const FITUR: readonly Fitur[] = [
   {
     key: 'unit-kerja',
     label: 'Unit kerja',
-    // Neither vendored 3D pack has a settings/location concept to draw — this
-    // is a back-office screen, not stock or a delivery — so it stays the
-    // guide's own documented stopgap for exactly that gap: a Feather glyph on
-    // the tint reserved for account/settings tiles, not a render hunted from a
-    // third contributor.
-    art: { kind: 'glyph', icon: 'settings', tone: 'akun' },
+    // A gudang, because every ruang this section manages is one — the
+    // section's subject rather than a gear standing in for "settings".
+    art: { kind: 'art3d', source: ART.unitKerja },
     route: '/pengaturan',
   },
   {
@@ -289,8 +293,8 @@ const FITUR: readonly Fitur[] = [
     key: 'susulan',
     label: 'Kiriman susulan',
     // The board draws no tile for this one at all — it is the ninth, and lives
-    // behind "Lihat semua" — so the render is this app's choice, from the same
-    // pack as its three neighbours.
+    // behind "Lihat semua" — so the render is this app's choice: a calendar
+    // beside a parcel, the part of a delivery that arrives on a later date.
     art: { kind: 'art3d', source: ART.susulan },
     route: '/penerimaan-susulan',
   },
