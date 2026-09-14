@@ -313,8 +313,8 @@ const styles = StyleSheet.create({
   bodyContent: { paddingHorizontal: L.gutter, paddingTop: L.space2, gap: L.cardGap },
 
   stamp: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: L.space1 },
-  // Guide §1 wants a time on every operational number and §7 puts metadata
-  // at 13/18 — the stamp is both.
+  // Guide §1 wants a time on every operational number, and `T.caption` is the
+  // merchant scale's metadata size — the stamp is both.
   stampText: { ...T.caption, color: C.textMuted, flex: 1, minWidth: 0 },
   stampAction: { ...T.caption, color: C.textLink },
 

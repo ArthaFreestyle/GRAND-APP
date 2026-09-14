@@ -305,8 +305,8 @@ export function RamahChip({
 }
 
 /**
- * The small grey heading above a group of rows. 13px semibold, muted — the
- * group's *name*, not a title competing with the rows under it.
+ * The small grey heading above a group of rows. `T.caption` weight semibold,
+ * muted — the group's *name*, not a title competing with the rows under it.
  *
  * `action` is the design system's own second slot (`SectionHeader.jsx` takes
  * `action` / `onAction`): one link-coloured word on the far right, baseline
@@ -688,6 +688,142 @@ export function RamahSheetOption({
 }
 
 /**
+ * One row of a master table, resolved by search rather than picked from a
+ * short fixed list — a product, a supplier, an ekspedisi.
+ */
+export interface RamahSearchOption {
+  value: string;
+  label: string;
+  /** Second line: a code, a phone number, whatever tells two similar rows apart. */
+  sub?: string;
+}
+
+/**
+ * A search-and-pick sheet over a table the client has never fully loaded.
+ *
+ * The Ramah counterpart of `components/shell/search-picker.tsx`'s
+ * `SearchPicker`, and a sheet rather than an inline expand/collapse for the
+ * same reason `TurunanLineEditor`'s satuan picker is one: the field on the form
+ * shows the *answer* (`RamahPickerField`), and searching for a different one is
+ * a question about the field, raised over the screen rather than inside it.
+ *
+ * One debounced `search` per keystroke burst, same as the component it
+ * replaces — a page of results, nothing cached, the empty term run on open so
+ * a short master table (ekspedisi, a handful of rooms) is fully visible before
+ * anybody types.
+ */
+export function RamahSearchSheet({
+  visible,
+  title,
+  onClose,
+  search,
+  onPick,
+  placeholder,
+  emptyHint,
+}: {
+  visible: boolean;
+  title: string;
+  onClose: () => void;
+  /**
+   * Runs the query. **Must be memoized** (`useCallback`) — it is an effect
+   * dependency, so a fresh closure every render would re-query on every render.
+   */
+  search: (term: string) => Promise<RamahSearchOption[]>;
+  onPick: (option: RamahSearchOption) => void;
+  placeholder: string;
+  /** Shown in place of the results when the query came back empty. */
+  emptyHint: string;
+}) {
+  const [term, setTerm] = useState('');
+  const [options, setOptions] = useState<RamahSearchOption[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+
+  /**
+   * Bumped by every query, so a slow answer to an older term cannot paint over
+   * a newer one. The debounce alone does not cover this: two queries can be in
+   * flight whenever the second is typed before the first returns.
+   */
+  const generation = useRef(0);
+
+  useEffect(() => {
+    if (!visible) return;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      const mine = ++generation.current;
+      setLoading(true);
+      search(term.trim())
+        .then((result) => {
+          if (cancelled || generation.current !== mine) return;
+          setOptions(result);
+          setErr('');
+        })
+        .catch(() => {
+          if (cancelled || generation.current !== mine) return;
+          setOptions([]);
+          setErr('Gagal memuat pilihan.');
+        })
+        .finally(() => {
+          if (!cancelled && generation.current === mine) setLoading(false);
+        });
+    }, 350);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [visible, term, search]);
+
+  // A closed sheet reopening on the previous query would show stale results
+  // for a beat before the empty-term search above lands. Cleared at the one
+  // place this component actually closes rather than reacted to afterwards in
+  // an effect — every path to `visible: false` in this codebase's usage runs
+  // through `onClose`, so there is no separate "the prop just changed" case to
+  // catch.
+  const close = () => {
+    setTerm('');
+    onClose();
+  };
+
+  const pick = (option: RamahSearchOption) => {
+    onPick(option);
+    close();
+  };
+
+  return (
+    <RamahSheet visible={visible} title={title} onClose={close}>
+      <View style={searchSheetStyles.wrap}>
+        <RamahSearchField value={term} onChangeText={setTerm} placeholder={placeholder} />
+        {loading && options.length === 0 ? (
+          <View style={searchSheetStyles.center}>
+            <ActivityIndicator color={C.brand} />
+          </View>
+        ) : err !== '' ? (
+          <RamahInlineError message={err} />
+        ) : options.length === 0 ? (
+          <Text style={searchSheetStyles.empty}>{emptyHint}</Text>
+        ) : (
+          options.map((o) => (
+            <RamahSheetOption
+              key={o.value}
+              label={o.label}
+              sub={o.sub}
+              selected={false}
+              onPress={() => pick(o)}
+            />
+          ))
+        )}
+      </View>
+    </RamahSheet>
+  );
+}
+
+const searchSheetStyles = StyleSheet.create({
+  wrap: { paddingHorizontal: L.gutter, gap: L.space3 },
+  center: { paddingVertical: L.space6, alignItems: 'center' },
+  empty: { ...T.caption, color: C.textBody, paddingVertical: L.space3 },
+});
+
+/**
  * One shortcut tile in the feature grid (guide §4, §7, §8).
  *
  * **The art is a real 3D render**, from the packs §8 names: IconScout, Iqonic
@@ -1009,8 +1145,9 @@ export function RamahInlineError({ message, onRetry }: { message: string; onRetr
  * A form field, drawn upside down from the usual one.
  *
  * Revision 2 of the guide inverts the hierarchy every form library ships with:
- * the **label** is small, grey and semibold (12/16) and the **value** is large,
- * dark and bold (17/23), sitting on a 1px underline rather than inside a box.
+ * the **label** is small, grey and semibold (`T.fieldLabel`) and the **value**
+ * is large, dark and bold (`T.fieldValue`), sitting on a 1px underline rather
+ * than inside a box.
  * The reason is what a filled form then looks like — a summary. A boxed field
  * makes every row the same weight whether it holds anything or not, so a form
  * somebody has finished reads exactly like a form nobody has started; this way
@@ -1539,11 +1676,12 @@ const styles = StyleSheet.create({
     gap: 6,
     marginTop: L.space1,
   },
-  // 24/28 — the one figure allowed above the merchant scale's 22/26 top,
-  // because on this card it is the entire subject rather than one of two.
-  scoreValue: { fontSize: 24, lineHeight: 28, ...W.bold },
-  scoreOutOf: { fontSize: 15, lineHeight: 20, ...W.semibold, color: C.textMuted },
-  scoreNote: { fontSize: 13, lineHeight: 18, ...W.semibold },
+  // `metric`, the scale's top tier: on this card the score is the entire
+  // subject rather than one of a pair, which is the same reasoning a stat
+  // card's own figure gets.
+  scoreValue: { ...T.metric },
+  scoreOutOf: { ...T.subtitle, ...W.semibold, color: C.textMuted },
+  scoreNote: { ...T.caption, ...W.semibold },
 
   stackRow: {
     flexDirection: 'row',

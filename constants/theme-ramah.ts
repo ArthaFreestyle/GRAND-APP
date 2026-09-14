@@ -220,50 +220,92 @@ export const RamahWeight = {
 } as const satisfies Record<string, TextStyle>;
 
 /**
- * The merchant type scale (guide §7).
+ * The merchant type scale.
  *
- * This is a *different scale* from `tokens/typography.css`, on purpose. That
- * file's bundles (`--type-display` at 34/40, `--type-h1` at 28/34) size a
- * consumer onboarding screen where one question fills the viewport. A merchant
- * home shows six cards at once, so the top of the scale comes down to 22/26 and
- * the contrast is carried by weight and colour instead of by size.
+ * Revision 3: rescaled to a general-purpose mobile type ramp — one scale, one
+ * ratio, used everywhere in the app rather than a size picked per screen. Six
+ * sizes, each a step of roughly 1.2–1.25× from the last: **12 → 14 → 16 → 20 →
+ * 24 → 30**, plus the one documented exception below it. That replaces
+ * revision 2's own scale, which topped out at 22/26 on the argument that six
+ * cards sharing a viewport should carry their hierarchy in weight and colour
+ * rather than size — a real tradeoff, and the one this revision spends back
+ * for platform-standard title sizes (24–28pt is iOS's own large-title-adjacent
+ * range, and Material 3's Title/Headline tiers land in the same place). Weight
+ * and colour still do real work here — a 20pt bold heading beside a 16pt grey
+ * regular line is legible without either needing to be bigger — but the sizes
+ * themselves now sit inside the range a phone's own type system expects.
  *
- * **The floor is 13px for anything you are meant to read.** 11px exists only
- * for a tile label and a character counter — two strings the eye lands on
- * because it already knows where they are, not because it is reading them.
+ * Every named bundle below maps onto that six-step ramp:
  *
- * Poppins is the guide's family, and the binaries are bundled now — every
- * bundle below carries one of `RamahWeight`'s four named faces, so a style
- * spread from here is already in the right family and the right weight. A
- * screen that writes a raw `fontSize`/`fontWeight` pair of its own is a screen
- * rendering in the platform font; spread a bundle, or at minimum spread the
- * matching `RamahWeight` entry beside the size.
+ *   metric (30) → identity (24) → groupTitle / fieldValue (20)
+ *   → subtitle / rowTitle / body (16, 16, 16 — see note) → caption (12)
  *
- * **Tracking.** `tokens/typography.css` asks for −0.01em on titles and 0 on
- * body, and Poppins is a geometric grotesque that needs it: at 22px its default
- * fit reads airy next to the rest of the card. React Native's `letterSpacing`
- * is in points rather than ems, so the em figure is multiplied out per size and
- * rounded to a tenth. Nothing at or below 15px is tracked at all — that is the
- * token file's `--tracking-body`, and negative tracking on a 13px caption is
- * where legibility starts to go.
+ * `subtitle` is new: a secondary line directly under a heading (guide's own
+ * "satu tingkat di bawah title, dibedakan dengan warna abu-abu, bukan cuma
+ * ukuran"). It sits at 14 between `caption` and `body`/`rowTitle` — reach for
+ * it on new screens; existing screens that put a `caption`-styled line under a
+ * title were not mass-migrated to it, and `caption` itself was corrected to
+ * the guide's own "Caption/label: 12" value.
+ *
+ * **The floor is 12px for anything you are meant to read.** 11px (`micro`)
+ * exists only for a tile label and a character counter — two strings the eye
+ * lands on because it already knows where they are, not because it is reading
+ * them — which is exactly the "batas minimum 11–12" floor the guide states
+ * rather than a seventh step on the main ramp.
+ *
+ * Poppins is still the family (max two is the guide's cap; this app uses one),
+ * and the binaries are bundled — every bundle below carries one of
+ * `RamahWeight`'s four named faces, so a style spread from here is already in
+ * the right family and the right weight. A screen that writes a raw
+ * `fontSize`/`fontWeight` pair of its own is a screen rendering in the
+ * platform font; spread a bundle, or at minimum spread the matching
+ * `RamahWeight` entry beside the size.
+ *
+ * **Line height** follows the guide's own ranges rather than a fixed number:
+ * body-weight text (`body`, `subtitle`, `caption`) sits at roughly 1.4–1.45×
+ * its size, and heading-weight text (`rowTitle` and everything above it) at
+ * roughly 1.2–1.3×, tightening slightly at the top of the scale the way a
+ * large numeral's leading usually does.
+ *
+ * **Tracking.** Poppins is a geometric grotesque that reads slightly airy at
+ * heading sizes without it, so −0.01em is applied from `groupTitle` (20) up —
+ * React Native's `letterSpacing` is in points rather than ems, so the em
+ * figure is multiplied out per size and rounded to a tenth. Nothing at or
+ * below 16px is tracked at all, which is `tokens/typography.css`'s own
+ * `--tracking-body` rule; negative tracking on a 12px caption is where
+ * legibility starts to go.
+ *
+ * **Scaling.** Nothing here disables the system's own font-size setting —
+ * there is no blanket `allowFontScaling={false}` anywhere in the app, which is
+ * what actually answers the guide's "pakai sp/Dynamic Type, jangan ukuran
+ * fixed" rule on React Native: an unadorned `Text` already grows with the
+ * user's chosen size. `app/(admin)/kasir.tsx` is the one deliberate exception,
+ * capping growth on the till's own dense numeric chrome with a size-derived
+ * `maxFontSizeMultiplier` — documented there, not a rule to copy elsewhere.
  */
 export const RamahType = {
   /** A money figure or a headline count on a card. The top of the scale. */
-  metric: { fontSize: 22, lineHeight: 26, letterSpacing: -0.2, ...RamahWeight.bold },
-  /** The business name in the identity block. */
-  identity: { fontSize: 20, lineHeight: 26, letterSpacing: -0.2, ...RamahWeight.bold },
+  metric: { fontSize: 30, lineHeight: 36, letterSpacing: -0.3, ...RamahWeight.bold },
+  /** The business name in the identity block, or a screen's own page-level heading. */
+  identity: { fontSize: 24, lineHeight: 30, letterSpacing: -0.2, ...RamahWeight.bold },
   /** A group heading, and the *value* of a form field — they are the same size. */
-  groupTitle: { fontSize: 17, lineHeight: 22, letterSpacing: -0.2, ...RamahWeight.bold },
-  fieldValue: { fontSize: 17, lineHeight: 23, letterSpacing: -0.2, ...RamahWeight.bold },
+  groupTitle: { fontSize: 20, lineHeight: 25, letterSpacing: -0.2, ...RamahWeight.bold },
+  fieldValue: { fontSize: 20, lineHeight: 26, letterSpacing: -0.2, ...RamahWeight.bold },
+  /**
+   * A secondary line directly under a title or identity — "atas nomor faktur",
+   * "unit kerja aktif". One step below the tier above it and meant to read as
+   * quieter through colour (`textBody`/`textMuted`) more than through size.
+   */
+  subtitle: { fontSize: 14, lineHeight: 20, ...RamahWeight.regular },
   /** A list row's title. */
-  rowTitle: { fontSize: 15, lineHeight: 22, ...RamahWeight.semibold },
-  body: { fontSize: 15, lineHeight: 22, ...RamahWeight.regular },
+  rowTitle: { fontSize: 16, lineHeight: 20, ...RamahWeight.semibold },
+  body: { fontSize: 16, lineHeight: 23, ...RamahWeight.regular },
   /** Explanation and metadata. The smallest size a sentence may be set in. */
-  caption: { fontSize: 13, lineHeight: 18, ...RamahWeight.regular },
+  caption: { fontSize: 12, lineHeight: 17, ...RamahWeight.regular },
   /** A field's label — small and grey, above a value that is large and dark. */
-  fieldLabel: { fontSize: 12, lineHeight: 16, ...RamahWeight.semibold },
+  fieldLabel: { fontSize: 12, lineHeight: 15, ...RamahWeight.semibold },
   /** A delta chip: arrow glyph plus a percentage. */
-  delta: { fontSize: 12, lineHeight: 16, ...RamahWeight.semibold },
+  delta: { fontSize: 12, lineHeight: 15, ...RamahWeight.semibold },
   /** Tile labels and character counters. Nothing else may be this small. */
   micro: { fontSize: 11, lineHeight: 14, ...RamahWeight.semibold },
 } as const satisfies Record<string, TextStyle>;

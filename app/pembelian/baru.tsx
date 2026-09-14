@@ -49,6 +49,7 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FotoNotaStep, type HalamanNota } from '@/components/pembelian/foto-nota';
 import { PilihBarangStep, type BarangDipilih } from '@/components/pembelian/pilih-barang';
@@ -83,16 +84,14 @@ export default function PembelianBaruScreen() {
   const router = useRouter();
 
   /**
-   * Only the keyboard, and no safe-area inset at all.
-   *
-   * This screen is inside the Nota tab, and native tabs already spend the bottom
-   * inset for the bar — on Android by wrapping each tab screen in a
-   * `SafeAreaView`. Adding `insets.bottom` here would pay for that edge twice.
-   * What the tab wrapper does *not* know about is the keyboard, which under
-   * edge-to-edge does not resize the window, so a docked pill is simply covered
-   * by it. `useDockPadding(0, gap)` is exactly that half.
+   * Only the bottom inset here — `_layout.tsx` pays top, left and right outside
+   * this screen. `useDockPadding` swaps it for the keyboard's height while the
+   * IME is up: under edge-to-edge Android does not resize the window for it,
+   * so a docked pill would simply be covered by it otherwise, and the two are
+   * alternatives, never a sum.
    */
-  const dockPad = useDockPadding(0, L.cardGap);
+  const insets = useSafeAreaInsets();
+  const dockPad = useDockPadding(insets.bottom, L.cardGap);
 
   const [langkah, setLangkah] = useState<Langkah>('barang');
 

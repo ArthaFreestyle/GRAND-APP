@@ -9,13 +9,14 @@
  * and the bar has exactly three roots. Declared on the **root** stack in
  * `app/_layout.tsx`.
  *
- * Unlike every other section beside the tabs, this one is not reached from a
- * Beranda tile — issue #23's whole point is that it did not exist, so five
- * screens across the app stop dead the moment a unit kerja has no ruang, each
- * with a sentence and nowhere to go. Those five now push here directly. That
- * is also why there is no tile for it yet: a tile earns its place once
- * something routine sends people to it, and today the only paths in are five
- * dead ends and whoever goes looking.
+ * Reached from Beranda's "Unit kerja" tile now (issue #24), which took the
+ * slot "Persetujuan" used to occupy — that tile opened the same route as
+ * Pembelian beside it, so two of the eight led to one screen, and this section
+ * had gone without one since issue #23 built it. Before that tile existed, the
+ * only paths in were five screens across the app that stop dead the moment a
+ * unit kerja has no ruang, each with a sentence and nowhere to go; those five
+ * still push here directly, and still matter for the same reason: a shop that
+ * has never opened this screen can hit one of them first.
  *
  * ## Why this file pads three edges
  *

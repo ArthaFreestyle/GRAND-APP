@@ -23,19 +23,15 @@
  * document it is confirming, which is why it lives in `shell/` rather than under
  * any one section. See `services/alur-dokumen.ts`.
  *
- * ## Why it is a sheet now, and why pembelian got it too
+ * ## Why it is a sheet now
  *
  * It was a centred `ModalShell` over `theme-erp`. It is a `RamahSheet` over
- * `theme-ramah`, because the screens that raise it are being ported one section
- * at a time and this file is shared by all of them — there is no version of this
- * that is right for both palettes at once, and a second copy is how the wording
+ * `theme-ramah` now that every screen that raises it — `penerimaan-susulan`,
+ * `stok-opname`, and pembelian as of issue #24 — has been ported to Ramah. One
+ * shared file rather than one per palette: a second copy is how the wording
  * drifts apart again.
  *
- * So `app/(admin)/pembelian/[id].tsx` now raises a green-accented sheet over a
- * blue-and-gold screen until that section is ported. That is the cheaper
- * inconsistency of the two on offer: the words are identical, the sheet is the
- * shape the system uses everywhere else, and pembelian is next in the queue.
- *
+
  * A sheet rather than a centred card is also the better fit for what this is. It
  * is a question about the document underneath, raised from a button at the foot
  * of the screen; it rises from the same edge the button sits on, and the scrim

@@ -152,14 +152,14 @@ function RootNavigator() {
           Katalog sits **beside** the tabs for the same reason susulan does,
           below — and it moved out the day the till took the middle tab.
 
-          The bar has three roots and the board draws three: Beranda, Kasir,
-          Nota. Katalog is not one of them any more, and a route inside
-          `(admin)` with no `NativeTabs.Trigger` is a route nothing can reach.
-          So it is pushed from the stack that *contains* the tabs, which is also
-          how the board draws the screen itself: `LayarGudang.dc.html` gives
-          Katalog an `AppHeader` with a back arrow to home, not a tab root with
-          no way back. Beranda's metric card and its Katalog tile are what push
-          it, and closing it returns there.
+          The board draws three roots — Beranda, Kasir, Nota — and the bar had
+          three to match until issue #24 (below). Katalog was never one of them:
+          a route inside `(admin)` with no `NativeTabs.Trigger` is a route
+          nothing can reach. So it is pushed from the stack that *contains* the
+          tabs, which is also how the board draws the screen itself:
+          `LayarGudang.dc.html` gives Katalog an `AppHeader` with a back arrow to
+          home, not a tab root with no way back. Beranda's metric card and its
+          Katalog tile are what push it, and closing it returns there.
         */}
         <Stack.Screen name="produk" />
         {/*
@@ -210,6 +210,18 @@ function RootNavigator() {
           sentence and nowhere to go. See `app/pengaturan/_layout.tsx`.
         */}
         <Stack.Screen name="pengaturan" />
+        {/*
+          Nota pembelian, beside the tabs too now — issue #24 moved it off the
+          bar it used to be the third root of. It was not a hard constraint like
+          the six above: a `NativeTabs.Trigger` could still have hosted it. It
+          moved because its docked "Faktur baru" pill was sitting under the bar
+          rather than above it, and because Beranda's own "Pembelian" tile was
+          already a second door to the same screen — the same redundancy that
+          issue had just finished removing from the feature grid itself
+          (`Persetujuan`, folded into the "Diajukan" chip on this list). See
+          `app/pembelian/_layout.tsx`.
+        */}
+        <Stack.Screen name="pembelian" />
       </Stack.Protected>
     </Stack>
   );

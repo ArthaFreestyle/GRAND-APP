@@ -402,9 +402,10 @@ const styles = StyleSheet.create({
     gap: L.space4,
   },
   countRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  // 13/18, not micro. Guide §7 puts the 11px floor under *tile labels and
-  // character counters only* — "teks yang harus dibaca tidak pernah di bawah
-  // 13px" — and how many pages are in hand is read, not glanced at.
+  // `T.caption`, not `T.micro`. Guide §7 puts the 11px floor under *tile
+  // labels and character counters only* — "teks yang harus dibaca tidak
+  // pernah di bawah 13px" — and how many pages are in hand is read, not
+  // glanced at.
   countLabel: { ...T.caption, color: C.textMuted },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: TILE_GAP },

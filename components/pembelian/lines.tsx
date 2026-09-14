@@ -21,23 +21,39 @@
  * dispute nobody wrote down. It may never be *higher*: goods that were not
  * invoiced have no value, and their proportional share of the invoice would
  * corrupt the moving average permanently.
+ *
+ * Ported to Ramah with the rest of the section. `SearchPicker` (a debounced
+ * search that expands inline) is replaced by `RamahPickerField` + the sheet
+ * `RamahSearchSheet` opens over it — the field shows the *answer*, and the
+ * search is a question raised over the screen rather than growing inside the
+ * form. The satuan picker copies the sheet-of-options shape
+ * `components/pembelian/turunan.tsx` already uses for the same choice on the
+ * two documents that hang off this one.
  */
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import Feather from '@expo/vector-icons/Feather';
 
-import { SearchPicker, type PickerOption } from '@/components/shell/search-picker';
 import {
-  Card,
-  CardHead,
-  EmptyState,
-  Field,
-  GhostButton,
-  OptionPicker,
-  SecondaryButton,
-  TextField,
-  TinyButton,
-} from '@/components/shell/ui';
-import { Colors as C, rp, tanggal } from '@/constants/theme-erp';
+  RamahField,
+  RamahIconButton,
+  RamahNote,
+  RamahPickerField,
+  RamahSearchSheet,
+  RamahSecondaryButton,
+  RamahSectionHeader,
+  RamahSheet,
+  RamahSheetOption,
+  type RamahSearchOption,
+} from '@/components/shell/ramah';
+import { formatRupiah, formatTanggal } from '@/constants/produk';
+import {
+  RamahColors as C,
+  RamahIcon,
+  RamahLayout as L,
+  RamahRadius as R,
+  RamahType as T,
+} from '@/constants/theme-ramah';
 import { decimalToNumber, numericToDecimal, rupiahToDecimal } from '@/services/decimal';
 import type { PembelianLine, PembelianLineInput } from '@/services/pembelian';
 import { getProduct, listProducts, listRiwayatBeli } from '@/services/produk';
@@ -257,42 +273,44 @@ export function PembelianLineEditor({
   );
 
   return (
-    <Card>
-      <CardHead
-        title="Baris faktur"
-        right={
-          <Text style={styles.headRight}>
-            {lines.length} baris · subtotal {rp(linesSubtotal(lines))}
+    <View style={styles.group}>
+      <RamahSectionHeader>
+        {`Baris faktur · ${lines.length} baris · subtotal ${formatRupiah(linesSubtotal(lines))}`}
+      </RamahSectionHeader>
+
+      {lines.length === 0 ? (
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyTitle}>Belum ada baris</Text>
+          <Text style={styles.emptySub}>
+            Satu baris per produk yang tertulis di faktur supplier. Dokumen tanpa baris tidak bisa
+            diajukan.
           </Text>
-        }
-      />
-      {lines.map((line, i) => (
-        <LineRow
-          key={line.key}
-          index={i}
-          line={line}
-          idSupplier={idSupplier}
-          pakaiKoli={pakaiKoli}
-          editable={editable}
-          onPatch={patch}
-          onRemove={remove}
-        />
-      ))}
-      {lines.length === 0 && (
-        <EmptyState
-          title="Belum ada baris"
-          sub="Satu baris per produk yang tertulis di faktur supplier. Dokumen tanpa baris tidak bisa diajukan."
-        />
+        </View>
+      ) : (
+        lines.map((line, i) => (
+          <LineRow
+            key={line.key}
+            index={i}
+            line={line}
+            idSupplier={idSupplier}
+            pakaiKoli={pakaiKoli}
+            editable={editable}
+            onPatch={patch}
+            onRemove={remove}
+          />
+        ))
       )}
+
       {editable && (
         <View style={styles.addBar}>
-          <SecondaryButton
-            label="+ Tambah baris"
+          <RamahSecondaryButton
+            label="Tambah baris"
+            icon="plus"
             onPress={() => onChange((prev) => [...prev, emptyLine()])}
           />
         </View>
       )}
-    </Card>
+    </View>
   );
 }
 
@@ -314,8 +332,10 @@ function LineRow({
   onRemove: (key: string) => void;
 }) {
   const [loadingSatuan, setLoadingSatuan] = useState(false);
+  const [productSheet, setProductSheet] = useState(false);
+  const [satuanSheet, setSatuanSheet] = useState(false);
 
-  const cariProduk = useCallback(async (term: string): Promise<PickerOption[]> => {
+  const cariProduk = useCallback(async (term: string): Promise<RamahSearchOption[]> => {
     const page = await listProducts({ search: term || undefined, size: CARI_SIZE, is_aktif: true });
     return page.data.map((p) => ({ value: String(p.id), label: p.nama, sub: p.kode }));
   }, []);
@@ -329,7 +349,7 @@ function LineRow({
    * missing hint is not worth blocking an entry over.
    */
   const pickProduct = useCallback(
-    async (option: PickerOption) => {
+    async (option: RamahSearchOption) => {
       const id = Number(option.value);
       setLoadingSatuan(true);
       try {
@@ -361,7 +381,7 @@ function LineRow({
           const perDasar = decimalToNumber(last.harga_satuan_dasar);
           onPatch(line.key, {
             harga: String(Math.round(perDasar * chosen.faktor)),
-            riwayat: `Terakhir ${rp(perDasar)}/${last.nama_satuan_dasar ?? ''} · ${tanggal(last.tanggal)}`,
+            riwayat: `Terakhir ${formatRupiah(perDasar)}/${last.nama_satuan_dasar ?? ''} · ${formatTanggal(last.tanggal)}`,
           });
         } catch {
           // No hint, no harm.
@@ -384,6 +404,7 @@ function LineRow({
       onPatch(line.key, {
         satuan: detail.satuan.map((s) => ({ id: s.idSatuan, nama: s.nama, faktor: s.faktor })),
       });
+      setSatuanSheet(true);
     } catch {
       // Leaving `satuan` null keeps the stored unit on screen, which is correct.
     } finally {
@@ -393,172 +414,239 @@ function LineRow({
 
   const faktor = line.satuan?.find((s) => s.id === line.idSatuanInput)?.faktor ?? null;
   const kurang =
-    line.qtyDiterima.trim() !== '' && Number(line.qtyDiterima.replace(',', '.')) !== Number(line.qtyFaktur.replace(',', '.'));
+    line.qtyDiterima.trim() !== '' &&
+    Number(line.qtyDiterima.replace(',', '.')) !== Number(line.qtyFaktur.replace(',', '.'));
 
   return (
     <View style={styles.lineBox}>
       <View style={styles.lineTop}>
-        <Text style={styles.lineNo}>#{index + 1}</Text>
-        <View style={{ flex: 1, minWidth: 220 }}>
-          {editable ? (
-            <SearchPicker
-              chosen={line.idProduct === null ? null : `${line.kode} · ${line.nama}`}
-              onPick={pickProduct}
-              search={cariProduk}
-              placeholder="Cari nama atau kode barang"
-              emptyHint="Tidak ada produk aktif yang cocok."
-            />
-          ) : (
-            <Text style={styles.readNama}>
-              {line.kode} · {line.nama}
-            </Text>
-          )}
+        <Text style={styles.lineNo}>{`#${index + 1}`}</Text>
+        <View style={styles.grow}>
+          <RamahPickerField
+            label="Produk"
+            value={line.idProduct === null ? '' : `${line.kode} · ${line.nama}`}
+            placeholder="Cari nama atau kode barang"
+            locked={!editable}
+            onPress={() => setProductSheet(true)}
+          />
         </View>
-        {editable && <TinyButton label="Hapus" danger onPress={() => onRemove(line.key)} />}
+        {editable && (
+          <RamahIconButton
+            icon="trash-2"
+            label={`Hapus baris ${index + 1}`}
+            onPress={() => onRemove(line.key)}
+            color={C.danger}
+          />
+        )}
       </View>
 
-      {line.riwayat !== '' && <Text style={styles.riwayat}>{line.riwayat}</Text>}
+      {line.riwayat !== '' ? <RamahNote icon="clock">{line.riwayat}</RamahNote> : null}
 
       <View style={styles.fieldRow}>
-        <View style={{ flexGrow: 1, flexBasis: 150 }}>
-          <Field label="SATUAN">
-            {loadingSatuan ? (
-              <View style={styles.readout}>
-                <ActivityIndicator color={C.primary} />
-              </View>
-            ) : line.satuan === null ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <View style={[styles.readout, { flex: 1 }]}>
-                  <Text style={styles.readoutText}>{line.namaSatuan || '—'}</Text>
-                </View>
-                {editable && line.idProduct !== null && (
-                  <GhostButton label="Ganti" onPress={loadSatuan} />
-                )}
-              </View>
-            ) : (
-              <OptionPicker
-                options={line.satuan.map((s) => ({
-                  value: String(s.id),
-                  label: s.faktor === 1 ? s.nama : `${s.nama} (×${s.faktor})`,
-                }))}
-                value={line.idSatuanInput === null ? null : String(line.idSatuanInput)}
-                onChange={(v) => {
-                  const picked = line.satuan?.find((s) => s.id === Number(v));
-                  onPatch(line.key, {
-                    idSatuanInput: Number(v),
-                    namaSatuan: picked?.nama ?? '',
-                  });
-                }}
-              />
-            )}
-          </Field>
-        </View>
-        <View style={{ flexGrow: 1, flexBasis: 110 }}>
-          <Field
-            label="QTY FAKTUR"
-            hint={faktor !== null && faktor !== 1 ? `×${faktor} satuan dasar` : undefined}>
-            <TextField
-              value={line.qtyFaktur}
-              onChangeText={(v) => onPatch(line.key, { qtyFaktur: v })}
-              keyboardType="numeric"
-              placeholder="0"
+        <View style={styles.fieldCell}>
+          <Text style={styles.miniLabel}>Satuan</Text>
+          {loadingSatuan ? (
+            <ActivityIndicator color={C.brand} style={styles.satuanLoading} />
+          ) : (
+            <SatuanChip
+              nama={line.namaSatuan}
               editable={editable}
+              onPress={
+                line.satuan === null ? () => void loadSatuan() : () => setSatuanSheet(true)
+              }
             />
-          </Field>
+          )}
         </View>
-        <View style={{ flexGrow: 1, flexBasis: 110 }}>
-          <Field label="QTY DITERIMA" hint="kosong = sama">
-            <TextField
-              value={line.qtyDiterima}
-              onChangeText={(v) => onPatch(line.key, { qtyDiterima: v })}
-              keyboardType="numeric"
-              placeholder={line.qtyFaktur || '0'}
-              editable={editable}
-            />
-          </Field>
+        <View style={styles.fieldCell}>
+          <RamahField
+            label="Qty faktur"
+            value={line.qtyFaktur}
+            onChangeText={(v) => onPatch(line.key, { qtyFaktur: v })}
+            keyboardType="numeric"
+            placeholder="0"
+            editable={editable}
+            helper={faktor !== null && faktor !== 1 ? `×${faktor} satuan dasar` : undefined}
+          />
         </View>
-        <View style={{ flexGrow: 1, flexBasis: 140 }}>
-          <Field label="HARGA / SATUAN">
-            <TextField
-              value={line.harga}
-              onChangeText={(v) => onPatch(line.key, { harga: v })}
-              keyboardType="numeric"
-              placeholder="0"
-              editable={editable}
-            />
-          </Field>
+        <View style={styles.fieldCell}>
+          <RamahField
+            label="Qty diterima"
+            value={line.qtyDiterima}
+            onChangeText={(v) => onPatch(line.key, { qtyDiterima: v })}
+            keyboardType="numeric"
+            placeholder={line.qtyFaktur || '0'}
+            editable={editable}
+            helper="Kosong berarti sama dengan qty faktur"
+          />
         </View>
-        <View style={{ flexGrow: 1, flexBasis: 120 }}>
-          <Field label="DISKON BARIS">
-            <TextField
-              value={line.diskon}
-              onChangeText={(v) => onPatch(line.key, { diskon: v })}
-              keyboardType="numeric"
-              placeholder="0"
-              editable={editable}
-            />
-          </Field>
+        <View style={styles.fieldCell}>
+          <RamahField
+            label="Harga / satuan"
+            prefix="Rp"
+            value={line.harga}
+            onChangeText={(v) => onPatch(line.key, { harga: v })}
+            keyboardType="numeric"
+            placeholder="0"
+            editable={editable}
+          />
+        </View>
+        <View style={styles.fieldCell}>
+          <RamahField
+            label="Diskon baris"
+            prefix="Rp"
+            value={line.diskon}
+            onChangeText={(v) => onPatch(line.key, { diskon: v })}
+            keyboardType="numeric"
+            placeholder="0"
+            editable={editable}
+          />
         </View>
         {pakaiKoli && (
-          <View style={{ flexGrow: 1, flexBasis: 110 }}>
-            <Field label="JUMLAH KOLI">
-              <TextField
-                value={line.koli}
-                onChangeText={(v) => onPatch(line.key, { koli: v })}
-                keyboardType="numeric"
-                placeholder="0"
-                editable={editable}
-              />
-            </Field>
+          <View style={styles.fieldCell}>
+            <RamahField
+              label="Jumlah koli"
+              value={line.koli}
+              onChangeText={(v) => onPatch(line.key, { koli: v })}
+              keyboardType="numeric"
+              placeholder="0"
+              editable={editable}
+            />
           </View>
         )}
       </View>
 
       {kurang && (
-        <Field label="KETERANGAN SELISIH">
-          <TextField
-            value={line.keterangan}
-            onChangeText={(v) => onPatch(line.key, { keterangan: v })}
-            placeholder="Kurang 5 pcs, supplier janji kirim susulan minggu depan"
-            editable={editable}
-            multiline
-          />
-        </Field>
+        <RamahField
+          label="Keterangan selisih"
+          required
+          value={line.keterangan}
+          onChangeText={(v) => onPatch(line.key, { keterangan: v })}
+          placeholder="Kurang 5 pcs, supplier janji kirim susulan minggu depan"
+          editable={editable}
+          multiline
+        />
       )}
 
       <View style={styles.lineFoot}>
         <Text style={styles.lineFootLabel}>Subtotal baris</Text>
-        <Text style={styles.lineFootValue}>{rp(lineSubtotal(line))}</Text>
+        <Text style={styles.lineFootValue}>{formatRupiah(lineSubtotal(line))}</Text>
       </View>
+
+      <RamahSearchSheet
+        visible={productSheet}
+        title="Cari produk"
+        onClose={() => setProductSheet(false)}
+        search={cariProduk}
+        onPick={(o) => void pickProduct(o)}
+        placeholder="Cari nama atau kode barang"
+        emptyHint="Tidak ada produk aktif yang cocok."
+      />
+
+      <RamahSheet
+        visible={satuanSheet}
+        title={`Satuan ${line.nama || line.kode}`}
+        onClose={() => setSatuanSheet(false)}>
+        {(line.satuan ?? []).map((s) => (
+          <RamahSheetOption
+            key={s.id}
+            label={s.faktor === 1 ? s.nama : `${s.nama} (×${s.faktor})`}
+            selected={s.id === line.idSatuanInput}
+            onPress={() => {
+              onPatch(line.key, { idSatuanInput: s.id, namaSatuan: s.nama });
+              setSatuanSheet(false);
+            }}
+          />
+        ))}
+      </RamahSheet>
     </View>
   );
 }
 
+/** The unit chip beside the qty fields — a read-only pill when the row cannot be edited. */
+function SatuanChip({
+  nama,
+  editable,
+  onPress,
+}: {
+  nama: string;
+  editable: boolean;
+  onPress: () => void;
+}) {
+  const [down, setDown] = useState(false);
+  return (
+    <Pressable
+      onPress={editable ? onPress : undefined}
+      onPressIn={() => setDown(true)}
+      onPressOut={() => setDown(false)}
+      disabled={!editable}
+      accessibilityRole="button"
+      accessibilityLabel={`Satuan ${nama || '—'}${editable ? '. Ganti satuan' : ''}`}
+      style={[styles.satuanChip, down && editable && styles.satuanChipDown]}>
+      <Text style={styles.satuanChipText} numberOfLines={1}>
+        {nama || '—'}
+      </Text>
+      {editable ? <Feather name="chevron-down" size={RamahIcon.meta} color={C.iconMuted} /> : null}
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
-  headRight: { fontSize: 13.5, color: C.muted3 },
-  lineBox: {
-    gap: 12,
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: C.borderLighter,
-  },
-  lineTop: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
-  lineNo: { fontSize: 13, fontWeight: '700', color: C.muted2, width: 28 },
-  readNama: { fontSize: 15.5, fontWeight: '500', color: C.text },
-  riwayat: { fontSize: 12.5, color: C.muted3, marginLeft: 40 },
-  fieldRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  readout: {
-    minHeight: 40,
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-    borderRadius: 9,
+  grow: { flex: 1, minWidth: 0 },
+  group: { gap: L.cardGap },
+
+  emptyCard: {
+    backgroundColor: C.surfaceCard,
     borderWidth: 1,
-    borderColor: C.borderLight,
-    backgroundColor: C.tableHeaderBg,
+    borderColor: C.borderHairline,
+    borderRadius: R.card,
+    padding: L.cardPad,
+    gap: L.space1,
   },
-  readoutText: { fontSize: 14, color: C.dark2 },
-  lineFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 14 },
-  lineFootLabel: { fontSize: 13, color: C.muted3 },
-  lineFootValue: { fontSize: 16, fontWeight: '700', color: C.text },
-  addBar: { padding: 14, alignItems: 'flex-start' },
+  emptyTitle: { ...T.rowTitle, color: C.textTitle },
+  emptySub: { ...T.caption, color: C.textBody },
+
+  lineBox: {
+    backgroundColor: C.surfaceCard,
+    borderWidth: 1,
+    borderColor: C.borderHairline,
+    borderRadius: R.card,
+    padding: L.cardPad,
+    gap: L.space3,
+  },
+  lineTop: { flexDirection: 'row', alignItems: 'flex-end', gap: L.space2 },
+  lineNo: { ...T.caption, color: C.textMuted, paddingBottom: 10 },
+
+  fieldRow: { flexDirection: 'row', flexWrap: 'wrap', gap: L.space3 },
+  fieldCell: { flexGrow: 1, flexBasis: 130 },
+  miniLabel: { ...T.fieldLabel, color: C.textBody, marginBottom: 6 },
+  satuanLoading: { alignSelf: 'flex-start' },
+
+  satuanChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    height: L.controlHSm,
+    paddingHorizontal: 14,
+    borderRadius: R.pill,
+    borderWidth: 1.5,
+    borderColor: C.borderHairline,
+    backgroundColor: C.white,
+  },
+  satuanChipDown: { backgroundColor: C.surfaceStack },
+  satuanChipText: { ...T.caption, color: C.textTitle },
+
+  lineFoot: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: L.space3,
+    borderTopWidth: 1,
+    borderTopColor: C.borderHairline,
+    paddingTop: L.space2,
+  },
+  lineFootLabel: { ...T.caption, color: C.textBody },
+  lineFootValue: { ...T.rowTitle, color: C.textTitle },
+
+  addBar: { alignItems: 'flex-start' },
 });

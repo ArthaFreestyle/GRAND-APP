@@ -1,0 +1,534 @@
+/**
+ * Pembelian — the list of purchase documents.
+ *
+ * Search, both status filters, and paging are server-side: `GET /pembelian`
+ * takes `page`, `size`, `search`, `status`, `status_penerimaan`, `id_supplier`,
+ * and a date range. `search` matches the document number **or** the supplier's
+ * invoice number — not the supplier's name, which the old in-memory filter did
+ * match and this one honestly cannot.
+ *
+ * **The chips are the document's own status.** They used to read
+ * "lunas / belum lunas", computed from a `dibayar` column that the contract does
+ * not have: money out is `/pembayaran-utang`, a separate document group with its
+ * own allocations and posting. What a pembelian knows about payment is the
+ * server-side `status_pembayaran` cache, which rides along as a field.
+ *
+ * **The three KPI tiles are gone.** "Total hutang berjalan" summed the whole
+ * seeded dataset; a paged endpoint hands over twenty rows and a count, and
+ * summing those would put a confident rupiah figure on screen that means the
+ * page rather than the books. The supplier detail has the real balance, one
+ * supplier at a time, from `GET /supplier/{id}/utang`.
+ *
+ * **The table is gone too.** Four fixed columns wanted 880pt; a phone has ~354.
+ * Ported to Ramah alongside `app/penerimaan-susulan/index.tsx`, which this
+ * screen now matches shape for shape: a docked green pill, cards assembled row
+ * by row rather than through `RamahStackCard` (this list appends pages, and
+ * wrapping every row in one element would give up the windowing a `FlatList`
+ * does), and a second caption line that prints only what is actually worth
+ * chasing — a short delivery, an unpaid POSTED invoice — rather than repeating
+ * "Diterima lengkap" or "Lunas" on rows where it says nothing.
+ *
+ * **This section sits beside the tabs, not inside them — see `_layout.tsx`.**
+ * It was the third tab root until this screen's own docked pill turned up
+ * sitting under the bar rather than above it, and Beranda's "Pembelian" tile
+ * was already a second, redundant door to the same place. Reached now the way
+ * Katalog is: pushed from Beranda, with a back arrow rather than a tab.
+ *
+ * Opening a document and creating one are routes (`[id]` and `baru`), so this
+ * screen keeps its rows, its pages, and its scroll while either is on top of it.
+ * What happens up there arrives over `pembelianBus`.
+ */
+import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Feather from '@expo/vector-icons/Feather';
+
+import {
+  RamahBadge,
+  RamahChip,
+  RamahHeader,
+  RamahInlineError,
+  RamahPrimaryButton,
+  RamahSearchField,
+} from '@/components/shell/ramah';
+import { BAYAR_META, DOKUMEN_RAMAH } from '@/components/shell/status-dokumen';
+import { formatRupiah, formatTanggal } from '@/constants/produk';
+import {
+  RamahColors as C,
+  RamahIcon,
+  RamahLayout as L,
+  RamahRadius as R,
+  RamahTileTone,
+  RamahType as T,
+} from '@/constants/theme-ramah';
+import { useDockPadding } from '@/hooks/use-keyboard-height';
+import { useRecordBus } from '@/hooks/use-record-bus';
+import { messageOf } from '@/services/api';
+import { decimalToNumber } from '@/services/decimal';
+import {
+  listPembelian,
+  pembelianBus,
+  type PembelianRow,
+  type StatusDokumen,
+  type StatusPenerimaan,
+} from '@/services/pembelian';
+import { useCanWrite } from '@/services/permissions';
+
+const PAGE_SIZE = 20;
+const SEARCH_DEBOUNCE_MS = 350;
+
+type StatusFilter = 'semua' | StatusDokumen;
+type TerimaFilter = 'semua' | StatusPenerimaan;
+
+const STATUS_OPTIONS: { key: StatusFilter; label: string }[] = [
+  { key: 'semua', label: 'Semua' },
+  { key: 'DRAFT', label: 'Draft' },
+  { key: 'DIAJUKAN', label: 'Diajukan' },
+  { key: 'POSTED', label: 'Posted' },
+  { key: 'BATAL', label: 'Batal' },
+];
+
+/**
+ * A real query parameter, and the closest thing the contract has to a work
+ * queue: `KURANG` is every document still owed goods, which is what a follow-up
+ * delivery gets chased from.
+ */
+const TERIMA_OPTIONS: { key: TerimaFilter; label: string }[] = [
+  { key: 'semua', label: 'Semua kiriman' },
+  { key: 'KURANG', label: 'Kiriman kurang' },
+  { key: 'LENGKAP', label: 'Lengkap' },
+];
+
+export default function PembelianListScreen() {
+  const router = useRouter();
+  const canWrite = useCanWrite('pembelian');
+  /**
+   * Only the bottom inset here — `_layout.tsx` pays top, left and right outside
+   * this screen, the same box `produk` and `pengaturan` use. `useDockPadding`
+   * swaps it for the keyboard's height while the IME is up, because under
+   * edge-to-edge Android does not resize the window for it and the two are
+   * alternatives, never a sum.
+   */
+  const insets = useSafeAreaInsets();
+  const dockPad = useDockPadding(insets.bottom, L.cardGap);
+
+  const [rows, setRows] = useState<PembelianRow[]>([]);
+  const [listErr, setListErr] = useState('');
+
+  const [query, setQuery] = useState('');
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState<StatusFilter>('semua');
+  const [terima, setTerima] = useState<TerimaFilter>('semua');
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [moreErr, setMoreErr] = useState('');
+  const [reloadToken, setReloadToken] = useState(0);
+
+  /**
+   * Loading is derived — "the key I want loaded" against "the key I have
+   * loaded" — the shape `app/produk/index.tsx` established, rather than a
+   * `setLoading(true)` written at the top of the fetch effect. That used to
+   * carry an `eslint-disable-next-line react-hooks/set-state-in-effect` here,
+   * queued for exactly this port.
+   */
+  const requestKey = `${search}|${status}|${terima}|${reloadToken}`;
+  const [loadedKey, setLoadedKey] = useState('');
+  const listLoading = loadedKey !== requestKey;
+
+  const reloadList = useCallback(() => setReloadToken((n) => n + 1), []);
+
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(query.trim()), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const result = await listPembelian({
+          page: 1,
+          size: PAGE_SIZE,
+          search: search || undefined,
+          status: status === 'semua' ? undefined : status,
+          statusPenerimaan: terima === 'semua' ? undefined : terima,
+        });
+        if (!alive) return;
+        setRows(result.data);
+        setPage(1);
+        setHasMore(Math.max(1, result.paging.total_page ?? 1) > 1);
+        setListErr('');
+      } catch (e) {
+        if (!alive) return;
+        setRows([]);
+        setHasMore(false);
+        setListErr(messageOf(e, 'Gagal memuat daftar pembelian.'));
+      } finally {
+        if (alive) {
+          setMoreErr('');
+          setLoadedKey(requestKey);
+        }
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [search, status, terima, reloadToken, requestKey]);
+
+  // What the detail did while this screen sat underneath it. A posted or
+  // cancelled document is patched into the rows already on screen; a new one
+  // could be anywhere in a list sorted by date, so it re-reads.
+  //
+  // A patch can leave a row that no longer belongs under the active chip — a
+  // draft submitted while "Draft" is selected. It is left visible on purpose:
+  // silently vanishing the record someone just acted on reads as a bug, and the
+  // next reload settles it honestly.
+  useRecordBus(pembelianBus, (change) => {
+    if (change.kind === 'reload') {
+      reloadList();
+      return;
+    }
+    const saved = change.row;
+    setRows((list) => list.map((r) => (r.id === saved.id ? saved : r)));
+  });
+
+  const loadMore = useCallback(
+    async (force = false) => {
+      if (loadingMore || listLoading || !hasMore) return;
+      if (!force && moreErr !== '') return;
+      setLoadingMore(true);
+      const next = page + 1;
+      try {
+        const result = await listPembelian({
+          page: next,
+          size: PAGE_SIZE,
+          search: search || undefined,
+          status: status === 'semua' ? undefined : status,
+          statusPenerimaan: terima === 'semua' ? undefined : terima,
+        });
+        // Offset paging, no cursor: a document posted while the reader is
+        // scrolling shifts the window and the same row can arrive twice.
+        setRows((list) => {
+          const seen = new Set(list.map((x) => x.id));
+          return [...list, ...result.data.filter((x) => !seen.has(x.id))];
+        });
+        setPage(next);
+        setHasMore(next < Math.max(1, result.paging.total_page ?? 1));
+        setMoreErr('');
+      } catch (e) {
+        setMoreErr(messageOf(e, 'Gagal memuat halaman berikutnya.'));
+      } finally {
+        setLoadingMore(false);
+      }
+    },
+    [loadingMore, listLoading, hasMore, moreErr, page, search, status, terima]
+  );
+
+  const openDetail = useCallback(
+    (id: number) => {
+      router.push({ pathname: '/pembelian/[id]', params: { id } });
+    },
+    [router]
+  );
+
+  const goBack = useCallback(() => {
+    // `dismiss()` targets this section's own Stack; `back()` is offered to
+    // whatever navigator sits above it first, which for a section pushed over
+    // the tabs may answer by switching tabs instead of popping this screen.
+    // The `replace` covers a cold deep link with nothing to pop at all.
+    if (router.canDismiss()) router.dismiss();
+    else router.replace('/beranda');
+  }, [router]);
+
+  const renderRow = useCallback(
+    ({ item, index }: { item: PembelianRow; index: number }) => (
+      <PembelianCard
+        row={item}
+        first={index === 0}
+        last={index === rows.length - 1}
+        onPress={openDetail}
+      />
+    ),
+    [rows.length, openDetail]
+  );
+
+  const filtered = search !== '' || status !== 'semua' || terima !== 'semua';
+
+  return (
+    <View style={styles.screen}>
+      <RamahHeader title="Pembelian" onBack={goBack} />
+
+      <FlatList
+        data={rows}
+        keyExtractor={(r) => String(r.id)}
+        renderItem={renderRow}
+        style={styles.list}
+        contentContainerStyle={styles.listContent}
+        keyboardShouldPersistTaps="handled"
+        onEndReached={() => loadMore()}
+        onEndReachedThreshold={0.4}
+        ListHeaderComponent={
+          <View style={styles.controls}>
+            <RamahSearchField
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Cari nomor dokumen atau no. faktur supplier"
+            />
+            {/* Two rows, each its own horizontal scroll: wrapped, five status
+                chips plus three kiriman chips push to two lines on a ~354pt
+                phone, and a filter block that changes height as it is used
+                shoves the first record up and down under the reader's thumb. */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.chipRow}>
+              {STATUS_OPTIONS.map((o) => (
+                <RamahChip
+                  key={o.key}
+                  label={o.label}
+                  selected={status === o.key}
+                  onPress={() => setStatus(o.key)}
+                />
+              ))}
+            </ScrollView>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.chipRow}>
+              {TERIMA_OPTIONS.map((o) => (
+                <RamahChip
+                  key={o.key}
+                  label={o.label}
+                  selected={terima === o.key}
+                  onPress={() => setTerima(o.key)}
+                />
+              ))}
+            </ScrollView>
+            {listErr ? <RamahInlineError message={listErr} onRetry={reloadList} /> : null}
+          </View>
+        }
+        ListEmptyComponent={
+          <ListPlaceholder loading={listLoading} error={listErr} filtered={filtered} />
+        }
+        ListFooterComponent={
+          <ListFooter
+            loading={loadingMore}
+            error={moreErr}
+            onRetry={() => loadMore(true)}
+          />
+        }
+      />
+
+      {canWrite ? (
+        <View style={[styles.dock, { paddingBottom: dockPad }]}>
+          <RamahPrimaryButton
+            label="Faktur baru"
+            icon="plus"
+            onPress={() => router.push('/pembelian/baru')}
+          />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * One document, as a card.
+ *
+ * The supplier is the title because that is what anyone hunting a paper
+ * invoice on a desk actually remembers; the document number and the date are
+ * the line under it, along with the supplier's own invoice number when there
+ * is one — the other thing that gets matched against paper.
+ *
+ * The second caption line is the layout-economy rule applied to this row:
+ * "Diterima lengkap" on nine rows out of ten is a column that says nothing, so
+ * it prints only when there is something to chase — a short delivery, or an
+ * invoice that has been posted and is not yet settled.
+ */
+function PembelianCard({
+  row,
+  first,
+  last,
+  onPress,
+}: {
+  row: PembelianRow;
+  first: boolean;
+  last: boolean;
+  onPress: (id: number) => void;
+}) {
+  const [down, setDown] = useState(false);
+  const meta = DOKUMEN_RAMAH[row.status];
+  const total = formatRupiah(decimalToNumber(row.total));
+
+  const catatan: string[] = [];
+  if (row.statusTerima === 'KURANG') catatan.push('Kiriman kurang');
+  if (row.status === 'POSTED' && row.statusBayar !== 'LUNAS') {
+    catatan.push(BAYAR_META[row.statusBayar].label);
+  }
+
+  return (
+    <View style={[styles.card, first && styles.cardFirst, last && styles.cardLast]}>
+      {first ? null : <View style={styles.divider} />}
+      <Pressable
+        onPress={() => onPress(row.id)}
+        onPressIn={() => setDown(true)}
+        onPressOut={() => setDown(false)}
+        accessibilityRole="button"
+        accessibilityLabel={`${row.namaSupplier || 'Tanpa pemasok'}, ${row.nomor}, ${total}, ${meta.label}${
+          catatan.length ? `, ${catatan.join(', ')}` : ''
+        }`}
+        style={[styles.row, down && styles.rowDown]}>
+        <View style={styles.rowIcon}>
+          <Feather name="file-text" size={RamahIcon.row} color={RamahTileTone.dokumen.ink} />
+        </View>
+        <View style={styles.grow}>
+          <Text style={styles.rowTitle} numberOfLines={1}>
+            {row.namaSupplier || '—'}
+          </Text>
+          <Text style={styles.rowSub} numberOfLines={1}>
+            {`${row.nomor} · ${formatTanggal(row.tanggal)}${
+              row.noFakturSupplier ? ` · faktur ${row.noFakturSupplier}` : ''
+            }`}
+          </Text>
+          {catatan.length ? (
+            <Text style={styles.rowNote} numberOfLines={1}>
+              {catatan.join(' · ')}
+            </Text>
+          ) : null}
+        </View>
+        <View style={styles.rowRight}>
+          <Text style={styles.rowValue} numberOfLines={1}>
+            {total}
+          </Text>
+          <RamahBadge label={meta.label} tone={meta.tone} />
+        </View>
+      </Pressable>
+    </View>
+  );
+}
+
+function ListPlaceholder({
+  loading,
+  error,
+  filtered,
+}: {
+  loading: boolean;
+  error: string;
+  filtered: boolean;
+}) {
+  if (loading) {
+    return (
+      <View style={styles.placeholder}>
+        <ActivityIndicator color={C.brand} />
+      </View>
+    );
+  }
+  // The error already has its own line above the list, with the retry on it.
+  if (error) return null;
+  return (
+    <View style={styles.placeholder}>
+      <Text style={styles.placeholderTitle}>
+        {filtered ? 'Tidak ada yang cocok' : 'Belum ada faktur pembelian'}
+      </Text>
+      <Text style={styles.placeholderSub}>
+        {filtered
+          ? 'Coba kata kunci lain, atau lepas filternya.'
+          : 'Dokumen pembelian yang dibuat di unit kerja sesi ini akan terdaftar di sini.'}
+      </Text>
+    </View>
+  );
+}
+
+function ListFooter({
+  loading,
+  error,
+  onRetry,
+}: {
+  loading: boolean;
+  error: string;
+  onRetry: () => void;
+}) {
+  if (error) {
+    return (
+      <View style={styles.footer}>
+        <RamahInlineError message={error} onRetry={onRetry} />
+      </View>
+    );
+  }
+  if (!loading) return null;
+  return (
+    <View style={styles.footer}>
+      <ActivityIndicator color={C.brand} />
+    </View>
+  );
+}
+
+/**
+ * No top, left or right inset here: `_layout.tsx` pays all three for the
+ * section, outside the navigator. The bottom is this screen's own and is read
+ * in the component — an inset is a runtime value and is often zero.
+ */
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: C.surfaceSunken },
+  grow: { flex: 1, minWidth: 0 },
+
+  list: { flex: 1 },
+  listContent: { paddingHorizontal: L.gutter, paddingBottom: L.space6 },
+
+  controls: { gap: L.cardGap, paddingTop: L.space1, paddingBottom: L.cardGap },
+  chipRow: { gap: 10, paddingRight: L.gutter },
+
+  // The group card, assembled row by row rather than with `RamahStackCard`:
+  // this list appends pages, and wrapping every row in one element would give
+  // up the windowing a `FlatList` does. Each row draws the edges it owns.
+  card: {
+    backgroundColor: C.surfaceCard,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: C.borderHairline,
+    overflow: 'hidden',
+  },
+  cardFirst: { borderTopWidth: 1, borderTopLeftRadius: R.card, borderTopRightRadius: R.card },
+  cardLast: { borderBottomWidth: 1, borderBottomLeftRadius: R.card, borderBottomRightRadius: R.card },
+  divider: { height: 1, backgroundColor: C.borderHairline, marginHorizontal: L.cardPad },
+
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: L.space3,
+    padding: L.cardPad,
+    minHeight: L.rowH,
+  },
+  rowDown: { backgroundColor: C.surfaceStack },
+  rowIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: R.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: RamahTileTone.dokumen.tint,
+  },
+  rowTitle: { ...T.rowTitle, color: C.textTitle },
+  rowSub: { ...T.caption, color: C.textMuted, marginTop: 2 },
+  rowNote: { ...T.caption, color: C.orange600, marginTop: 2 },
+  rowRight: { flexShrink: 0, maxWidth: 148, alignItems: 'flex-end', gap: 6 },
+  rowValue: { ...T.rowTitle, color: C.textTitle, textAlign: 'right' },
+
+  placeholder: { paddingTop: L.space10, gap: L.space2, alignItems: 'center' },
+  placeholderTitle: { ...T.groupTitle, color: C.textTitle, textAlign: 'center' },
+  placeholderSub: { ...T.caption, color: C.textBody, textAlign: 'center' },
+
+  footer: { paddingVertical: L.space4, alignItems: 'center' },
+
+  dock: {
+    paddingHorizontal: L.gutter,
+    paddingTop: 10,
+    backgroundColor: C.surfacePage,
+    borderTopWidth: 1,
+    borderTopColor: C.borderHairline,
+  },
+});

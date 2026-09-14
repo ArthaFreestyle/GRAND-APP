@@ -20,7 +20,7 @@
  *
  * The second half of the board's claim stands: `ocr_id` has nothing behind it,
  * because `POST /ocr/faktur` does not exist. That gap is named where it bites,
- * in `app/(admin)/pembelian/baru.tsx`, not papered over here.
+ * in `app/pembelian/baru.tsx`, not papered over here.
  *
  * ## The orphan tray is a real feature, not a leak
  *

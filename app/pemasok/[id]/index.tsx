@@ -373,6 +373,6 @@ const styles = StyleSheet.create({
   barisLabel: { ...T.fieldLabel, color: C.textBody },
   barisValue: { ...T.body, color: C.textTitle },
 
-  // Metadata is 13/18 in the merchant scale, not 11/14.
+  // `T.caption`, the merchant scale's metadata size — not `T.micro`.
   jejak: { ...T.caption, color: C.textMuted, paddingTop: L.space2 },
 });

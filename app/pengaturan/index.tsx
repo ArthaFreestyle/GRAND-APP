@@ -8,9 +8,13 @@
  * screen's entire job. Tapping a row opens it and its ruang; the docked pill
  * adds a new one.
  *
- * There is no tile that leads here yet — see `_layout.tsx` for why — so every
- * arrival today is either the five dead ends this issue closes or somebody who
- * came looking on purpose.
+ * Reached from Beranda's "Unit kerja" tile (issue #24) as well as the five
+ * dead-end screens this issue's own #23 closes — see `_layout.tsx` for both.
+ *
+ * The tile is drawn for every role, same as the rest of the grid: Beranda
+ * branches on nothing, and `useCanWrite('unit-kerja')` below is what keeps the
+ * docked "Tambah unit kerja" pill off a grant that cannot use it, not whether
+ * the screen opens at all.
  */
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';

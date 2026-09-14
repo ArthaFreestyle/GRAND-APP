@@ -28,9 +28,11 @@
  * small print on a faktur is to look at the paper, which is by definition in the
  * room.
  *
- * This component is drawn with `components/shell/ui.tsx` and `theme-erp`, not
- * with Ramah, because the screen it sits inside still is. The two never meet in
- * one screen; when pembelian is ported, this card ports with it.
+ * Ported to Ramah with the rest of the section. It is drawn as a plain white
+ * group card rather than through `RamahStackCard` — a strip of thumbnails is not
+ * a stack of rows — and the viewer stays React Native's own `Modal`: it is its
+ * own full-screen window, outside every padded box and every sheet the section
+ * uses elsewhere.
  */
 import Feather from '@expo/vector-icons/Feather';
 import { Image } from 'expo-image';
@@ -38,8 +40,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Card, CardHead, EmptyState, GhostButton } from '@/components/shell/ui';
-import { Colors as C } from '@/constants/theme-erp';
+import { RamahInlineError, RamahSectionHeader } from '@/components/shell/ramah';
+import { RamahColors as C, RamahLayout as L, RamahRadius as R, RamahType as T } from '@/constants/theme-ramah';
 import { messageOf } from '@/services/api';
 import {
   dokumenSource,
@@ -115,12 +117,9 @@ export function LampiranCard({
   if (!loading && rows.length === 0 && err === '' && !gagalSaatDibuat) return null;
 
   return (
-    <Card>
-      <CardHead
-        title="Foto nota"
-        right={<Text style={styles.right}>{rows.length ? `${rows.length} halaman` : '—'}</Text>}
-      />
-      <View style={styles.body}>
+    <View style={styles.group}>
+      <RamahSectionHeader>{`Foto nota${rows.length ? ` · ${rows.length} halaman` : ''}`}</RamahSectionHeader>
+      <View style={styles.card}>
         {gagalSaatDibuat ? (
           <Text style={styles.warn}>
             {`${gagalSaatDibuat} foto gagal ditempel ke nota ini saat dibuat. Fotonya masih tersimpan di server dan bisa ditempel lagi dari alur foto nota.`}
@@ -128,19 +127,13 @@ export function LampiranCard({
         ) : null}
 
         {err !== '' ? (
-          <View style={styles.centerBox}>
-            <Text style={styles.errText}>{err}</Text>
-            <GhostButton label="Coba lagi" onPress={reload} />
-          </View>
+          <RamahInlineError message={err} onRetry={reload} />
         ) : loading ? (
           <View style={styles.centerBox}>
-            <ActivityIndicator color={C.primary} />
+            <ActivityIndicator color={C.brand} />
           </View>
         ) : rows.length === 0 ? (
-          <EmptyState
-            title="Belum ada foto"
-            sub="Nota ini diketik tanpa lampiran foto faktur."
-          />
+          <Text style={styles.emptyText}>Nota ini diketik tanpa lampiran foto faktur.</Text>
         ) : (
           <ScrollView
             horizontal
@@ -160,7 +153,7 @@ export function LampiranCard({
       </View>
 
       <Viewer row={dibuka} token={token} onClose={() => setDibuka(null)} />
-    </Card>
+    </View>
   );
 }
 
@@ -195,7 +188,7 @@ function Thumb({
         />
       ) : (
         <View style={styles.thumbGlyph}>
-          <Feather name={gambar ? 'image' : 'file-text'} size={24} color={C.muted2} />
+          <Feather name={gambar ? 'image' : 'file-text'} size={24} color={C.iconMuted} />
         </View>
       )}
       <Text style={styles.thumbLabel} numberOfLines={1}>{`Halaman ${index + 1}`}</Text>
@@ -258,33 +251,40 @@ function Viewer({
 }
 
 const styles = StyleSheet.create({
-  right: { fontSize: 13, color: C.muted2 },
-  body: { padding: 16, gap: 12 },
-  warn: { fontSize: 13, lineHeight: 18, color: C.amber },
-  centerBox: { alignItems: 'center', gap: 10, paddingVertical: 18 },
-  errText: { fontSize: 13, color: C.red, textAlign: 'center' },
+  group: { gap: L.space2 },
+  card: {
+    backgroundColor: C.surfaceCard,
+    borderWidth: 1,
+    borderColor: C.borderHairline,
+    borderRadius: R.card,
+    padding: L.cardPad,
+    gap: L.space3,
+  },
+  warn: { ...T.caption, color: C.amber600, lineHeight: 18 },
+  centerBox: { alignItems: 'center', paddingVertical: L.space5 },
+  emptyText: { ...T.caption, color: C.textBody },
 
-  strip: { gap: 10 },
+  strip: { gap: L.space3 },
   thumb: { width: 92, gap: 6 },
   thumbImage: {
     width: 92,
     height: 122,
-    borderRadius: 10,
+    borderRadius: R.cardSm,
     borderWidth: 1,
-    borderColor: C.borderCard,
-    backgroundColor: C.borderLighter,
+    borderColor: C.borderHairline,
+    backgroundColor: C.surfaceStack,
   },
   thumbGlyph: {
     width: 92,
     height: 122,
-    borderRadius: 10,
+    borderRadius: R.cardSm,
     borderWidth: 1,
-    borderColor: C.borderCard,
-    backgroundColor: C.borderLighter,
+    borderColor: C.borderHairline,
+    backgroundColor: C.surfaceStack,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  thumbLabel: { fontSize: 11.5, color: C.muted3, textAlign: 'center' },
+  thumbLabel: { ...T.micro, color: C.textMuted, textAlign: 'center' },
 
   viewer: { flex: 1, backgroundColor: '#000' },
   viewerImage: { flex: 1, width: '100%' },
@@ -302,8 +302,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 16,
     right: 16,
+    ...T.caption,
     color: '#fff',
-    fontSize: 12.5,
     textAlign: 'center',
     opacity: 0.85,
   },

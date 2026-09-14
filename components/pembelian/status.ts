@@ -10,7 +10,15 @@
 import type { StatusMeta } from '@/components/shell/status-dokumen';
 import type { StatusPenerimaan } from '@/services/pembelian';
 
-/** `LENGKAP` is the unremarkable case, so it gets the quiet tint. */
+/**
+ * `LENGKAP` is the unremarkable case, so it gets the quiet tint.
+ *
+ * No Ramah-toned counterpart of this map: the ported list and detail both say
+ * "Kiriman kurang" as plain amber caption text rather than a second badge next
+ * to the document's own — one filled badge is what a reader scans thirty rows
+ * for without reading any words, and a second badge competing for that same
+ * glance would blunt it.
+ */
 export const TERIMA_META: Record<StatusPenerimaan, StatusMeta> = {
   LENGKAP: { label: 'Diterima lengkap', tone: 'neutral' },
   KURANG: { label: 'Kiriman kurang', tone: 'amber' },

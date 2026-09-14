@@ -58,13 +58,14 @@
  *   pemasok have no screens in this repo. They are drawn *disabled* — 55%, the
  *   board's own treatment for a tile that does not open — rather than dropped,
  *   because the grid is also a map of what this app is going to be.
- * - **Three of the board's 3D renders.** §8 restricts the grid to Iqonic
- *   Design's *Ulta Bizz* and *Bizzy Vol.2*, and stok opname, pemasok and
- *   persetujuan have no equivalent in either pack. They hold a Lucide-style
- *   line glyph on the matching tint, which is the guide's documented stopgap;
- *   borrowing a lookalike render from a third pack is what it forbids, because
- *   one contributor is what keeps camera angle, bevel and light identical
- *   across the grid.
+ * - **One of the eight renders.** §8 restricts the grid to Iqonic Design's
+ *   *Ulta Bizz* and *Bizzy Vol.2* and a second, IconScout-vetted logistics pack
+ *   (see `ART` below); nothing in either covers "unit kerja & ruang" — a
+ *   settings screen, not a stock or delivery concept — so that tile holds a
+ *   Feather line glyph on the matching tint, which is the guide's documented
+ *   stopgap. Borrowing a lookalike render from a third pack is what it
+ *   forbids, because one contributor is what keeps camera angle, bevel and
+ *   light identical across the grid.
  */
 import Feather from '@expo/vector-icons/Feather';
 import { useRouter, type Href } from 'expo-router';
@@ -121,10 +122,9 @@ const ART = {
   nota: require('@/assets/icons-3d/finance-report.png'),
   laporan: require('@/assets/icons-3d/growth-graph.png'),
   utang: require('@/assets/icons-3d/deposit-box.png'),
-  // The four below are the second family — see the note under this block.
+  // The three below are the second family — see the note under this block.
   opname: require('@/assets/icons-3d/package-scale.png'),
   pemasok: require('@/assets/icons-3d/warehouse.png'),
-  persetujuan: require('@/assets/icons-3d/package-list.png'),
   susulan: require('@/assets/icons-3d/fast-delivery.png'),
 } as const;
 
@@ -139,27 +139,28 @@ const ART = {
  *
  * `LayarGudang.dc.html` draws all eight of its tiles with a 3D render, and
  * three of them are **not** from Iqonic: `ai-analysis` on Stok opname,
- * `ai-network` on Pemasok, `package-list` on Persetujuan. So the board has
- * already spent the exception; what was left to decide was how to spend it
- * well.
+ * `ai-network` on Pemasok, `package-list` on Persetujuan (a beranda tile this
+ * app no longer draws — see below). So the board has already spent the
+ * exception; what was left to decide was how to spend it well.
  *
  * **Two of the board's three are unusable as drawn.** `ai-analysis` is a bar
  * chart and `ai-network` a node graph, and both carry a literal "AI" plate in
  * the render — a tile reading "Stok opname" under a badge saying AI is worse
  * than the line glyph it replaces, and neither is the concept anyway. The
- * third, `package-list`, is a clipboard with a parcel and a check: that *is*
- * Persetujuan, and it is kept exactly as the board picked it.
+ * third, `package-list`, is a clipboard with a parcel and a check, and reads as
+ * well on "Persetujuan" as the board intended.
  *
- * **The other three come from that same asset's pack** — Semusim Kreatif's
- * ten-item logistics set, which is where `package-list` lives. Taking all four
- * from one pack is §8's own rule applied rather than abandoned: one contributor
- * is one render language, so what the grid now holds is two coherent families
- * (Iqonic's matte blue-and-orange, Semusim's glossy red-and-yellow) instead of
- * the board's three. The pack also happens to be about exactly the concepts
- * this app was missing — counting stock, a supplier's warehouse, a delivery —
- * which is why nothing here is a lookalike standing in for something else.
+ * **The other two come from that same asset's pack** — Semusim Kreatif's
+ * ten-item logistics set, the one `package-list` itself belongs to. Taking
+ * both from one pack is §8's own rule applied rather than abandoned: one
+ * contributor is one render language, so what the grid holds is two coherent
+ * families (Iqonic's matte blue-and-orange, Semusim's glossy red-and-yellow)
+ * instead of the board's three. The pack also happens to be about exactly the
+ * concepts this app was missing — counting stock, a supplier's warehouse, a
+ * delivery — which is why nothing here is a lookalike standing in for
+ * something else.
  *
- * All four are 3000×3000 square, free for commercial use, no attribution
+ * All three are 3000×3000 square, free for commercial use, no attribution
  * required, pulled as 500px PNG on a transparent ground (`png` asked for
  * explicitly — the default download format for a 3D asset is `compressed-glb`,
  * which is a model, not an image).
@@ -168,6 +169,18 @@ const ART = {
  * a free hand: **a 3D asset is never recoloured**, and a gap is never closed by
  * hunting a *single* lookalike out of a random pack. What adapts to the palette
  * is the tile's surroundings.
+ *
+ * ### `package-list.png`, unreferenced but kept
+ *
+ * Issue #24 replaced the Persetujuan tile with Unit kerja, because Persetujuan
+ * opened the same screen as the Pembelian tile beside it (`/pembelian`, with no
+ * filter ever actually sent) and the slot was worth more as this section's
+ * front door. That render is not deleted from `assets/icons-3d/` even though
+ * nothing `require`s it any more: the issue explicitly leaves a real entry
+ * point for the persetujuan *queue* — `/pembelian?status=DIAJUKAN` — for later,
+ * and re-sourcing a clipboard-and-check render that already fits the guide's
+ * every rule would be wasted work. Delete it only alongside the decision that
+ * queue is never getting its own tile.
  */
 
 /**
@@ -211,15 +224,23 @@ const FITUR: readonly Fitur[] = [
     art: { kind: 'art3d', source: ART.pemasok },
     route: '/pemasok',
   },
-  // "Persetujuan" is a filter on the Nota list rather than a place of its own,
-  // so it lands on that list. The glyph is the guide's own suggestion for the
-  // gap it calls "Pesanan masuk".
+  // Issue #24: this slot used to be "Persetujuan", which opened the exact
+  // same route as the Pembelian tile above it — the filter it promised
+  // ("Diajukan") was never actually sent, so two of the eight tiles led to one
+  // screen. Persetujuan is still one tap away as the "Diajukan" chip on that
+  // list; what earns the freed slot is the section #23 built and gave no tile
+  // at all — `app/pengaturan/_layout.tsx` names the five dead ends that used
+  // to be its only doors in.
   {
-    key: 'persetujuan',
-    label: 'Persetujuan',
-    // The board's own pick, kept: a delivery list with a check on it.
-    art: { kind: 'art3d', source: ART.persetujuan },
-    route: '/pembelian',
+    key: 'unit-kerja',
+    label: 'Unit kerja',
+    // Neither vendored 3D pack has a settings/location concept to draw — this
+    // is a back-office screen, not stock or a delivery — so it stays the
+    // guide's own documented stopgap for exactly that gap: a Feather glyph on
+    // the tint reserved for account/settings tiles, not a render hunted from a
+    // third contributor.
+    art: { kind: 'glyph', icon: 'settings', tone: 'akun' },
+    route: '/pengaturan',
   },
   {
     key: 'laporan',
@@ -248,12 +269,12 @@ const FITUR: readonly Fitur[] = [
     The board labels this one "Penjualan"; here it is the till, and "Kasir" is
     what everyone in the shop calls it.
 
-    The till is also the middle tab now, so this tile is no longer the only way
-    in — it stays because the grid is a map of what the app does, and a feature
-    that is missing from the map because it happens to be one tap away
-    elsewhere is a feature somebody stops looking for. The same is true in
-    reverse of Katalog, which *lost* its tab to the till and is reached from
-    here and from the reorder metric above.
+    The till is also a tab now, so this tile is no longer the only way in — it
+    stays because the grid is a map of what the app does, and a feature that is
+    missing from the map because it happens to be one tap away elsewhere is a
+    feature somebody stops looking for. The same is true in reverse of Katalog
+    and Pembelian, which have no tab at all and are reached only from here (and,
+    for Katalog, the reorder metric above).
   */
   { key: 'kasir', label: 'Kasir', art: { kind: 'art3d', source: ART.kasir }, route: '/kasir' },
   // The ninth, and the reason "Lihat semua" has something to show: a susulan is
@@ -384,12 +405,13 @@ export default function BerandaScreen() {
   /**
    * `navigate`, not `push`.
    *
-   * Two of these destinations are *tab roots* now — Kasir and Nota — and a tab
-   * root is not something to stack a second copy of: `navigate` switches to the
-   * tab that already exists, and only pushes when the route is not in the
-   * navigator yet, which is what Katalog and Kiriman susulan on the root stack
-   * want too. `push` would have quietly grown a second Katalog every time
-   * somebody tapped the tile twice.
+   * One of these destinations is a *tab root* — Kasir — and a tab root is not
+   * something to stack a second copy of: `navigate` switches to the tab that
+   * already exists. Every other tile is a root-stack section beside the tabs
+   * (Katalog, Pembelian, Kiriman susulan, …), and `navigate` only pushes those
+   * when the route is not already in the navigator, which is what keeps a
+   * double-tap on the Pembelian tile from quietly growing a second Nota under
+   * the first.
    */
   const openFitur = (f: Fitur) => {
     setFiturOpen(false);
@@ -673,10 +695,10 @@ const styles = StyleSheet.create({
   metricLabel: { ...T.caption, color: C.textBody },
   /**
    * Always `--text-title`, never toned. Guide §3 is flat about it: the *value*
-   * is 22/26 bold in the title colour and the tone lives in the delta chip
-   * beside it. An earlier version painted the reorder count orange, which read
-   * as urgency the number does not carry on its own — seven items below minimum
-   * is not alarming in a shop that stocks four hundred.
+   * is `T.metric`, bold, in the title colour, and the tone lives in the delta
+   * chip beside it. An earlier version painted the reorder count orange, which
+   * read as urgency the number does not carry on its own — seven items below
+   * minimum is not alarming in a shop that stocks four hundred.
    */
   metricValue: { ...T.metric, color: C.textTitle },
   cardFoot: {

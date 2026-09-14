@@ -390,9 +390,9 @@ const styles = StyleSheet.create({
   rowSub: { ...T.caption, color: C.textBody },
   rowValue: { ...T.fieldValue, color: C.textTitle, textAlign: 'right' },
   rowFoot: { flexDirection: 'row', alignItems: 'center', gap: L.space2 },
-  // 13/18: this is the arithmetic behind a figure somebody is about to pay
-  // against, so it has to be checkable. Guide §7 reserves 11px for tile
-  // labels and counters.
+  // `T.caption`: this is the arithmetic behind a figure somebody is about to
+  // pay against, so it has to be checkable, not `T.micro` — that size is
+  // reserved for tile labels and counters.
   rowWorking: { ...T.caption, color: C.textMuted, flex: 1, minWidth: 0, textAlign: 'right' },
 
   placeholder: { paddingVertical: L.space8, paddingHorizontal: L.space4, alignItems: 'center' },
