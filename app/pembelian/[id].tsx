@@ -589,7 +589,8 @@ export default function PembelianDetailScreen() {
             <RamahBadge label={meta.label} tone={meta.tone} />
           </View>
           <Text style={styles.identitySub}>
-            {`${doc.nomor} · ${formatTanggal(doc.tanggal)} · ruang ${doc.namaRuang || '—'}`}
+            {/* No `doc.nomor` here: the header right above already carries it. */}
+            {`${formatTanggal(doc.tanggal)} · ${doc.namaRuang || '—'}`}
           </Text>
           <Text style={styles.identityStamp}>
             {readAt ? `Dibaca ${stempelPembaruan(readAt)}` : 'Membaca…'}
@@ -949,7 +950,7 @@ function FakturLineRow({ line }: { line: PembelianLine }) {
           {line.nama || line.kode}
         </Text>
         <Text style={styles.lineSub} numberOfLines={1}>
-          {`${line.kode} · ${formatDesimal(line.qtyFaktur)} ${line.namaSatuan}${
+          {`${formatDesimal(line.qtyFaktur)} ${line.namaSatuan}${
             line.faktor === 1 ? '' : ` (×${line.faktor})`
           }`}
         </Text>
@@ -993,10 +994,11 @@ function SisaLineRow({
         <Text style={styles.lineNama} numberOfLines={1}>
           {baris.nama_product}
         </Text>
-        <Text style={styles.lineSub} numberOfLines={1}>
-          {baris.kode_barang}
-          {baris.keterangan_selisih ? ` · ${baris.keterangan_selisih}` : ''}
-        </Text>
+        {baris.keterangan_selisih ? (
+          <Text style={styles.lineSub} numberOfLines={1}>
+            {baris.keterangan_selisih}
+          </Text>
+        ) : null}
       </View>
       <View style={styles.lineRight}>
         <Text style={styles.lineHarga} numberOfLines={1}>

@@ -337,7 +337,9 @@ function LineRow({
 
   const cariProduk = useCallback(async (term: string): Promise<RamahSearchOption[]> => {
     const page = await listProducts({ search: term || undefined, size: CARI_SIZE, is_aktif: true });
-    return page.data.map((p) => ({ value: String(p.id), label: p.nama, sub: p.kode }));
+    // No `sub`: the product code is how the server finds a row, not how a
+    // person recognises one. The search still matches it.
+    return page.data.map((p) => ({ value: String(p.id), label: p.nama }));
   }, []);
 
   /**
@@ -420,12 +422,11 @@ function LineRow({
   return (
     <View style={styles.lineBox}>
       <View style={styles.lineTop}>
-        <Text style={styles.lineNo}>{`#${index + 1}`}</Text>
         <View style={styles.grow}>
           <RamahPickerField
             label="Produk"
-            value={line.idProduct === null ? '' : `${line.kode} · ${line.nama}`}
-            placeholder="Cari nama atau kode barang"
+            value={line.idProduct === null ? '' : line.nama || line.kode}
+            placeholder="Cari nama barang"
             locked={!editable}
             onPress={() => setProductSheet(true)}
           />
@@ -538,7 +539,7 @@ function LineRow({
         onClose={() => setProductSheet(false)}
         search={cariProduk}
         onPick={(o) => void pickProduct(o)}
-        placeholder="Cari nama atau kode barang"
+        placeholder="Cari nama barang"
         emptyHint="Tidak ada produk aktif yang cocok."
       />
 
@@ -614,7 +615,6 @@ const styles = StyleSheet.create({
     gap: L.space3,
   },
   lineTop: { flexDirection: 'row', alignItems: 'flex-end', gap: L.space2 },
-  lineNo: { ...T.bodySmall, color: C.textMuted, paddingBottom: L.space3 },
 
   fieldRow: { flexDirection: 'row', flexWrap: 'wrap', gap: L.space3 },
   fieldCell: { flexGrow: 1, flexBasis: 130 },

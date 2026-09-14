@@ -2,7 +2,10 @@
  * Membuat nota pembelian — E1 → E1b → E2 of `Papan Layar.dc.html`, with H1 of
  * `Papan Layar OCR.dc.html` hanging off the first of them.
  *
- * Pick what needs buying, pick who is selling it, and the nota starts existing.
+ * Pick what to buy, pick who is selling it, say what it costs, and the nota
+ * starts existing. The price step ("Harga beli", `components/pembelian/
+ * isi-harga.tsx`) is not on the board: the board left prices to the draft, and
+ * a draft opened with the wrong price on every line is one somebody posts.
  * The board is explicit about where that moment is: E1b's exit note says "di
  * sini nota mulai ada", and everything after it — units, quantities, prices,
  * the faktur number, freight — is edited on the draft, which is E2.
@@ -34,14 +37,13 @@
  *
  * ## Three reads, and why each is where it is
  *
- * - **`GET /ruang`**, once, at the top. It is both the room the shortfalls are
- *   counted in and the `id_ruang` every line of the nota will land in, so it
+ * - **`GET /ruang`**, once, at the top. It is both the room the balances are
+ *   read in and the `id_ruang` every line of the nota will land in, so it
  *   cannot live inside the list step.
- * - **`GET /product/{id}`**, one per row as it is ticked. `StokMinimum` carries
- *   no unit at all, and the contract has no read that reports the base unit for
- *   a set of arbitrary product ids — so this is the honest cost of a picker
- *   built on the reorder queue. It is a small request on a deliberate tap, and
- *   it is what makes the stepper able to say "rim" instead of "satuan".
+ * - **`GET /product/{id}`**, only for a row ticked from the "Stok menipis"
+ *   filter. Any product can be picked from `GET /pos/product`, which carries
+ *   the base unit already; `StokMinimum` carries no unit at all, so a row from
+ *   the reorder queue pays one small read on a deliberate tap.
  * - **`GET /product/{id}/riwayat-beli`**, one per selected product, on the way
  *   into the supplier step. It is what ranks the suppliers *and* what fills the
  *   opening prices, so it is read once for both.
@@ -52,23 +54,29 @@ import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FotoNotaStep, type HalamanNota } from '@/components/pembelian/foto-nota';
-import { PilihBarangStep, type BarangDipilih } from '@/components/pembelian/pilih-barang';
+import { IsiHargaStep, type BarisHarga } from '@/components/pembelian/isi-harga';
+import {
+  PilihBarangStep,
+  type BarangDipilih,
+  type Kandidat,
+} from '@/components/pembelian/pilih-barang';
 import { PilihPemasokStep, type PemasokRiwayat } from '@/components/pembelian/pilih-pemasok';
 import { RamahColors as C, RamahLayout as L } from '@/constants/theme-ramah';
 import { todayISO } from '@/constants/produk';
 import { useDockPadding } from '@/hooks/use-keyboard-height';
 import { messageOf } from '@/services/api';
+import { decimalToNumber, rupiahToDecimal } from '@/services/decimal';
 import { tempelDokumen } from '@/services/dokumen';
 import {
   createPembelian,
   pembelianBus,
   type PembelianLineInput,
 } from '@/services/pembelian';
-import { getProduct, listRiwayatBeli, type StokMinimumRow } from '@/services/produk';
+import { getProduct, listRiwayatBeli } from '@/services/produk';
 import { listRuang, type RuangRow } from '@/services/ruang';
 import type { Supplier } from '@/services/supplier';
 
-type Langkah = 'barang' | 'foto' | 'pemasok';
+type Langkah = 'barang' | 'foto' | 'pemasok' | 'harga';
 
 /**
  * How many suppliers one product's history may report. The endpoint answers one
@@ -118,6 +126,14 @@ export default function PembelianBaruScreen() {
    */
   const [riwayatKey, setRiwayatKey] = useState('');
 
+  /**
+   * Only the prices somebody actually typed, keyed `${idProduct}:${idSatuan}`.
+   * The opening figure from history is derived during render instead, so it
+   * follows a change of supplier or of unit without an effect copying it in —
+   * and a typed price is never overwritten by a history read landing late.
+   */
+  const [hargaKetik, setHargaKetik] = useState<ReadonlyMap<string, string>>(new Map());
+
   const [membuat, setMembuat] = useState(false);
   const [buatErr, setBuatErr] = useState('');
 
@@ -164,6 +180,27 @@ export default function PembelianBaruScreen() {
   const wantRiwayat = [...selection.keys()].sort((a, b) => a - b).join(',');
   const riwayatSiap = riwayatKey === wantRiwayat;
   const riwayatLoading = selection.size > 0 && !riwayatSiap;
+
+  /**
+   * One row per line for the price step: what was typed, else the last price
+   * this supplier was paid scaled from its base-unit figure to the chosen unit
+   * (1.000/PCS is 12.000/DUS), else empty.
+   */
+  const barisHarga: BarisHarga[] = [...selection.values()].map((b) => {
+    const key = `${b.id}:${b.idSatuan}`;
+    const lalu =
+      supplier && riwayatSiap ? riwayat.get(supplier.id)?.perProduk.get(b.id) : undefined;
+    const awal = lalu ? String(Math.round(decimalToNumber(lalu.harga) * b.faktor)) : '';
+    const ketik = hargaKetik.get(key);
+    return {
+      key,
+      barang: b,
+      harga: ketik ?? awal,
+      // Only while the field still shows that figure: once somebody retypes
+      // it, "harga terakhir" would label a number that is no longer there.
+      terakhir: lalu && (ketik === undefined || ketik === awal) ? lalu.tanggal : null,
+    };
+  });
 
   /**
    * Every selected product's purchase history, folded into one map per supplier.
@@ -249,7 +286,7 @@ export default function PembelianBaruScreen() {
    * *is* blocked is creating the nota with a line whose `id_satuan_input` never
    * resolved; see `buat()`.
    */
-  const toggle = useCallback(async (row: StokMinimumRow) => {
+  const toggle = useCallback(async (row: Kandidat) => {
     let sudahAda = false;
     setSelection((current) => {
       const next = new Map(current);
@@ -257,21 +294,25 @@ export default function PembelianBaruScreen() {
         sudahAda = true;
         next.delete(row.id);
       } else {
+        const awal =
+          row.satuan?.find((s) => s.id === row.idSatuanAwal) ??
+          row.satuan?.find((s) => s.faktor === 1) ??
+          null;
         next.set(row.id, {
           id: row.id,
           nama: row.nama,
-          // The shortfall, not a reorder suggestion — no endpoint carries one,
-          // and the board says so in as many words. At least one, because a
-          // product that is exactly at its minimum has a shortfall of zero and
-          // is still on this list.
-          qty: Math.max(1, row.selisih),
-          idSatuanDasar: 0,
-          namaSatuanDasar: '',
+          qty: row.saran,
+          satuan: row.satuan ?? [],
+          idSatuan: awal?.id ?? 0,
+          namaSatuan: awal?.nama ?? '',
+          faktor: awal?.faktor ?? 1,
         });
       }
       return next;
     });
-    if (sudahAda) return;
+    // A row from `GET /pos/product` already carried its units; only a row from
+    // the reorder queue needs the read below.
+    if (sudahAda || row.satuan) return;
 
     try {
       const detail = await getProduct(row.id);
@@ -281,10 +322,15 @@ export default function PembelianBaruScreen() {
         const existing = current.get(row.id);
         if (!existing) return current;
         const next = new Map(current);
+        // Opens in the base unit, not the default input unit: the quantity
+        // was seeded from the shortfall, which is counted in base units, and
+        // silently rounding it into cartons would change what was ordered.
         next.set(row.id, {
           ...existing,
-          idSatuanDasar: detail.idDasar,
-          namaSatuanDasar: detail.namaSatuanDasar,
+          satuan: detail.satuan.map((s) => ({ id: s.idSatuan, nama: s.nama, faktor: s.faktor })),
+          idSatuan: detail.idDasar,
+          namaSatuan: detail.namaSatuanDasar,
+          faktor: 1,
         });
         return next;
       });
@@ -301,6 +347,30 @@ export default function PembelianBaruScreen() {
       if (!existing) return current;
       const next = new Map(current);
       next.set(id, { ...existing, qty });
+      return next;
+    });
+  }, []);
+
+  /**
+   * Changing the unit keeps the amount, not the number: 24 pcs moved to a DUS
+   * of 12 becomes 2 dus, not 24 dus. Rounded **up** when it does not divide —
+   * 30 pcs becomes 3 dus — because a short order is the mistake this screen
+   * exists to prevent, and the stepper shows the new figure straight away.
+   */
+  const setSatuan = useCallback((id: number, idSatuan: number) => {
+    setSelection((current) => {
+      const existing = current.get(id);
+      const pilih = existing?.satuan.find((s) => s.id === idSatuan);
+      if (!existing || !pilih || pilih.id === existing.idSatuan) return current;
+      const dasar = existing.qty * existing.faktor;
+      const next = new Map(current);
+      next.set(id, {
+        ...existing,
+        idSatuan: pilih.id,
+        namaSatuan: pilih.nama,
+        faktor: pilih.faktor,
+        qty: Math.max(1, Math.ceil(dasar / pilih.faktor)),
+      });
       return next;
     });
   }, []);
@@ -334,30 +404,29 @@ export default function PembelianBaruScreen() {
     if (!supplier || ruangId === null) return;
 
     const lines = [...selection.values()];
-    const belumAdaSatuan = lines.filter((b) => b.idSatuanDasar === 0);
+    const belumAdaSatuan = lines.filter((b) => b.idSatuan === 0);
     if (belumAdaSatuan.length) {
       // `id_satuan_input` has no foreign key behind it and an unregistered one
       // answers 400 for the whole document, so a line with an unresolved base
       // unit would take the other five down with it.
       setBuatErr(
-        `Satuan dasar ${belumAdaSatuan.map((b) => b.nama).join(', ')} belum terbaca. Lepas centangnya lalu centang lagi.`
+        `Satuan ${belumAdaSatuan.map((b) => b.nama).join(', ')} belum terbaca. Lepas centangnya lalu centang lagi.`
       );
       return;
     }
 
-    const detail: PembelianLineInput[] = lines.map((b) => {
-      const harga = riwayat.get(supplier.id)?.perProduk.get(b.id)?.harga;
-      return {
-        id_product: b.id,
-        id_satuan_input: b.idSatuanDasar,
-        qty_faktur: String(b.qty),
-        // The last price paid to *this* supplier for this product, per base
-        // unit. Zero when there is none — a first purchase, or a history that
-        // would not load — which is a price the draft asks to be corrected
-        // rather than a guess presented as a fact.
-        harga_satuan_input: harga ?? '0',
-      };
-    });
+    const kosong = barisHarga.filter((b) => b.harga === '');
+    if (kosong.length) {
+      setBuatErr(`Isi harga ${kosong.map((b) => b.barang.nama).join(', ')}.`);
+      return;
+    }
+
+    const detail: PembelianLineInput[] = barisHarga.map((b) => ({
+      id_product: b.barang.id,
+      id_satuan_input: b.barang.idSatuan,
+      qty_faktur: String(b.barang.qty),
+      harga_satuan_input: rupiahToDecimal(b.harga),
+    }));
 
     setMembuat(true);
     setBuatErr('');
@@ -389,7 +458,7 @@ export default function PembelianBaruScreen() {
       setBuatErr(messageOf(e, 'Gagal membuat nota pembelian.'));
       setMembuat(false);
     }
-  }, [membuat, supplier, ruangId, selection, riwayat, pages, router]);
+  }, [membuat, supplier, ruangId, selection, barisHarga, pages, router]);
 
   const commonDock = dockPad;
 
@@ -404,6 +473,7 @@ export default function PembelianBaruScreen() {
           selection={selection}
           onToggle={toggle}
           onQty={setQty}
+          onSatuan={setSatuan}
           jumlahHalaman={pages.length}
           onFoto={() => setLangkah('foto')}
           onBack={keluar}
@@ -431,6 +501,24 @@ export default function PembelianBaruScreen() {
           picked={supplier}
           onPick={setSupplier}
           onBack={() => setLangkah('barang')}
+          onLanjut={() => {
+            setBuatErr('');
+            setLangkah('harga');
+          }}
+          dockPad={commonDock}
+        />
+      ) : null}
+
+      {langkah === 'harga' && supplier ? (
+        <IsiHargaStep
+          namaPemasok={supplier.nama}
+          baris={barisHarga}
+          riwayatLoading={riwayatLoading}
+          onHarga={(key, digits) => {
+            setHargaKetik((current) => new Map(current).set(key, digits));
+            setBuatErr('');
+          }}
+          onBack={() => setLangkah('pemasok')}
           onBuat={buat}
           membuat={membuat}
           buatErr={buatErr}

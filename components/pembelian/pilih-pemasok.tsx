@@ -89,9 +89,7 @@ export function PilihPemasokStep({
   picked,
   onPick,
   onBack,
-  onBuat,
-  membuat,
-  buatErr,
+  onLanjut,
   dockPad,
 }: {
   jumlahBarang: number;
@@ -102,9 +100,8 @@ export function PilihPemasokStep({
   picked: Supplier | null;
   onPick: (s: Supplier) => void;
   onBack: () => void;
-  onBuat: () => void;
-  membuat: boolean;
-  buatErr: string;
+  /** Goes on to the price step; the nota is created from there. */
+  onLanjut: () => void;
   dockPad: number;
 }) {
   const [query, setQuery] = useState('');
@@ -277,7 +274,7 @@ export function PilihPemasokStep({
             <RamahSearchField
               value={query}
               onChangeText={setQuery}
-              placeholder="Cari nama atau kode pemasok"
+              placeholder="Cari nama pemasok"
             />
             {riwayatLoading ? (
               <View style={styles.riwayatLoading}>
@@ -305,14 +302,12 @@ export function PilihPemasokStep({
       />
 
       <View style={[styles.dock, { paddingBottom: dockPad }]}>
-        {buatErr ? <RamahInlineError message={buatErr} /> : null}
         <RamahNote icon="lock">Tidak bisa diubah setelah nota dibuat.</RamahNote>
         <RamahPrimaryButton
-          label={membuat ? 'Membuat nota…' : 'Buat nota pembelian'}
-          icon="file-plus"
-          onPress={onBuat}
-          disabled={!picked || membuat}
-          busy={membuat}
+          label="Lanjut isi harga"
+          icon="arrow-right"
+          onPress={onLanjut}
+          disabled={!picked}
         />
       </View>
     </View>
@@ -344,12 +339,12 @@ function PemasokRow({
    * is choosing a supplier, not grading one.
    */
   const ringkas = useMemo(() => {
-    if (!riwayat || riwayat.perProduk.size === 0) return supplier.kode || 'Belum pernah dibeli';
+    if (!riwayat || riwayat.perProduk.size === 0) return 'Belum pernah dibeli';
     const entries = [...riwayat.perProduk.values()];
     const terbaru = entries.reduce((a, b) => (a.tanggal >= b.tanggal ? a : b));
     const cakupan = `${riwayat.perProduk.size} dari ${jumlahBarang} barang`;
     return `${cakupan} · terakhir ${formatTanggal(terbaru.tanggal)}`;
-  }, [riwayat, supplier.kode, jumlahBarang]);
+  }, [riwayat, jumlahBarang]);
 
   // Only meaningful for a single-product list, where one price is *the* price
   // rather than one of several. With more than one, the figure would invite a
