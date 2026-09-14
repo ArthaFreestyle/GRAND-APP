@@ -64,10 +64,10 @@ import {
 import { formatRupiah, formatTanggal, todayISO } from '@/constants/produk';
 import {
   RamahColors as C,
+  RamahElevation as E,
   RamahLayout as L,
   RamahRadius as R,
   RamahType as T,
-  RamahWeight as W,
 } from '@/constants/theme-ramah';
 import { messageOf } from '@/services/api';
 import { getPembelian, listPembelian, type PembelianDoc, type PembelianRow } from '@/services/pembelian';
@@ -89,7 +89,7 @@ export default function PenerimaanSusulanBaruScreen() {
    * while it is up — the two are alternatives, never a sum, because the
    * gesture bar that inset pays for is itself behind the keyboard.
    */
-  const dockPad = useDockPadding(insets.bottom, L.cardGap);
+  const dockPad = useDockPadding(insets.bottom, L.dockPad);
   const params = useLocalSearchParams<{ idPembelian?: string }>();
   const canWrite = useCanWrite('penerimaan-susulan');
 
@@ -473,7 +473,7 @@ const styles = StyleSheet.create({
     gap: L.space5,
   },
 
-  group: { gap: L.space2 },
+  group: { gap: L.related },
 
   sumberCard: {
     backgroundColor: C.surfaceCard,
@@ -483,9 +483,9 @@ const styles = StyleSheet.create({
     padding: L.cardPad,
     gap: L.space1,
   },
-  sumberNomor: { ...T.groupTitle, color: C.textTitle },
-  sumberMeta: { ...T.caption, color: C.textBody },
-  sumberNote: { ...T.micro, ...W.regular, color: C.textMuted, marginTop: L.space2 },
+  sumberNomor: { ...T.titleSmall, color: C.textTitle },
+  sumberMeta: { ...T.bodySmall, color: C.textBody },
+  sumberNote: { ...T.bodySmall, color: C.textMuted, marginTop: L.space2 },
 
   sumberLoading: { paddingVertical: L.space8, alignItems: 'center' },
   sumberEmpty: {
@@ -496,20 +496,19 @@ const styles = StyleSheet.create({
     padding: L.cardPad,
     gap: L.space1,
   },
-  emptyTitle: { ...T.rowTitle, color: C.textTitle },
-  emptySub: { ...T.caption, color: C.textBody },
+  emptyTitle: { ...T.titleTiny, color: C.textTitle },
+  emptySub: { ...T.bodySmall, color: C.textBody },
   emptyAction: { paddingTop: L.space3 },
 
-  saveNote: { ...T.micro, ...W.regular, color: C.textBody },
+  saveNote: { ...T.bodySmall, color: C.textBody },
 
   dock: {
     paddingHorizontal: L.gutter,
-    paddingTop: 10,
+    paddingTop: L.dockPad,
     backgroundColor: C.surfacePage,
-    borderTopWidth: 1,
-    borderTopColor: C.borderHairline,
+    ...E.low,
   },
 
-  sheetHead: { paddingHorizontal: L.gutter, paddingBottom: L.space3, gap: L.cardGap },
+  sheetHead: { paddingHorizontal: L.gutter, paddingBottom: L.space3, gap: L.stack },
   sheetLoading: { paddingVertical: L.space8, alignItems: 'center' },
 });

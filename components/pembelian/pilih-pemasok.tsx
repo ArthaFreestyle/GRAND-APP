@@ -43,6 +43,7 @@ import {
 import { formatRupiah, formatTanggal } from '@/constants/produk';
 import {
   RamahColors as C,
+  RamahElevation as E,
   RamahLayout as L,
   RamahRadius as R,
   RamahType as T,
@@ -237,7 +238,12 @@ export function PilihPemasokStep({
 
   const renderEntry = useCallback(
     ({ item }: { item: Entry }) => {
-      if (item.kind === 'header') return <RamahSectionHeader>{item.label}</RamahSectionHeader>;
+      if (item.kind === 'header')
+        return (
+          <View style={styles.listHeading}>
+            <RamahSectionHeader>{item.label}</RamahSectionHeader>
+          </View>
+        );
       return (
         <PemasokRow
           supplier={item.supplier}
@@ -435,18 +441,21 @@ const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
   list: { flex: 1 },
   listContent: { paddingHorizontal: L.gutter, paddingTop: L.space2, paddingBottom: L.space8 },
-  controls: { gap: L.cardGap, paddingBottom: L.space4 },
+  controls: { gap: L.stack, paddingBottom: L.stack },
 
   riwayatLoading: { flexDirection: 'row', alignItems: 'center', gap: L.space2 },
-  riwayatLoadingText: { ...T.caption, color: C.textBody },
+  riwayatLoadingText: { ...T.bodySmall, color: C.textBody },
 
   card: { backgroundColor: C.surfaceCard, borderColor: C.borderHairline, borderWidth: 1 },
   cardFirst: { borderTopLeftRadius: R.card, borderTopRightRadius: R.card },
   cardLast: {
     borderBottomLeftRadius: R.card,
     borderBottomRightRadius: R.card,
-    marginBottom: L.groupGap,
+    marginBottom: L.stack,
   },
+  // A heading opens a group: `group` above it (this, plus the `stack` under the
+  // card or controls before it) and `related` down to the rows it names.
+  listHeading: { paddingTop: L.group - L.stack, paddingBottom: L.related },
   divider: { height: 1, backgroundColor: C.borderHairline, marginHorizontal: L.cardPad },
   row: {
     flexDirection: 'row',
@@ -463,23 +472,24 @@ const styles = StyleSheet.create({
     borderColor: C.borderStrong,
     alignItems: 'center',
     justifyContent: 'center',
+    // An optical nudge onto the title's first line, not a gap — one of the
+    // exceptions `RamahLayout` lists to the 4px grid.
     marginTop: 1,
   },
   radioOn: { backgroundColor: C.brand, borderColor: C.brand },
-  rowTitle: { ...T.rowTitle, color: C.textTitle },
-  rowSub: { ...T.caption, color: C.textBody },
-  rowValue: { ...T.caption, color: C.textTitle, textAlign: 'right', maxWidth: 130 },
+  rowTitle: { ...T.titleTiny, color: C.textTitle },
+  rowSub: { ...T.bodySmall, color: C.textBody },
+  rowValue: { ...T.bodySmall, color: C.textTitle, textAlign: 'right', maxWidth: 130 },
 
   placeholder: { paddingVertical: L.space8, paddingHorizontal: L.space4, alignItems: 'center' },
-  placeholderText: { ...T.caption, color: C.textBody, textAlign: 'center' },
+  placeholderText: { ...T.bodySmall, color: C.textBody, textAlign: 'center' },
   footer: { paddingVertical: L.space5, alignItems: 'center' },
 
   dock: {
     paddingHorizontal: L.gutter,
-    paddingTop: L.cardGap,
+    paddingTop: L.dockPad,
     gap: L.space2,
     backgroundColor: C.surfacePage,
-    borderTopWidth: 1,
-    borderTopColor: C.borderHairline,
+    ...E.low,
   },
 });

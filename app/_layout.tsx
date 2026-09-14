@@ -12,7 +12,6 @@
  * avoided.
  */
 import { Poppins_400Regular } from '@expo-google-fonts/poppins/400Regular';
-import { Poppins_500Medium } from '@expo-google-fonts/poppins/500Medium';
 import { Poppins_600SemiBold } from '@expo-google-fonts/poppins/600SemiBold';
 import { Poppins_700Bold } from '@expo-google-fonts/poppins/700Bold';
 import { useFonts } from 'expo-font';
@@ -29,7 +28,7 @@ import { GluestackUIProvider } from '@/components/ui/gluestack-ui-provider';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { hasChosenContext, hydrateSession, useSession } from '@/services/session';
 
-// Reading the stored session is a Keystore round trip, and the four Poppins
+// Reading the stored session is a Keystore round trip, and the three Poppins
 // faces are files. Holding the splash for both is what keeps a signed-in user
 // from seeing the login screen flash past on every cold start, and every screen
 // from painting one frame in the platform font before swapping family under it.
@@ -46,7 +45,8 @@ export default function RootLayout() {
   const [hydrated, setHydrated] = useState(false);
 
   /**
-   * Poppins, in the four weights `constants/theme-ramah.ts` names.
+   * Poppins, in the three weights `constants/theme-ramah.ts` names — Book,
+   * Demi and Bold. Medium was dropped with issue #33, and its file with it.
    *
    * Loaded at runtime rather than embedded by the `expo-font` config plugin,
    * because the runtime loader registers each file under the family name we
@@ -61,7 +61,6 @@ export default function RootLayout() {
    */
   const [fontsLoaded, fontsError] = useFonts({
     Poppins_400Regular,
-    Poppins_500Medium,
     Poppins_600SemiBold,
     Poppins_700Bold,
   });

@@ -65,6 +65,7 @@ import {
 import { formatNumber } from '@/constants/produk';
 import {
   RamahColors as C,
+  RamahElevation as E,
   RamahIcon,
   RamahLayout as L,
   RamahRadius as R,
@@ -265,7 +266,12 @@ export function PilihBarangStep({
 
   const renderEntry = useCallback(
     ({ item }: { item: Entry }) => {
-      if (item.kind === 'header') return <RamahSectionHeader>{item.label}</RamahSectionHeader>;
+      if (item.kind === 'header')
+        return (
+          <View style={styles.listHeading}>
+            <RamahSectionHeader>{item.label}</RamahSectionHeader>
+          </View>
+        );
       const picked = selection.get(item.row.id);
       return (
         <BarangRow
@@ -596,7 +602,7 @@ const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
   list: { flex: 1 },
   listContent: { paddingHorizontal: L.gutter, paddingTop: L.space2, paddingBottom: L.space8 },
-  controls: { gap: L.cardGap, paddingBottom: L.space4 },
+  controls: { gap: L.stack, paddingBottom: L.stack },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: L.space2 },
   ruangErrBox: { gap: L.space2, alignItems: 'flex-start' },
 
@@ -621,17 +627,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.green200,
   },
-  ocrTitle: { ...T.rowTitle, color: C.textTitle },
-  ocrSub: { ...T.caption, color: C.brandInk },
-  ocrSeparator: { ...T.caption, color: C.textMuted, textAlign: 'center', paddingTop: L.space1 },
+  ocrTitle: { ...T.titleTiny, color: C.textTitle },
+  ocrSub: { ...T.bodySmall, color: C.brandInk },
+  ocrSeparator: { ...T.bodySmall, color: C.textMuted, textAlign: 'center', paddingTop: L.space1 },
 
   card: { backgroundColor: C.surfaceCard, borderColor: C.borderHairline, borderWidth: 1 },
   cardFirst: { borderTopLeftRadius: R.card, borderTopRightRadius: R.card },
   cardLast: {
     borderBottomLeftRadius: R.card,
     borderBottomRightRadius: R.card,
-    marginBottom: L.groupGap,
+    marginBottom: L.stack,
   },
+  // A heading opens a group: `group` above it (this, plus the `stack` under the
+  // card or controls before it) and `related` down to the rows it names.
+  listHeading: { paddingTop: L.group - L.stack, paddingBottom: L.related },
   divider: { height: 1, backgroundColor: C.borderHairline, marginHorizontal: L.cardPad },
   row: {
     flexDirection: 'row',
@@ -648,13 +657,15 @@ const styles = StyleSheet.create({
     borderColor: C.borderStrong,
     alignItems: 'center',
     justifyContent: 'center',
+    // An optical nudge onto the title's first line, not a gap — one of the
+    // exceptions `RamahLayout` lists to the 4px grid.
     marginTop: 1,
   },
   boxOn: { backgroundColor: C.brand, borderColor: C.brand },
-  rowTitle: { ...T.rowTitle, color: C.textTitle },
-  rowStatus: { ...T.caption, color: C.textBody },
+  rowTitle: { ...T.titleTiny, color: C.textTitle },
+  rowStatus: { ...T.bodySmall, color: C.textBody },
   rowStatusHabis: { color: C.textDanger },
-  rowValue: { ...T.rowTitle, color: C.textTitle, textAlign: 'right', maxWidth: 120 },
+  rowValue: { ...T.titleTiny, color: C.textTitle, textAlign: 'right', maxWidth: 120 },
 
   stepper: {
     flexDirection: 'row',
@@ -672,33 +683,32 @@ const styles = StyleSheet.create({
     backgroundColor: C.surfacePage,
     textAlign: 'center',
     color: C.textTitle,
-    ...T.rowTitle,
+    ...T.titleTiny,
     paddingVertical: 0,
   },
-  stepLabel: { ...T.caption, color: C.textBody },
+  stepLabel: { ...T.bodySmall, color: C.textBody },
 
   placeholder: { paddingVertical: L.space8, paddingHorizontal: L.space4, alignItems: 'center' },
-  placeholderText: { ...T.caption, color: C.textBody, textAlign: 'center' },
+  placeholderText: { ...T.bodySmall, color: C.textBody, textAlign: 'center' },
   footer: { paddingVertical: L.space5, alignItems: 'center' },
 
   dock: {
     paddingHorizontal: L.gutter,
-    paddingTop: L.cardGap,
+    paddingTop: L.dockPad,
     gap: L.space2,
     backgroundColor: C.surfacePage,
-    borderTopWidth: 1,
-    borderTopColor: C.borderHairline,
+    ...E.low,
   },
-  dockHint: { ...T.caption, color: C.textBody },
-  selChips: { gap: 6, paddingBottom: 2 },
+  dockHint: { ...T.bodySmall, color: C.textBody },
+  selChips: { gap: L.related },
   selChip: {
     maxWidth: 200,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: L.space2,
+    paddingVertical: L.space1,
     borderRadius: R.pill,
     backgroundColor: C.grey100,
   },
   // Guide §7: 11px is for tile labels and counters. These chips are the
   // summary of what is going on the nota, which is read.
-  selChipText: { ...T.caption, color: C.textBody },
+  selChipText: { ...T.bodySmall, color: C.textBody },
 });

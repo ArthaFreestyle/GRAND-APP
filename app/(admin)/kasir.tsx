@@ -192,12 +192,12 @@ import {
 import { formatNumber, formatRupiah } from '@/constants/produk';
 import {
   RamahColors as C,
+  RamahElevation as E,
   RamahIcon,
   RamahLayout as L,
   RamahMotion,
   RamahRadius as R,
   RamahType as T,
-  RamahWeight as W,
 } from '@/constants/theme-ramah';
 import { atLeast, useBreakpoint } from '@/hooks/use-breakpoint';
 import { messageOf } from '@/services/api';
@@ -366,10 +366,11 @@ const KEY_ROWS: readonly (readonly string[])[] = [
 // This screen is the densest in the app — on a tablet three columns have to
 // stay on screen at once — so the usual blanket 1.4 cap on the system font size
 // is more than it can absorb. The cap is derived from the text's own size
-// instead, and it goes *down* as the text gets bigger: an 11px column header is
-// what somebody who enlarged their system font actually needs enlarged, while
-// the 28px keypad readout is already legible from across the counter and
-// growing it only pushes the columns apart.
+// instead, and it goes *down* as the text gets bigger: a 12pt caption is what
+// somebody who enlarged their system font actually needs enlarged, while the
+// Title Moderate keypad readout is already legible from across the counter and
+// growing it only pushes the columns apart. The thresholds are steps of
+// `RamahType`: 20 is Title Small, 15 is Title Tiny and Body Moderate.
 function fontCap(size: number | undefined): number {
   if (size === undefined) return 1.3; // inherits from a parent Text, already capped
   if (size >= 20) return 1; // the readouts: total, keypad, kembalian
@@ -1347,7 +1348,8 @@ export default function KasirScreen() {
   const wideKeyH = compact
     ? Math.max(
         L.tapMin,
-        Math.min(78, Math.floor((winH - 120 - (payH + 30 + insets.bottom) - 24 - 30) / 4))
+        // `3 * L.space2` is the three gaps between the four rows of `padGrid`.
+        Math.min(78, Math.floor((winH - 120 - (payH + 30 + insets.bottom) - 24 - 3 * L.space2) / 4))
       )
     : 78;
 
@@ -1759,7 +1761,7 @@ export default function KasirScreen() {
                   <RamahPrimaryButton
                     label={simpanLabel}
                     height={payH}
-                    fontSize={compact ? 18 : 22}
+                    type={compact ? 'titleSmall' : 'titleModerate'}
                     busy={jualBusy}
                     disabled={!isQris && uang < total}
                     onPress={() => void selesai()}
@@ -1774,7 +1776,7 @@ export default function KasirScreen() {
                 <RamahPrimaryButton
                   label={total > 0 ? `Bayar ${formatRupiah(total)}` : 'Bayar'}
                   height={payH}
-                  fontSize={compact ? 18 : 22}
+                  type={compact ? 'titleSmall' : 'titleModerate'}
                   disabled={cartRows.length === 0}
                   onPress={goBayar}
                 />
@@ -1848,7 +1850,7 @@ export default function KasirScreen() {
                 ))
               )}
             </ScrollView>
-            <View style={[styles.phoneFoot, { paddingBottom: 18 + insets.bottom }]}>
+            <View style={[styles.phoneFoot, { paddingBottom: L.dockPad + insets.bottom }]}>
               <TotalLine
                 label={ppn > 0 ? `Subtotal + PPN ${formatNumber(ppnPref.persen)}%` : 'Subtotal'}
                 value={ppn > 0 ? `${formatRupiah(sub)} + ${formatRupiah(ppn)}` : formatRupiah(sub)}
@@ -1952,7 +1954,7 @@ export default function KasirScreen() {
                 // The phone card is the whole frame, so it pays the bottom inset
                 // itself — on the tablet it is a floating card with the scrim's
                 // own margin under it.
-                !wide && { paddingBottom: 28 + insets.bottom },
+                !wide && { paddingBottom: L.section + insets.bottom },
               ]}>
               <View style={styles.suksesMark}>
                 <Feather name="check" size={28} color={C.brand} />
@@ -2361,32 +2363,32 @@ const styles = StyleSheet.create({
   cartHead: {
     paddingHorizontal: L.space5,
     paddingTop: L.cardPad,
-    paddingBottom: L.cardGap,
+    paddingBottom: L.space3,
     borderBottomWidth: 1,
     borderBottomColor: C.borderHairline,
   },
-  h3: { fontSize: 18, lineHeight: 24, ...W.semibold, color: C.textTitle },
-  nota: { ...T.caption, color: C.textMuted },
+  h3: { ...T.titleSmall, color: C.textTitle },
+  nota: { ...T.bodySmall, color: C.textMuted },
 
   cartScroll: { flex: 1, backgroundColor: C.surfaceSunken },
-  cartScrollPad: { padding: L.cardPad, paddingTop: L.cardGap },
-  emptyCard: { padding: 18, borderRadius: R.card, backgroundColor: C.white, gap: 6 },
-  emptyTitle: { ...T.rowTitle, color: C.textTitle },
-  emptyBody: { ...T.caption, color: C.textBody },
+  cartScrollPad: { padding: L.cardPad, paddingTop: L.space3 },
+  emptyCard: { padding: L.cardPad, borderRadius: R.card, backgroundColor: C.white, gap: L.inline },
+  emptyTitle: { ...T.titleTiny, color: C.textTitle },
+  emptyBody: { ...T.bodySmall, color: C.textBody },
 
   cartStack: { borderRadius: R.card, backgroundColor: C.surfaceStack, overflow: 'hidden' },
   cartLine: {
     paddingVertical: L.space3,
-    paddingHorizontal: 14,
+    paddingHorizontal: L.space3,
     backgroundColor: C.white,
     borderBottomWidth: 1,
     borderBottomColor: C.borderHairline,
     gap: L.space2,
   },
   cartLineTop: { flexDirection: 'row', alignItems: 'flex-start', gap: L.space2 },
-  lineName: { ...T.rowTitle, color: C.textTitle },
-  lineSub: { ...T.caption, color: C.textBody },
-  lineTotal: { ...T.rowTitle, color: C.textTitle, textAlign: 'right' },
+  lineName: { ...T.titleTiny, color: C.textTitle },
+  lineSub: { ...T.bodySmall, color: C.textBody },
+  lineTotal: { ...T.titleTiny, color: C.textTitle, textAlign: 'right' },
   stepper: { flexDirection: 'row', alignItems: 'center', gap: L.space2 },
   qtyInput: {
     width: 64,
@@ -2397,28 +2399,31 @@ const styles = StyleSheet.create({
     borderRadius: R.field,
     backgroundColor: C.white,
     padding: 0,
-    fontSize: 18,
-    lineHeight: 24,
-    ...W.bold,
+    ...T.titleSmall,
     color: C.textTitle,
   },
-  limit: { ...T.caption, color: C.textDanger },
+  limit: { ...T.bodySmall, color: C.textDanger },
 
+  // The three feet below each sit one layer over something that scrolls behind
+  // them, so each carries `low` in place of its hairline — and each needs an
+  // opaque ground, or `boxShadow` draws nothing.
   cartFoot: {
-    borderTopWidth: 1,
-    borderTopColor: C.borderHairline,
+    ...E.low,
+    backgroundColor: C.surfacePage,
     paddingHorizontal: L.space5,
     paddingTop: L.space3,
-    gap: 6,
+    gap: L.related,
   },
   totalRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: L.space2 },
-  totalSmall: { ...T.caption, color: C.textTitle },
-  totalLabel: { ...T.rowTitle, color: C.textTitle },
-  totalValue: { fontSize: 24, lineHeight: 30, ...W.bold, color: C.textTitle },
+  totalSmall: { ...T.bodySmall, color: C.textTitle },
+  totalLabel: { ...T.titleTiny, color: C.textTitle },
+  totalValue: { ...T.titleModerate, color: C.textTitle },
 
   listHead: {
     paddingHorizontal: L.space5,
-    paddingTop: 14,
+    // 16, the same as `cartHead` and `padHead`: the three column heads start on
+    // one line across the tablet frame.
+    paddingTop: L.cardPad,
     paddingBottom: L.space3,
     backgroundColor: C.white,
     borderBottomWidth: 1,
@@ -2432,14 +2437,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: L.space2,
-    paddingHorizontal: 14,
+    paddingHorizontal: L.space4,
     backgroundColor: C.white,
     borderWidth: 1.5,
     borderColor: C.borderStrong,
     borderRadius: R.field,
   },
-  searchInput: { flex: 1, minWidth: 0, padding: 0, ...T.body, color: C.textTitle },
-  searchHint: { ...T.caption, color: C.brandInk },
+  searchInput: { flex: 1, minWidth: 0, padding: 0, ...T.bodyModerate, color: C.textTitle },
+  searchHint: { ...T.bodySmall, color: C.brandInk },
   scanMsg: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2448,7 +2453,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: L.space3,
     borderRadius: R.cardSm,
   },
-  scanMsgText: { ...T.caption, color: C.textTitle, flex: 1, minWidth: 0 },
+  scanMsgText: { ...T.bodySmall, color: C.textTitle, flex: 1, minWidth: 0 },
 
   produkScroll: { flex: 1, backgroundColor: C.white },
   produkRow: {
@@ -2463,23 +2468,23 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: C.borderHairline,
   },
-  produkNama: { ...T.rowTitle, color: C.textTitle, flex: 1, minWidth: 0 },
+  produkNama: { ...T.titleTiny, color: C.textTitle, flex: 1, minWidth: 0 },
   listNote: { paddingVertical: L.space5, paddingHorizontal: L.gutter, alignItems: 'center' },
   listNoteGap: { gap: L.space3 },
-  produkHarga: { ...T.body, color: C.textBody, flexShrink: 1 },
-  kosongCari: { ...T.caption, color: C.textMuted, padding: L.gutter },
+  produkHarga: { ...T.bodyModerate, color: C.textBody, flexShrink: 1 },
+  kosongCari: { ...T.bodySmall, color: C.textMuted, padding: L.gutter },
 
   padHead: {
     paddingHorizontal: L.space5,
     paddingTop: L.cardPad,
-    paddingBottom: L.cardGap,
+    paddingBottom: L.space3,
     borderBottomWidth: 1,
     borderBottomColor: C.borderHairline,
     gap: L.space2,
   },
-  padHeadCompact: { paddingTop: L.space3, paddingBottom: L.space2, gap: 6 },
-  padTitle: { ...T.micro, color: C.textMuted },
-  padContext: { ...T.rowTitle, color: C.textTitle },
+  padHeadCompact: { paddingTop: L.space3, paddingBottom: L.space2, gap: L.inline },
+  padTitle: { ...T.caption, color: C.textMuted },
+  padContext: { ...T.titleTiny, color: C.textTitle },
   padDisplay: {
     borderRadius: R.cardSm,
     backgroundColor: C.grey100,
@@ -2487,7 +2492,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: L.cardPad,
   },
-  padValue: { fontSize: 28, lineHeight: 34, ...W.bold, color: C.textTitle },
+  // Title Moderate, not Large: the compact readout box is 44pt tall, and Large's
+  // 44pt line would fill it edge to edge.
+  padValue: { ...T.titleModerate, color: C.textTitle },
   padDisplayPhone: {
     height: 64,
     borderRadius: R.cardSm,
@@ -2496,15 +2503,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: L.cardPad,
   },
-  padValuePhone: { fontSize: 30, lineHeight: 36, ...W.bold, color: C.textTitle },
+  padValuePhone: { ...T.titleLarge, color: C.textTitle },
 
   padBody: { flex: 1 },
   // `justifyContent: flex-end` is the board's: the keypad sits at the bottom of
   // its column, where a thumb reaches it, and grows upward when the payment
   // step adds chips above it.
-  padBodyPad: { flexGrow: 1, justifyContent: 'flex-end', gap: L.cardGap, padding: L.space5, paddingVertical: L.space3 },
-  padGrid: { gap: 10 },
-  padRow: { flexDirection: 'row', gap: 10 },
+  padBodyPad: { flexGrow: 1, justifyContent: 'flex-end', gap: L.space3, padding: L.space5, paddingVertical: L.space3 },
+  // 8 between keys, the same as the phone pad: one keypad drawn two sizes, not
+  // two keypads. The compact `wideKeyH` arithmetic reads this gap.
+  padGrid: { gap: L.space2 },
+  padRow: { flexDirection: 'row', gap: L.space2 },
   padKey: {
     flex: 1,
     minWidth: 0,
@@ -2515,7 +2524,7 @@ const styles = StyleSheet.create({
     borderColor: C.borderStrong,
     backgroundColor: C.white,
   },
-  padKeyLabel: { fontSize: 28, lineHeight: 34, ...W.semibold, color: C.textTitle },
+  padKeyLabel: { ...T.titleModerate, color: C.textTitle },
   padGridPhone: { gap: L.space2 },
   padRowPhone: { flexDirection: 'row', gap: L.space2 },
   padKeyPhone: {
@@ -2528,12 +2537,12 @@ const styles = StyleSheet.create({
     borderColor: C.borderHairline,
     backgroundColor: C.white,
   },
-  padKeyLabelPhone: { fontSize: 21, lineHeight: 27, ...W.semibold, color: C.textTitle },
-  qrisCard: { borderRadius: R.card, backgroundColor: C.sky50, padding: L.cardPad, gap: 6 },
+  padKeyLabelPhone: { ...T.titleSmall, color: C.textTitle },
+  qrisCard: { borderRadius: R.card, backgroundColor: C.sky50, padding: L.cardPad, gap: L.inline },
 
   padFoot: {
-    borderTopWidth: 1,
-    borderTopColor: C.borderHairline,
+    ...E.low,
+    backgroundColor: C.surfacePage,
     paddingHorizontal: L.space5,
     paddingTop: L.space3,
     gap: L.space2,
@@ -2547,9 +2556,9 @@ const styles = StyleSheet.create({
   phone: { flex: 1 },
   phoneHead: {
     paddingHorizontal: L.gutter,
-    paddingTop: 14,
-    paddingBottom: 10,
-    gap: 10,
+    paddingTop: L.space3,
+    paddingBottom: L.space3,
+    gap: L.related,
     borderBottomWidth: 1,
     borderBottomColor: C.borderHairline,
   },
@@ -2560,8 +2569,9 @@ const styles = StyleSheet.create({
   // so what gives is the list region between them — down to nothing if it has
   // to, which is survivable, where a totals foot drawn below the bottom edge is
   // not.
-  phoneCart: { flexShrink: 1, borderTopWidth: 1, borderTopColor: C.borderHairline, backgroundColor: C.white },
-  phoneCartHead: { paddingHorizontal: L.gutter, paddingTop: 10, paddingBottom: 6 },
+  // `low`: the docked cart sits over the product list, which scrolls behind it.
+  phoneCart: { flexShrink: 1, ...E.low, backgroundColor: C.white },
+  phoneCartHead: { paddingHorizontal: L.gutter, paddingTop: L.space3, paddingBottom: L.space1 },
   // `maxHeight` arrives per render from `cartListMax`. `flexShrink: 1` is the
   // half that was missing: React Native defaults it to 0, so this list held its
   // full content height and pushed the foot out of the cart.
@@ -2570,21 +2580,26 @@ const styles = StyleSheet.create({
   phoneLine: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: L.space3,
     minHeight: L.tapMin,
-    paddingVertical: 10,
+    // Dense on purpose: the docked cart is the part of the phone layout that
+    // gives way first, and every row it holds is one more the cashier sees.
+    paddingVertical: L.space2,
     borderBottomWidth: 1,
     borderBottomColor: C.borderHairline,
   },
+  // `low` again: the cart's own rows scroll behind its totals and pay button.
   phoneFoot: {
     paddingHorizontal: L.gutter,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: C.borderHairline,
+    paddingTop: L.space3,
+    ...E.low,
+    backgroundColor: C.surfacePage,
     gap: L.space2,
   },
 
-  sheetBody: { paddingHorizontal: L.gutter, paddingBottom: L.cardPad, gap: 14 },
+  // 12, not the 16 the grid also offers: `keyH` is sized from what a phone
+  // sheet has left, and four gaps here are four key rows' worth of it.
+  sheetBody: { paddingHorizontal: L.gutter, paddingBottom: L.cardPad, gap: L.space3 },
 
   // ---- success ----
   suksesRoot: {
@@ -2601,7 +2616,9 @@ const styles = StyleSheet.create({
   // than the frame scrolls from the top instead of having its head cut off.
   suksesScroll: { flexGrow: 1, justifyContent: 'center' },
   suksesScrollWide: { alignItems: 'center' },
-  suksesCard: { padding: 28, gap: L.cardPad },
+  // `section` all round: the end of a sale is the one thing on screen, and the
+  // room around it is what makes it read as done.
+  suksesCard: { padding: L.section, gap: L.cardPad },
   suksesCardWide: { width: 460, borderRadius: R.card, backgroundColor: C.white },
   suksesMark: {
     width: 56,
@@ -2611,11 +2628,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  suksesTitle: { fontSize: 22, lineHeight: 28, ...W.semibold, color: C.textTitle },
-  suksesSub: { ...T.body, color: C.textBody, marginTop: 6 },
-  kembaliCard: { borderRadius: R.card, backgroundColor: C.green50, padding: L.cardPad, gap: 4 },
-  kembaliValue: { fontSize: 34, lineHeight: 40, ...W.bold, color: C.brandInk },
-  suksesActions: { gap: 10 },
-  suksesActionsWide: { flexDirection: 'row', gap: 10 },
-  printerLabel: { ...T.caption, color: C.textMuted },
+  suksesTitle: { ...T.titleSmall, color: C.textTitle },
+  suksesSub: { ...T.bodyModerate, color: C.textBody, marginTop: L.inline },
+  kembaliCard: { borderRadius: R.card, backgroundColor: C.green50, padding: L.cardPad, gap: L.inline },
+  kembaliValue: { ...T.titleLarge, color: C.brandInk },
+  suksesActions: { gap: L.related },
+  suksesActionsWide: { flexDirection: 'row', gap: L.related },
+  printerLabel: { ...T.bodySmall, color: C.textMuted },
 });

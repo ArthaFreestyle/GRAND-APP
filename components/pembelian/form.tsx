@@ -46,7 +46,6 @@ import {
   RamahLayout as L,
   RamahRadius as R,
   RamahType as T,
-  RamahWeight as W,
 } from '@/constants/theme-ramah';
 import { numericToDecimal, rupiahToDecimal, rupiahToDecimalSigned } from '@/services/decimal';
 import { listEkspedisi } from '@/services/ekspedisi';
@@ -467,28 +466,31 @@ function CheckRow({
 
 const styles = StyleSheet.create({
   body: { paddingHorizontal: L.gutter, paddingBottom: L.space4, gap: L.space5 },
-  lead: { ...T.caption, color: C.textBody },
+  lead: { ...T.bodySmall, color: C.textBody },
 
   fieldRow: { flexDirection: 'row', flexWrap: 'wrap', gap: L.space3 },
   fieldCell: { flexGrow: 1, flexBasis: 130 },
-  miniLabel: { ...T.fieldLabel, color: C.textBody },
-  helper: { ...T.caption, color: C.textBody },
+  miniLabel: { ...T.caption, color: C.textBody },
+  helper: { ...T.bodySmall, color: C.textBody },
 
-  chipField: { gap: 6 },
+  chipField: { gap: L.inline },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: L.space2 },
   chip: {
     height: L.controlHSm,
     justifyContent: 'center',
-    paddingHorizontal: 14,
+    // The same insides as `RamahChip`.
+    paddingHorizontal: L.space3,
     borderRadius: R.pill,
     borderWidth: 1.5,
   },
-  chipLabel: { ...T.caption, ...W.medium },
+  chipLabel: { ...T.caption },
 
   checkRow: { flexDirection: 'row', alignItems: 'flex-start', gap: L.space3 },
   checkBox: {
     width: 20,
     height: 20,
+    // An optical nudge onto the label's first line, not a gap — one of the
+    // exceptions `RamahLayout` lists to the 4px grid.
     marginTop: 1,
     borderRadius: 5,
     borderWidth: 1.5,
@@ -497,8 +499,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   checkBoxOn: { backgroundColor: C.brand, borderColor: C.brand },
-  checkLabel: { ...T.caption, color: C.textTitle, flex: 1, minWidth: 0 },
+  checkLabel: { ...T.bodySmall, color: C.textTitle, flex: 1, minWidth: 0 },
 
   divider: { height: 1, backgroundColor: C.borderHairline, marginTop: L.space1 },
-  sectionNote: { ...T.caption, color: C.textBody, marginTop: -L.space3 },
+  sectionNote: { ...T.bodySmall, color: C.textBody, marginTop: -L.space3 },
 });

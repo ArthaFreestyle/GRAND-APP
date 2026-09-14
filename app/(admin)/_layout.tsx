@@ -105,16 +105,27 @@ export default function AdminLayout() {
       }}>
       <NativeTabs
         // The Ramah bar, expressed as the platform's own: white ground, brand
-        // green for the selected root, muted grey for the rest, and the guide's
-        // 11px semibold label — in Poppins, which is the one piece of chrome
-        // outside a `Text` element that has to be told the family by hand.
+        // green for the selected root, grey for the rest, and a Caption label —
+        // in Poppins, which is the one piece of chrome outside a `Text` element
+        // that has to be told the family by hand. The unselected *label* takes
+        // `textMuted` rather than the icons' lighter grey: an icon is exempt from
+        // WCAG 2.0's text ratio, the word under it is not.
         backgroundColor={C.white}
         tintColor={C.brandInk}
         iconColor={C.iconMuted}
         labelStyle={{
-          fontSize: T.micro.fontSize,
-          fontFamily: T.micro.fontFamily,
-          fontWeight: T.micro.fontWeight,
+          default: {
+            fontSize: T.caption.fontSize,
+            fontFamily: T.caption.fontFamily,
+            fontWeight: T.caption.fontWeight,
+            color: C.textMuted,
+          },
+          selected: {
+            fontSize: T.caption.fontSize,
+            fontFamily: T.caption.fontFamily,
+            fontWeight: T.caption.fontWeight,
+            color: C.brandInk,
+          },
         }}
         // iOS 26: let the bar shrink out of the way while a long list is being
         // read, and come back on the way up. Beranda is the root this matters

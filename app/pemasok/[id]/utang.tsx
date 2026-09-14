@@ -367,13 +367,13 @@ const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
   list: { flex: 1 },
   listContent: { paddingHorizontal: L.gutter, paddingTop: L.space2, paddingBottom: L.space8 },
-  controls: { gap: L.cardGap, paddingBottom: L.space4 },
+  controls: { gap: L.stack, paddingBottom: L.space4 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: L.space2 },
 
-  totalCard: { gap: 2 },
-  totalLabel: { ...T.caption, color: C.textBody },
+  totalCard: { gap: L.inline },
+  totalLabel: { ...T.bodySmall, color: C.textBody },
   /* Guide §3: the figure is never toned. What is owed is a fact, not an alarm. */
-  totalValue: { ...T.metric, color: C.textTitle },
+  totalValue: { ...T.titleLarge, color: C.textTitle },
 
   card: { backgroundColor: C.surfaceCard, borderColor: C.borderHairline, borderWidth: 1 },
   cardFirst: { borderTopLeftRadius: R.card, borderTopRightRadius: R.card },
@@ -382,17 +382,17 @@ const styles = StyleSheet.create({
   row: { padding: L.cardPad, gap: L.space2 },
   rowDown: { backgroundColor: C.grey50 },
   rowHead: { flexDirection: 'row', alignItems: 'flex-start', gap: L.space3 },
-  rowTitle: { ...T.rowTitle, color: C.textTitle },
-  rowSub: { ...T.caption, color: C.textBody },
-  rowValue: { ...T.fieldValue, color: C.textTitle, textAlign: 'right' },
+  rowTitle: { ...T.titleTiny, color: C.textTitle },
+  rowSub: { ...T.bodySmall, color: C.textBody },
+  rowValue: { ...T.titleSmall, color: C.textTitle, textAlign: 'right' },
   rowFoot: { flexDirection: 'row', alignItems: 'center', gap: L.space2 },
-  // `T.caption`: this is the arithmetic behind a figure somebody is about to
-  // pay against, so it has to be checkable, not `T.micro` — that size is
+  // `T.bodySmall`: this is the arithmetic behind a figure somebody is about to
+  // pay against, so it has to be checkable, not `T.caption` — that size is
   // reserved for tile labels and counters.
-  rowWorking: { ...T.caption, color: C.textMuted, flex: 1, minWidth: 0, textAlign: 'right' },
+  rowWorking: { ...T.bodySmall, color: C.textMuted, flex: 1, minWidth: 0, textAlign: 'right' },
 
   placeholder: { paddingVertical: L.space8, paddingHorizontal: L.space4, alignItems: 'center' },
-  placeholderText: { ...T.caption, color: C.textBody, textAlign: 'center' },
+  placeholderText: { ...T.bodySmall, color: C.textBody, textAlign: 'center' },
   placeholderAction: { paddingTop: L.space4 },
   footer: { paddingVertical: L.space5, alignItems: 'center' },
 });

@@ -78,9 +78,9 @@ import {
 import { formatNumber, formatRupiah, formatTanggal, todayISO } from '@/constants/produk';
 import {
   RamahColors as C,
+  RamahElevation as E,
   RamahLayout as L,
   RamahType as T,
-  RamahWeight as W,
   type RamahTileToneName,
 } from '@/constants/theme-ramah';
 import { messageOf } from '@/services/api';
@@ -116,7 +116,7 @@ export default function ProdukDetailScreen() {
    * while it is up — the two are alternatives, never a sum, because the
    * gesture bar that inset pays for is itself behind the keyboard.
    */
-  const dockPad = useDockPadding(insets.bottom, L.cardGap);
+  const dockPad = useDockPadding(insets.bottom, L.dockPad);
   const params = useLocalSearchParams<{ id: string; ruang?: string; ubah?: string; baru?: string }>();
   const id = Number(params.id);
   const canWrite = useCanWrite('produk');
@@ -505,67 +505,74 @@ export default function ProdukDetailScreen() {
           ) : null}
         </View>
 
-        {/* The gudang is a chip and not a heading, for the reason it is one on
-            the catalogue: a stock figure means nothing without the room it was
-            counted in. It stops being a button when there is only one room. */}
-        <View style={styles.chipRow}>
-          <RamahChip
-            label={activeRuang?.nama ?? 'Gudang'}
-            selected
-            iconRight={ruangList.length > 1 ? 'chevron-down' : undefined}
-            onPress={ruangList.length > 1 ? () => setRuangSheet(true) : undefined}
-            accessibilityLabel={
-              ruangList.length > 1
-                ? `Angka di layar ini untuk gudang ${namaGudang}. Ganti gudang`
-                : `Angka di layar ini untuk gudang ${namaGudang}`
-            }
-          />
-        </View>
-
-        <View style={styles.statRow}>
-          <RamahStatCard
-            label="Saldo akhir"
-            value={loadingFigures ? '—' : `${formatNumber(saldo)} ${dasar}`}
-            accessibilityLabel={
-              loadingFigures
-                ? 'Saldo akhir sedang dibaca'
-                : `Saldo akhir di ${namaGudang}, ${formatNumber(saldo)} ${dasar}`
-            }
-          />
-          <RamahStatCard
-            label="Stok minimum"
-            // The threshold itself comes off the product and is known before any
-            // room is chosen, so it is drawn immediately. Only the *comparison*
-            // under it has to wait for the balance.
-            value={punyaMinimum ? `${formatNumber(product.stokMin)} ${dasar}` : 'Belum diatur'}
-            // The tone is the *card's*, never the figure's. A balance under its
-            // reorder point is worth marking; painting the number orange reads
-            // as an alarm a bare count does not justify.
-            tone={!loadingFigures && low ? 'warn' : 'plain'}
-            note={
-              !punyaMinimum
-                ? undefined
-                : loadingFigures
-                  ? 'Membandingkan saldo…'
-                  : low
-                    ? `Kurang ${formatNumber(kurang)} ${dasar}`
-                    : 'Aman'
-            }
-          />
-        </View>
-
-        {figuresErr ? (
-          <View style={styles.figuresErrBox}>
-            <RamahInlineError message={figuresErr} />
-            {/* Issue #23: a unit kerja with no ruang used to leave this screen
-                permanently unable to read stock, with nowhere to go. */}
-            <RamahSecondaryButton
-              label="Atur gudang"
-              icon="settings"
-              onPress={() => router.push('/pengaturan')}
+        {/* The gudang chip, the two figures and the error about reading them
+            are one group: the chip is what the numbers under it are *for*, so
+            it sits a `stack` above them and a `group` below the product's name.
+            It used to be the other way round — pulled up against the name by a
+            negative margin and 16 clear of the figures it labels. */}
+        <View style={styles.figures}>
+          {/* The gudang is a chip and not a heading, for the reason it is one on
+              the catalogue: a stock figure means nothing without the room it was
+              counted in. It stops being a button when there is only one room. */}
+          <View style={styles.chipRow}>
+            <RamahChip
+              label={activeRuang?.nama ?? 'Gudang'}
+              selected
+              iconRight={ruangList.length > 1 ? 'chevron-down' : undefined}
+              onPress={ruangList.length > 1 ? () => setRuangSheet(true) : undefined}
+              accessibilityLabel={
+                ruangList.length > 1
+                  ? `Angka di layar ini untuk gudang ${namaGudang}. Ganti gudang`
+                  : `Angka di layar ini untuk gudang ${namaGudang}`
+              }
             />
           </View>
-        ) : null}
+
+          <View style={styles.statRow}>
+            <RamahStatCard
+              label="Saldo akhir"
+              value={loadingFigures ? '—' : `${formatNumber(saldo)} ${dasar}`}
+              accessibilityLabel={
+                loadingFigures
+                  ? 'Saldo akhir sedang dibaca'
+                  : `Saldo akhir di ${namaGudang}, ${formatNumber(saldo)} ${dasar}`
+              }
+            />
+            <RamahStatCard
+              label="Stok minimum"
+              // The threshold itself comes off the product and is known before any
+              // room is chosen, so it is drawn immediately. Only the *comparison*
+              // under it has to wait for the balance.
+              value={punyaMinimum ? `${formatNumber(product.stokMin)} ${dasar}` : 'Belum diatur'}
+              // The tone is the *card's*, never the figure's. A balance under its
+              // reorder point is worth marking; painting the number orange reads
+              // as an alarm a bare count does not justify.
+              tone={!loadingFigures && low ? 'warn' : 'plain'}
+              note={
+                !punyaMinimum
+                  ? undefined
+                  : loadingFigures
+                    ? 'Membandingkan saldo…'
+                    : low
+                      ? `Kurang ${formatNumber(kurang)} ${dasar}`
+                      : 'Aman'
+              }
+            />
+          </View>
+
+          {figuresErr ? (
+            <View style={styles.figuresErrBox}>
+              <RamahInlineError message={figuresErr} />
+              {/* Issue #23: a unit kerja with no ruang used to leave this screen
+                  permanently unable to read stock, with nowhere to go. */}
+              <RamahSecondaryButton
+                label="Atur gudang"
+                icon="settings"
+                onPress={() => router.push('/pengaturan')}
+              />
+            </View>
+          ) : null}
+        </View>
 
         <View style={styles.group}>
           <RamahSectionHeader
@@ -757,41 +764,42 @@ function ledgerLook(k: KartuStokRow): { icon: FeatherName; tone: RamahTileToneNa
  */
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: C.surfaceSunken },
-  headerActions: { flexDirection: 'row', alignItems: 'center', marginRight: -8 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', marginRight: -L.space2 },
 
   body: { flex: 1 },
   bodyContent: {
     paddingHorizontal: L.gutter,
     paddingTop: L.space1,
     paddingBottom: L.space6,
-    gap: L.groupGap,
+    gap: L.group,
   },
 
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: L.space8, gap: L.space2 },
-  centerTitle: { ...T.groupTitle, color: C.textTitle, textAlign: 'center' },
-  centerSub: { ...T.caption, color: C.textBody, textAlign: 'center' },
+  centerTitle: { ...T.titleSmall, color: C.textTitle, textAlign: 'center' },
+  centerSub: { ...T.bodySmall, color: C.textBody, textAlign: 'center' },
   figuresErrBox: { gap: L.space2, alignItems: 'flex-start' },
   centerAction: { paddingTop: L.space4 },
 
   identity: { gap: L.space1 },
-  identityName: { ...T.identity, color: C.textTitle },
-  identitySub: { ...T.caption, color: C.textBody },
+  identityName: { ...T.titleModerate, color: C.textTitle },
+  identitySub: { ...T.bodySmall, color: C.textBody },
   arsipTag: {
     alignSelf: 'flex-start',
     marginTop: L.space2,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: L.space2,
+    paddingVertical: L.space1,
     borderRadius: 999,
     backgroundColor: C.grey200,
   },
-  arsipText: { ...T.micro, color: C.textBody },
+  arsipText: { ...T.caption, color: C.textBody },
 
-  chipRow: { flexDirection: 'row', gap: 10, flexWrap: 'wrap', marginTop: -L.space2 },
-  statRow: { flexDirection: 'row', gap: 10 },
+  figures: { gap: L.stack },
+  chipRow: { flexDirection: 'row', gap: L.related, flexWrap: 'wrap' },
+  statRow: { flexDirection: 'row', gap: L.stack },
 
-  group: { gap: L.space2 },
+  group: { gap: L.related },
   inlineLoading: { paddingVertical: L.space8, alignItems: 'center' },
-  ledgerNote: { ...T.micro, ...W.regular, color: C.textBody, paddingTop: L.space1 },
+  ledgerNote: { ...T.bodySmall, color: C.textBody, paddingTop: L.space1 },
 
   emptyCard: {
     backgroundColor: C.surfaceCard,
@@ -801,14 +809,13 @@ const styles = StyleSheet.create({
     padding: L.cardPad,
     gap: L.space1,
   },
-  emptyTitle: { ...T.rowTitle, color: C.textTitle },
-  emptySub: { ...T.caption, color: C.textBody },
+  emptyTitle: { ...T.titleTiny, color: C.textTitle },
+  emptySub: { ...T.bodySmall, color: C.textBody },
 
   dock: {
     paddingHorizontal: L.gutter,
-    paddingTop: 10,
+    paddingTop: L.dockPad,
     backgroundColor: C.surfacePage,
-    borderTopWidth: 1,
-    borderTopColor: C.borderHairline,
+    ...E.low,
   },
 });

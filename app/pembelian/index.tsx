@@ -84,6 +84,7 @@ import { BAYAR_META, DOKUMEN_RAMAH } from '@/components/shell/status-dokumen';
 import { formatNumber, formatRupiah, formatTanggal } from '@/constants/produk';
 import {
   RamahColors as C,
+  RamahElevation as E,
   RamahIcon,
   RamahLayout as L,
   RamahRadius as R,
@@ -131,7 +132,7 @@ export default function PembelianListScreen() {
    * alternatives, never a sum.
    */
   const insets = useSafeAreaInsets();
-  const dockPad = useDockPadding(insets.bottom, L.cardGap);
+  const dockPad = useDockPadding(insets.bottom, L.dockPad);
 
   const [rows, setRows] = useState<PembelianRow[]>([]);
   const [listErr, setListErr] = useState('');
@@ -621,8 +622,8 @@ const styles = StyleSheet.create({
   list: { flex: 1 },
   listContent: { paddingHorizontal: L.gutter, paddingBottom: L.space6 },
 
-  controls: { gap: L.cardGap, paddingTop: L.space1, paddingBottom: L.cardGap },
-  chipRow: { gap: 10, paddingRight: L.gutter },
+  controls: { gap: L.stack, paddingTop: L.space1, paddingBottom: L.stack },
+  chipRow: { gap: L.related, paddingRight: L.gutter },
 
   // The "Perlu diurus" card, the same white-card-over-hairline shape Beranda's
   // own two-metric card uses, extended to three counts with a divider between
@@ -635,23 +636,23 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   needRow: { flexDirection: 'row', padding: L.cardPad, gap: L.metricGap },
-  needCell: { flex: 1, minWidth: 0, gap: 6 },
+  needCell: { flex: 1, minWidth: 0, gap: L.inline },
   needCellDown: { opacity: 0.7 },
   needDivider: { width: 1, backgroundColor: C.borderHairline },
-  needLabel: { ...T.caption, color: C.textBody },
-  needValue: { ...T.metric, color: C.textTitle },
+  needLabel: { ...T.bodySmall, color: C.textBody },
+  needValue: { ...T.titleLarge, color: C.textTitle },
   needFoot: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: L.space2,
-    paddingVertical: 11,
+    paddingVertical: L.space3,
     paddingHorizontal: L.cardPad,
     backgroundColor: C.grey50,
     borderTopWidth: 1,
     borderTopColor: C.borderHairline,
   },
-  needFootText: { ...T.caption, color: C.textMuted },
+  needFootText: { ...T.bodySmall, color: C.textMuted },
 
   // The group card, assembled row by row rather than with `RamahStackCard`:
   // this list appends pages, and wrapping every row in one element would give
@@ -683,23 +684,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: RamahTileTone.dokumen.tint,
   },
-  rowTitle: { ...T.rowTitle, color: C.textTitle },
-  rowSub: { ...T.caption, color: C.textMuted, marginTop: 2 },
-  rowNote: { ...T.caption, color: C.orange600, marginTop: 2 },
-  rowRight: { flexShrink: 0, maxWidth: 148, alignItems: 'flex-end', gap: 6 },
-  rowValue: { ...T.rowTitle, color: C.textTitle, textAlign: 'right' },
+  rowTitle: { ...T.titleTiny, color: C.textTitle },
+  rowSub: { ...T.bodySmall, color: C.textMuted, marginTop: L.inline },
+  rowNote: { ...T.bodySmall, color: C.textWarning, marginTop: L.inline },
+  rowRight: { flexShrink: 0, maxWidth: 148, alignItems: 'flex-end', gap: L.inline },
+  rowValue: { ...T.titleTiny, color: C.textTitle, textAlign: 'right' },
 
   placeholder: { paddingTop: L.space10, gap: L.space2, alignItems: 'center' },
-  placeholderTitle: { ...T.groupTitle, color: C.textTitle, textAlign: 'center' },
-  placeholderSub: { ...T.caption, color: C.textBody, textAlign: 'center' },
+  placeholderTitle: { ...T.titleSmall, color: C.textTitle, textAlign: 'center' },
+  placeholderSub: { ...T.bodySmall, color: C.textBody, textAlign: 'center' },
 
   footer: { paddingVertical: L.space4, alignItems: 'center' },
 
   dock: {
     paddingHorizontal: L.gutter,
-    paddingTop: 10,
+    paddingTop: L.dockPad,
     backgroundColor: C.surfacePage,
-    borderTopWidth: 1,
-    borderTopColor: C.borderHairline,
+    ...E.low,
   },
 });

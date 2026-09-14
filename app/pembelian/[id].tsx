@@ -107,9 +107,9 @@ import { BAYAR_META, DOKUMEN_RAMAH } from '@/components/shell/status-dokumen';
 import { formatRupiah, formatTanggal } from '@/constants/produk';
 import {
   RamahColors as C,
+  RamahElevation as E,
   RamahLayout as L,
   RamahType as T,
-  RamahWeight as W,
   stempelPembaruan,
 } from '@/constants/theme-ramah';
 import { useDockPadding } from '@/hooks/use-keyboard-height';
@@ -1074,26 +1074,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: L.gutter,
     paddingTop: L.space1,
     paddingBottom: L.space6,
-    gap: L.groupGap,
+    gap: L.group,
   },
 
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: L.space8, gap: L.space2 },
-  centerTitle: { ...T.groupTitle, color: C.textTitle, textAlign: 'center' },
-  centerSub: { ...T.caption, color: C.textBody, textAlign: 'center' },
+  centerTitle: { ...T.titleSmall, color: C.textTitle, textAlign: 'center' },
+  centerSub: { ...T.bodySmall, color: C.textBody, textAlign: 'center' },
   centerAction: { paddingTop: L.space4 },
 
   identity: { gap: L.space1 },
   identityTop: { flexDirection: 'row', alignItems: 'center', gap: L.space3 },
-  identityName: { ...T.identity, color: C.textTitle, flexShrink: 1 },
-  identitySub: { ...T.caption, color: C.textBody },
-  identityStamp: { ...T.micro, ...W.regular, color: C.textMuted, marginTop: 2 },
+  identityName: { ...T.titleModerate, color: C.textTitle, flexShrink: 1 },
+  identitySub: { ...T.bodySmall, color: C.textBody },
+  identityStamp: { ...T.bodySmall, color: C.textMuted, marginTop: L.inline },
 
-  statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: L.stack },
   statCell: { flexBasis: '47%', flexGrow: 1 },
   statCellFull: { flexBasis: '100%', flexGrow: 1 },
   barangAction: { paddingTop: L.space1, flexDirection: 'row' },
 
-  group: { gap: L.space2 },
+  group: { gap: L.related },
 
   lineRow: {
     flexDirection: 'row',
@@ -1102,26 +1102,25 @@ const styles = StyleSheet.create({
     padding: L.cardPad,
     minHeight: L.rowH,
   },
-  lineNama: { ...T.rowTitle, color: C.textTitle },
-  lineSub: { ...T.caption, color: C.textMuted, marginTop: 2 },
-  lineMeta: { ...T.caption, color: C.textBody, marginTop: 2 },
-  lineMetaWarn: { color: C.orange600 },
-  lineRight: { flexShrink: 0, maxWidth: 160, alignItems: 'flex-end', gap: 2 },
-  lineValue: { ...T.rowTitle, color: C.textTitle, textAlign: 'right' },
-  lineHarga: { ...T.caption, color: C.textBody, textAlign: 'right' },
+  lineNama: { ...T.titleTiny, color: C.textTitle },
+  lineSub: { ...T.bodySmall, color: C.textMuted, marginTop: L.inline },
+  lineMeta: { ...T.bodySmall, color: C.textBody, marginTop: L.inline },
+  lineMetaWarn: { color: C.textWarning },
+  lineRight: { flexShrink: 0, maxWidth: 160, alignItems: 'flex-end', gap: L.inline },
+  lineValue: { ...T.titleTiny, color: C.textTitle, textAlign: 'right' },
+  lineHarga: { ...T.bodySmall, color: C.textBody, textAlign: 'right' },
 
-  editNote: { ...T.micro, ...W.regular, color: C.textBody },
+  editNote: { ...T.bodySmall, color: C.textBody },
 
-  sisaNote: { ...T.micro, ...W.regular, color: C.textBody },
+  sisaNote: { ...T.bodySmall, color: C.textBody },
 
-  noAksi: { ...T.caption, color: C.textMuted, textAlign: 'center', paddingVertical: L.space2 },
+  noAksi: { ...T.bodySmall, color: C.textMuted, textAlign: 'center', paddingVertical: L.space2 },
 
   dock: {
     paddingHorizontal: L.gutter,
-    paddingTop: 10,
-    gap: 10,
+    paddingTop: L.dockPad,
+    gap: L.related,
     backgroundColor: C.surfacePage,
-    borderTopWidth: 1,
-    borderTopColor: C.borderHairline,
+    ...E.low,
   },
 });

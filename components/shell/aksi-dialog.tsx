@@ -62,7 +62,6 @@ import {
   RamahMotion,
   RamahRadius as R,
   RamahType as T,
-  RamahWeight as W,
 } from '@/constants/theme-ramah';
 import type { AksiDokumen } from '@/services/alur-dokumen';
 
@@ -171,9 +170,9 @@ function DangerButton({
 
 const styles = StyleSheet.create({
   body: { paddingHorizontal: L.gutter, gap: L.space4, paddingBottom: L.space2 },
-  penjelasan: { ...T.body, color: C.textBody },
-  jejak: { ...T.caption, color: C.textMuted },
-  actions: { gap: 10, paddingTop: L.space1 },
+  penjelasan: { ...T.bodyModerate, color: C.textBody },
+  jejak: { ...T.bodySmall, color: C.textMuted },
+  actions: { gap: L.related, paddingTop: L.space1 },
 
   danger: {
     height: L.controlH,
@@ -184,5 +183,5 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: C.danger,
   },
-  dangerLabel: { fontSize: 16, lineHeight: 20, ...W.semibold, color: C.danger },
+  dangerLabel: { ...T.titleTiny, color: C.textDanger },
 });

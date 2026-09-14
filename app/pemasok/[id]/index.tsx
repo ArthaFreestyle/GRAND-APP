@@ -291,7 +291,9 @@ export default function PemasokDetailScreen() {
           <Feather name="chevron-right" size={RamahIcon.row} color={C.iconMuted} />
         </Pressable>
 
-        <RamahSectionHeader>Kontak</RamahSectionHeader>
+        <View style={styles.groupStart}>
+          <RamahSectionHeader>Kontak</RamahSectionHeader>
+        </View>
         <RamahStackCard>
           <Baris label="Telepon" value={supplier.telepon} />
           <Baris label="Alamat" value={supplier.alamat} />
@@ -333,17 +335,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: L.gutter,
     paddingTop: L.space2,
     paddingBottom: L.space10,
-    gap: L.cardGap,
+    gap: L.stack,
   },
+  // A heading in this `stack` column opens a new group: `group` above it.
+  groupStart: { paddingTop: L.group - L.stack },
 
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: L.space6, gap: L.space2 },
-  centerTitle: { ...T.groupTitle, color: C.textTitle },
-  centerSub: { ...T.caption, color: C.textBody, textAlign: 'center' },
+  centerTitle: { ...T.titleSmall, color: C.textTitle },
+  centerSub: { ...T.bodySmall, color: C.textBody, textAlign: 'center' },
   centerAction: { paddingTop: L.space4 },
 
-  identity: { gap: 2, paddingVertical: L.space2 },
-  identityName: { ...T.identity, color: C.textTitle },
-  identitySub: { ...T.caption, color: C.textBody },
+  identity: { gap: L.inline, paddingVertical: L.space2 },
+  identityName: { ...T.titleModerate, color: C.textTitle },
+  identitySub: { ...T.bodySmall, color: C.textBody },
   badgeRow: { flexDirection: 'row', paddingTop: L.space2 },
 
   utangCard: {
@@ -356,23 +360,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.borderHairline,
   },
-  utangLabel: { ...T.fieldLabel, color: C.textBody },
+  utangLabel: { ...T.caption, color: C.textBody },
   /* Guide §3: a figure is always `--text-title`, never toned. Tone belongs to a
      chip beside it, and "three unpaid invoices" is not an alarm on its own. */
-  utangValue: { ...T.metric, color: C.textTitle },
-  utangSub: { ...T.caption, color: C.textBody },
+  utangValue: { ...T.titleLarge, color: C.textTitle },
+  utangSub: { ...T.bodySmall, color: C.textBody },
 
   baris: {
     paddingHorizontal: L.cardPad,
     paddingVertical: L.cardPadDense,
-    gap: 2,
+    gap: L.inline,
     // Guide §7: a list row is 56.
     minHeight: L.rowH,
     justifyContent: 'center',
   },
-  barisLabel: { ...T.fieldLabel, color: C.textBody },
-  barisValue: { ...T.body, color: C.textTitle },
+  barisLabel: { ...T.caption, color: C.textBody },
+  barisValue: { ...T.bodyModerate, color: C.textTitle },
 
-  // `T.caption`, the merchant scale's metadata size — not `T.micro`.
-  jejak: { ...T.caption, color: C.textMuted, paddingTop: L.space2 },
+  // `T.bodySmall`, the merchant scale's metadata size — not `T.caption`.
+  jejak: { ...T.bodySmall, color: C.textMuted, paddingTop: L.space2 },
 });

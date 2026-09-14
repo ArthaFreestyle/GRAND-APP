@@ -45,6 +45,7 @@ import {
 } from '@/components/shell/ramah';
 import {
   RamahColors as C,
+  RamahElevation as E,
   RamahLayout as L,
   RamahRadius as R,
   RamahType as T,
@@ -57,7 +58,7 @@ import { listRuang, type RuangRow } from '@/services/ruang';
 export default function StokOpnameBaruScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const dockPad = useDockPadding(insets.bottom, L.cardGap);
+  const dockPad = useDockPadding(insets.bottom, L.dockPad);
 
   const [ruangList, setRuangList] = useState<RuangRow[]>([]);
   const [ruangErr, setRuangErr] = useState('');
@@ -145,7 +146,9 @@ export default function StokOpnameBaruScreen() {
           </View>
         </View>
 
-        <RamahSectionHeader>Gudang yang dihitung</RamahSectionHeader>
+        <View style={styles.groupStart}>
+          <RamahSectionHeader>Gudang yang dihitung</RamahSectionHeader>
+        </View>
         {ruangErr ? (
           <RamahInlineError message={ruangErr} onRetry={() => setReloadToken((n) => n + 1)} />
         ) : loading ? (
@@ -264,8 +267,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: L.gutter,
     paddingTop: L.space4,
     paddingBottom: L.space10,
-    gap: L.cardGap,
+    gap: L.stack,
   },
+  // A heading in this `stack` column opens a new group: `group` above it.
+  groupStart: { paddingTop: L.group - L.stack },
 
   warn: {
     flexDirection: 'row',
@@ -276,11 +281,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.amber100,
   },
-  warnTitle: { ...T.rowTitle, color: C.textTitle },
-  warnText: { ...T.caption, color: C.textBody },
+  warnTitle: { ...T.titleTiny, color: C.textTitle },
+  warnText: { ...T.bodySmall, color: C.textBody },
 
   loadingBox: { paddingVertical: L.space6, alignItems: 'center' },
-  kosong: { ...T.caption, color: C.textBody, paddingVertical: L.space4 },
+  kosong: { ...T.bodySmall, color: C.textBody, paddingVertical: L.space4 },
   kosongBox: { gap: L.space3, alignItems: 'flex-start' },
 
   option: {
@@ -303,15 +308,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   radioOn: { backgroundColor: C.brand, borderColor: C.brand },
-  optionTitle: { ...T.rowTitle, color: C.textTitle },
-  optionSub: { ...T.caption, color: C.textBody },
+  optionTitle: { ...T.titleTiny, color: C.textTitle },
+  optionSub: { ...T.bodySmall, color: C.textBody },
 
   dock: {
     paddingHorizontal: L.gutter,
-    paddingTop: L.cardGap,
+    paddingTop: L.dockPad,
     gap: L.space2,
     backgroundColor: C.surfacePage,
-    borderTopWidth: 1,
-    borderTopColor: C.borderHairline,
+    ...E.low,
   },
 });

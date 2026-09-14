@@ -56,7 +56,6 @@ import {
   RamahMotion,
   RamahRadius as R,
   RamahType as T,
-  RamahWeight as W,
 } from '@/constants/theme-ramah';
 import { useRecordBus } from '@/hooks/use-record-bus';
 import { messageOf } from '@/services/api';
@@ -278,19 +277,21 @@ export default function PengaturanDetailScreen() {
           )}
         </View>
 
-        <RamahSectionHeader
-          action={canWriteRuang && ruangVisible ? 'Tambah' : undefined}
-          onAction={
-            canWriteRuang && ruangVisible
-              ? () =>
-                  router.push({
-                    pathname: '/pengaturan/ruang/baru',
-                    params: { idUnitKerja: id, namaUnitKerja: unitKerja.nama },
-                  })
-              : undefined
-          }>
-          Ruang di unit ini
-        </RamahSectionHeader>
+        <View style={styles.groupStart}>
+          <RamahSectionHeader
+            action={canWriteRuang && ruangVisible ? 'Tambah' : undefined}
+            onAction={
+              canWriteRuang && ruangVisible
+                ? () =>
+                    router.push({
+                      pathname: '/pengaturan/ruang/baru',
+                      params: { idUnitKerja: id, namaUnitKerja: unitKerja.nama },
+                    })
+                : undefined
+            }>
+            Ruang di unit ini
+          </RamahSectionHeader>
+        </View>
 
         {!ruangVisible ? (
           <RamahNote icon="eye-off">
@@ -397,25 +398,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: L.gutter,
     paddingTop: L.space2,
     paddingBottom: L.space10,
-    gap: L.cardGap,
+    gap: L.stack,
   },
+  // A heading in this `stack` column opens a new group: `group` above it.
+  groupStart: { paddingTop: L.group - L.stack },
 
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: L.space6, gap: L.space2 },
-  centerTitle: { ...T.groupTitle, color: C.textTitle },
-  centerSub: { ...T.caption, color: C.textBody, textAlign: 'center' },
+  centerTitle: { ...T.titleSmall, color: C.textTitle },
+  centerSub: { ...T.bodySmall, color: C.textBody, textAlign: 'center' },
   centerAction: { paddingTop: L.space4 },
 
-  identity: { gap: 2, paddingVertical: L.space2 },
-  identityName: { ...T.identity, color: C.textTitle },
-  identitySub: { ...T.caption, color: C.textBody },
+  identity: { gap: L.inline, paddingVertical: L.space2 },
+  identityName: { ...T.titleModerate, color: C.textTitle },
+  identitySub: { ...T.bodySmall, color: C.textBody },
   badgeRow: { flexDirection: 'row', paddingTop: L.space2 },
 
-  kosong: { ...T.caption, color: C.textBody, paddingVertical: L.space2 },
-  jejak: { ...T.caption, color: C.textMuted, paddingTop: L.space2 },
+  kosong: { ...T.bodySmall, color: C.textBody, paddingVertical: L.space2 },
+  jejak: { ...T.bodySmall, color: C.textMuted, paddingTop: L.space2 },
 
   confirmBody: { paddingHorizontal: L.gutter, gap: L.space4, paddingBottom: L.space2 },
-  confirmText: { ...T.body, color: C.textBody },
-  confirmActions: { gap: 10, paddingTop: L.space1 },
+  confirmText: { ...T.bodyModerate, color: C.textBody },
+  confirmActions: { gap: L.related, paddingTop: L.space1 },
 
   danger: {
     height: L.controlH,
@@ -426,5 +429,5 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: C.danger,
   },
-  dangerLabel: { fontSize: 16, lineHeight: 20, ...W.semibold, color: C.danger },
+  dangerLabel: { ...T.titleTiny, color: C.textDanger },
 });

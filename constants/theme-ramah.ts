@@ -1,4 +1,4 @@
-import type { TextStyle } from 'react-native';
+import { Platform, type TextStyle, type ViewStyle } from 'react-native';
 
 /**
  * The Ramah design system, revision 2 — "pola aplikasi merchant".
@@ -50,8 +50,8 @@ import type { TextStyle } from 'react-native';
  * **Every value is opaque.** Tints are pre-composited against white and written
  * as hex, never left as `rgba(…, .1)` — a translucent tint is a different
  * colour over the page than over a card than over a pressed row, which is three
- * colours wearing one name. The single exception is `scrim`, where the
- * translucency *is* the effect.
+ * colours wearing one name. The exceptions are `scrim` and the shadow ink in
+ * `RamahElevation`, where the translucency *is* the effect.
  */
 export const RamahColors = {
   // --- Brand green. Platform-level, and only for primary action. ---
@@ -82,10 +82,14 @@ export const RamahColors = {
   orange100: '#FADFC4',
   orange500: '#EE9130',
   orange600: '#C46F17',
+  /** The darkest orange that clears 4.5:1 on every light surface. Small orange text. */
+  orange700: '#9E5913',
   amber50: '#FEF6E6',
   amber100: '#FCE9BF',
   amber500: '#F5B24A',
   amber600: '#B97C15',
+  /** The darkest amber that clears 4.5:1 on every light surface. Small amber text. */
+  amber700: '#906110',
   navy50: '#EDF1F5',
   navy100: '#D5DEE7',
   navy500: '#103352',
@@ -129,7 +133,8 @@ export const RamahColors = {
    * In revision 1 the page was white and this grey barely appeared. In revision
    * 2 it is the default background of every operational screen, and white is
    * what a *card* is made of — which is the whole reason a stack of cards reads
-   * as separate objects with no shadow under any of them.
+   * as separate objects with no shadow under any of them. A card is part of the
+   * page; only what floats over the page takes a `RamahElevation` token.
    */
   surfacePage: '#FFFFFF',
   surfaceSunken: '#F5F5F5',
@@ -141,15 +146,59 @@ export const RamahColors = {
   /** The one translucent value in the system: 48% navy under a sheet. */
   scrim: 'rgba(16,51,82,.48)',
 
+  /*
+    Text colours are tested against WCAG 2.0 AA (issue #33): 4.5:1 for normal
+    text, 3:1 for large (≥ 24px, or ≥ 18.7px bold — Title Small and up), on
+    every light surface a line of text can sit on. Test a new text colour the
+    same way before adding it; the table is what the numbers were.
+
+    | text colour        | card #FFF | sunken #F5F5F5 | grey200 #EBEBEB | brandTint #E1F3E2 | red50 #FDECEC |
+    |--------------------|-----------|----------------|-----------------|-------------------|---------------|
+    | textTitle #2B2B2B  | 14.16     | 12.99          | 11.88           | 12.22             | 12.40         |
+    | textBody  #6A6A6A  |  5.41     |  4.96          |  4.54           |  4.67             |  4.73         |
+    | textLink  #006B09  |  6.76     |  6.20          |  5.67           |  5.83             |  5.92         |
+    | textDanger #D01E1E |  5.40     |  4.96          |  4.53           |  4.61             |  4.73         |
+    | textWarning #9E5913|  5.44     |  4.99          |  4.53           |  4.70             |  4.77         |
+    | amber700  #906110  |  5.40     |  4.95          |  4.51           |  4.66             |  4.73         |
+    | white on brand #008A0C: 4.53 · white on danger #E02020: 4.78            |
+
+    Three colours failed and moved: `textMuted` (#9B9B9B, 2.33–2.78 — failed
+    everywhere), `textDanger` (#E02020, 4.01 on grey200 and 4.12 on
+    brandTint), and orange600/amber600 as small text (3.0–3.7). The raw
+    orange500, amber500 (`warning`) and sky500 (`info`) are 1.85–2.45 and are
+    **never** a text colour. Icons, hairlines and fills are not text and keep
+    their lighter values — WCAG 2.0 sets no ratio for them.
+  */
   textTitle: '#2B2B2B',
-  textBody: '#6B6B6B',
-  textMuted: '#9B9B9B',
+  textBody: '#6A6A6A',
+  /**
+   * The same ink as `textBody`, and that is the cost of AA rather than a slip.
+   * Muted used to be #9B9B9B, a step lighter than body, at 2.78:1 on white; the
+   * lightest grey that clears 4.5:1 on grey200 is #6A6A6A, which is body. The
+   * name stays for the *role* — metadata, a stamp, a count — so the day body
+   * darkens, muted can take a real step again. Hierarchy between the two is
+   * carried by size and weight now, not by a paler grey nobody could read.
+   */
+  textMuted: '#6A6A6A',
+  /**
+   * The only grey text allowed under 4.5:1, because WCAG exempts text on a
+   * control that cannot be used: a disabled tile, a locked field. Never for
+   * anything a reader is meant to act on.
+   */
+  textDisabled: '#9B9B9B',
   textOnBrand: '#FFFFFF',
   textOnInverse: '#FFFFFF',
   textLink: '#006B09',
-  textDanger: '#E02020',
+  /** Darker than `danger` (#E02020), which stays the fill and border colour. */
+  textDanger: '#D01E1E',
+  /** Small warning text: orange600 only clears 4.5:1 as Title Small and up. */
+  textWarning: '#9E5913',
 
-  /** 1px, and the only structural line in the system. Depth comes from this. */
+  /**
+   * 1px, and the only structural line in the system: it separates things that
+   * sit on the same plane. Something *over* the page — a dock, a floating sheet —
+   * is separated by `RamahElevation` instead, never by both.
+   */
   borderHairline: '#EBEBEB',
   borderStrong: '#DCDCDC',
   borderBrand: '#008A0C',
@@ -184,14 +233,18 @@ export const RamahColors = {
  */
 
 /**
- * Poppins, in the four weights the system uses — and why it is four *families*
- * rather than one family and a `fontWeight`.
+ * Poppins, in the three weights the system uses — and why it is three
+ * *families* rather than one family and a `fontWeight`.
+ *
+ * **Three, named for the hierarchy they serve (issue #33): Book, Demi, Bold**,
+ * Aloha's three mapped onto Poppins' 400, 600 and 700. Medium (500) is gone: it
+ * was used six times, always as a half-step nobody could see from arm's length,
+ * and dropping it took a whole font file out of the bundle. There is no italic —
+ * none is loaded, and emphasis in this system is weight and colour.
  *
  * `tokens/fonts.css` sets `--font-display` and `--font-body` to Poppins (a
  * documented substitution upstream, made when no binaries came with the brief),
- * and `tokens/typography.css` spends exactly four weights on it: 400, 500, 600
- * and 700. Those are the four faces bundled here, from
- * `@expo-google-fonts/poppins`.
+ * and the three faces are bundled from `@expo-google-fonts/poppins`.
  *
  * **React Native does not synthesise a weight for a custom font.** Android in
  * particular resolves `fontFamily` to one registered face and then ignores
@@ -213,67 +266,65 @@ export const RamahColors = {
  * back to the platform font with no error anywhere.
  */
 export const RamahWeight = {
-  regular: { fontFamily: 'Poppins_400Regular', fontWeight: '400' },
-  medium: { fontFamily: 'Poppins_500Medium', fontWeight: '500' },
-  semibold: { fontFamily: 'Poppins_600SemiBold', fontWeight: '600' },
+  /** Aloha's Book: sentences and metadata. */
+  book: { fontFamily: 'Poppins_400Regular', fontWeight: '400' },
+  /** Aloha's Demi: a row's title, a button, a caption. */
+  demi: { fontFamily: 'Poppins_600SemiBold', fontWeight: '600' },
+  /** Aloha's Bold: every Title from Small up. */
   bold: { fontFamily: 'Poppins_700Bold', fontWeight: '700' },
 } as const satisfies Record<string, TextStyle>;
 
 /**
- * The merchant type scale.
+ * The type scale (issue #33): one formula, three weights, line heights on the
+ * 4px grid, and names that say where a line sits in the hierarchy.
  *
- * Revision 3: rescaled to a general-purpose mobile type ramp — one scale, one
- * ratio, used everywhere in the app rather than a size picked per screen. Six
- * sizes, each a step of roughly 1.2–1.25× from the last: **12 → 14 → 16 → 20 →
- * 24 → 30**, plus the one documented exception below it. That replaces
- * revision 2's own scale, which topped out at 22/26 on the argument that six
- * cards sharing a viewport should carry their hierarchy in weight and colour
- * rather than size — a real tradeoff, and the one this revision spends back
- * for platform-standard title sizes (24–28pt is iOS's own large-title-adjacent
- * range, and Material 3's Title/Headline tiers land in the same place). Weight
- * and colour still do real work here — a 20pt bold heading beside a 16pt grey
- * regular line is legible without either needing to be bigger — but the sizes
- * themselves now sit inside the range a phone's own type system expects.
+ * **Every size is derived, not picked.** The ramp is Aloha's (Gojek's design
+ * system): a 9pt base times 1.3 per step, rounded to a whole point, and a line
+ * height of that size times 1.3 rounded to the **nearest multiple of 4** — so
+ * a line of text lands on the same grid as every gap around it (issue #31).
  *
- * Every named bundle below maps onto that six-step ramp:
+ *   | n | 9 × 1.3ⁿ | size | × 1.3 | line height |
+ *   |---|----------|------|-------|-------------|
+ *   | 1 |   11.7   |  12  |  15.6 |     16      |
+ *   | 2 |   15.2   |  15  |  19.5 |     20      |
+ *   | 3 |   19.8   |  20  |  26.0 |     24      |
+ *   | 4 |   25.7   |  26  |  33.8 |     32      |
+ *   | 5 |   33.4   |  34  |  44.2 |     44      |
+ *   | 6 |   43.4   |  44  |  57.2 |     56      |
  *
- *   metric (30) → identity (24) → groupTitle / fieldValue (20)
- *   → subtitle / rowTitle / body (16, 16, 16 — see note) → caption (12)
+ * A new size is the next n, never a number between two of these — 12.5, 18,
+ * 21 and 28 were all on screens before this, each one somebody's eye. n=3 is
+ * the one tie (26 is as far from 24 as from 28) and takes **24**: it is the
+ * size of a form field's value and a group heading, both of which stack in
+ * dense forms, and 28 would open every one of those rows by four points.
  *
- * `subtitle` is new: a secondary line directly under a heading (guide's own
- * "satu tingkat di bawah title, dibedakan dengan warna abu-abu, bukan cuma
- * ukuran"). It sits at 14 between `caption` and `body`/`rowTitle` — reach for
- * it on new screens; existing screens that put a `caption`-styled line under a
- * title were not mass-migrated to it, and `caption` itself was corrected to
- * the guide's own "Caption/label: 12" value.
+ * **The names are the hierarchy, shared with the guide, not a screen's role**:
  *
- * **The floor is 12px for anything you are meant to read.** 11px (`micro`)
- * exists only for a tile label and a character counter — two strings the eye
- * lands on because it already knows where they are, not because it is reading
- * them — which is exactly the "batas minimum 11–12" floor the guide states
- * rather than a seventh step on the main ramp.
+ * - **Title** — Hero, Large, Moderate, Small, Tiny — for text or numbers that
+ *   matter: a metric, a business name, a group heading, a row's title, a
+ *   field's value, a button. Bold, except Tiny, which is Demi.
+ * - **Body** — Moderate, Small — for sentences. Book.
+ * - **Caption** — the smallest, Demi, and used sparingly: a field's label, a
+ *   tile's label, a status pill, a counter. A line of metadata or a short
+ *   explanation is Body Small, not Caption.
  *
- * Poppins is still the family (max two is the guide's cap; this app uses one),
- * and the binaries are bundled — every bundle below carries one of
- * `RamahWeight`'s four named faces, so a style spread from here is already in
- * the right family and the right weight. A screen that writes a raw
- * `fontSize`/`fontWeight` pair of its own is a screen rendering in the
- * platform font; spread a bundle, or at minimum spread the matching
- * `RamahWeight` entry beside the size.
+ * **12pt is the floor, with no exception.** The old 11px tier for tile labels
+ * and counters is gone; both are Caption now. **No italic, anywhere** — Poppins
+ * is not loaded in one, and emphasis in this system is weight and colour.
  *
- * **Line height** follows the guide's own ranges rather than a fixed number:
- * body-weight text (`body`, `subtitle`, `caption`) sits at roughly 1.4–1.45×
- * its size, and heading-weight text (`rowTitle` and everything above it) at
- * roughly 1.2–1.3×, tightening slightly at the top of the scale the way a
- * large numeral's leading usually does.
+ * **The family stays Poppins.** Aloha's own principle is that the typeface is
+ * chosen with the brand team, and its face, Maison Neue, is Gojek's licensed
+ * brand identity; this app adopts the system — weights, ramp, rounding, names,
+ * contrast — and keeps its own brand's face. Every bundle below carries one of
+ * `RamahWeight`'s three named faces, so a style spread from here is already in
+ * the right family. A screen writing its own `fontSize` is a line in the
+ * platform font on Android and a number off the ramp everywhere; spread a
+ * bundle instead.
  *
- * **Tracking.** Poppins is a geometric grotesque that reads slightly airy at
- * heading sizes without it, so −0.01em is applied from `groupTitle` (20) up —
- * React Native's `letterSpacing` is in points rather than ems, so the em
- * figure is multiplied out per size and rounded to a tenth. Nothing at or
- * below 16px is tracked at all, which is `tokens/typography.css`'s own
- * `--tracking-body` rule; negative tracking on a 12px caption is where
- * legibility starts to go.
+ * **Tracking.** −0.01em from Title Small (20) up, because a geometric
+ * grotesque reads airy at heading sizes without it. React Native's
+ * `letterSpacing` is in points, so the em figure is multiplied out per size and
+ * rounded to a tenth. Nothing at 15 or below is tracked.
  *
  * **Scaling.** Nothing here disables the system's own font-size setting —
  * there is no blanket `allowFontScaling={false}` anywhere in the app, which is
@@ -284,39 +335,59 @@ export const RamahWeight = {
  * `maxFontSizeMultiplier` — documented there, not a rule to copy elsewhere.
  */
 export const RamahType = {
-  /** A money figure or a headline count on a card. The top of the scale. */
-  metric: { fontSize: 30, lineHeight: 36, letterSpacing: -0.3, ...RamahWeight.bold },
-  /** The business name in the identity block, or a screen's own page-level heading. */
-  identity: { fontSize: 24, lineHeight: 30, letterSpacing: -0.2, ...RamahWeight.bold },
-  /** A group heading, and the *value* of a form field — they are the same size. */
-  groupTitle: { fontSize: 20, lineHeight: 25, letterSpacing: -0.2, ...RamahWeight.bold },
-  fieldValue: { fontSize: 20, lineHeight: 26, letterSpacing: -0.2, ...RamahWeight.bold },
-  /**
-   * A secondary line directly under a title or identity — "atas nomor faktur",
-   * "unit kerja aktif". One step below the tier above it and meant to read as
-   * quieter through colour (`textBody`/`textMuted`) more than through size.
-   */
-  subtitle: { fontSize: 14, lineHeight: 20, ...RamahWeight.regular },
-  /** A list row's title. */
-  rowTitle: { fontSize: 16, lineHeight: 20, ...RamahWeight.semibold },
-  body: { fontSize: 16, lineHeight: 23, ...RamahWeight.regular },
-  /** Explanation and metadata. The smallest size a sentence may be set in. */
-  caption: { fontSize: 12, lineHeight: 17, ...RamahWeight.regular },
-  /** A field's label — small and grey, above a value that is large and dark. */
-  fieldLabel: { fontSize: 12, lineHeight: 15, ...RamahWeight.semibold },
-  /** A delta chip: arrow glyph plus a percentage. */
-  delta: { fontSize: 12, lineHeight: 15, ...RamahWeight.semibold },
-  /** Tile labels and character counters. Nothing else may be this small. */
-  micro: { fontSize: 11, lineHeight: 14, ...RamahWeight.semibold },
+  /** n=6. One number with a screen to itself. Merchant screens rarely need it. */
+  titleHero: { fontSize: 44, lineHeight: 56, letterSpacing: -0.4, ...RamahWeight.bold },
+  /** n=5. A money figure or a headline count on a card; the till's readout. */
+  titleLarge: { fontSize: 34, lineHeight: 44, letterSpacing: -0.3, ...RamahWeight.bold },
+  /** n=4. A business name, a screen's page heading, a sale's total. */
+  titleModerate: { fontSize: 26, lineHeight: 32, letterSpacing: -0.3, ...RamahWeight.bold },
+  /** n=3. A group heading, and the *value* of a form field — the same size on purpose. */
+  titleSmall: { fontSize: 20, lineHeight: 24, letterSpacing: -0.2, ...RamahWeight.bold },
+  /** n=2. A list row's title, a button's label. */
+  titleTiny: { fontSize: 15, lineHeight: 20, ...RamahWeight.demi },
+  /** n=2. A sentence. */
+  bodyModerate: { fontSize: 15, lineHeight: 20, ...RamahWeight.book },
+  /** n=1. A short sentence, or the metadata line under a title. */
+  bodySmall: { fontSize: 12, lineHeight: 16, ...RamahWeight.book },
+  /** n=1. A field's label, a tile's label, a status pill, a counter. Sparingly. */
+  caption: { fontSize: 12, lineHeight: 16, ...RamahWeight.demi },
 } as const satisfies Record<string, TextStyle>;
 
+export type RamahTypeName = keyof typeof RamahType;
+
 /**
- * Spacing and the sizes of things (guide §2, §7).
+ * Spacing and the sizes of things (guide §2, §7; issue #31).
  *
  * The 4px base scale is unchanged from `tokens/spacing.css`; what revision 2
  * changes is the screen-level geometry, and two of these contradict the token
  * file outright. The token file is a consumer-app default, the guide is what
  * these screens are drawn at, so the guide wins.
+ *
+ * ### One grid, and every gap on it is a statement
+ *
+ * **Every spacing value in a Ramah screen is a multiple of 4**, inside a
+ * component and between components alike. The gap between two things is how a
+ * reader tells whether they belong together — nearer is related, further is
+ * not, and two things with the same gap pattern read as equal in weight — so a
+ * 10 next to a 12 next to a 14 is not three slightly different choices, it is
+ * noise that blurs which things are grouped.
+ *
+ * The five **semantic tiers** below name those relationships, and a screen
+ * reaches for them first. The `space*` scale stays as the raw ruler for a
+ * component's own interior geometry — a pill's side padding, a row's icon gap —
+ * where the question is "how big" rather than "how related".
+ *
+ * **The one rule the tiers exist to keep: the gap between groups is clearly
+ * larger than any gap inside one.** `stack` 12 against `group` 24 is a 2:1
+ * step; the 12/16 pair revision 2 drew was 4pt apart, which on a phone reads as
+ * the same distance twice. That is a deliberate departure from the guide — see
+ * "Spacing" in `CLAUDE.md`.
+ *
+ * **What may sit off the grid, and nothing else:** a hairline (1px, 1.5px); a
+ * size rather than a gap (`controlH`, `rowH`, `tapMin`, an icon); a radius
+ * (`RamahRadius`); and a 1–3px optical nudge that centres a drawn glyph or a
+ * checkbox against a line of text, where the number is the glyph's own shape
+ * and not a distance between two things.
  */
 export const RamahLayout = {
   // 4px base scale, straight from the token file.
@@ -331,6 +402,18 @@ export const RamahLayout = {
   space12: 48,
   space16: 64,
 
+  // ---- semantic tiers: how related two neighbours are ----
+  /** Two parts of one fact: a label and its value, a title and its subtitle. */
+  inline: 4,
+  /** Equal items in one group: chips in a row, buttons side by side, an icon and its label, a heading and the one card it names. */
+  related: 8,
+  /** Cards stacked in one group, and the controls stacked over a list. */
+  stack: 12,
+  /** Between groups that are about different things. Always clearly more than anything inside a group. */
+  group: 24,
+  /** Around the one thing a screen is for, and between the large parts of a page. */
+  section: 32,
+
   /**
    * The screen's left/right margin — and the width a docked button is inset by.
    *
@@ -344,14 +427,28 @@ export const RamahLayout = {
    */
   gutter: 16,
 
-  /** Between cards in a stack. */
-  cardGap: 12,
-  /** Between two *groups* of cards that are about different things. */
-  groupGap: 16,
-
-  /** A card's own padding. 14 when the card is dense, 16 when it is not. */
-  cardPadDense: 14,
+  /**
+   * A card's own padding. 16, and 12 when the card is dense.
+   *
+   * The dense value was 14, off the grid. It went **down** rather than up
+   * because dense is the point of it: these are the list rows and stat cards a
+   * reader scans thirty of, and the 4pt that snapping them to 16 would have
+   * cost each row is what a phone in portrait runs out of first. The two
+   * pixels it gives back come home as the 4pt `inline` gap between a row's
+   * title and its subtitle, which used to be 2.
+   */
+  cardPadDense: 12,
   cardPad: 16,
+
+  /**
+   * Above and below a docked action — the green pill, the transition buttons.
+   *
+   * 16 where it used to be 10 or 12 depending on the screen. The docked pill is
+   * the most important control on every screen that has one, and the space
+   * around a thing is what tells the eye it matters; it is also the one control
+   * with a hairline right above it, which a 10pt gap crowded.
+   */
+  dockPad: 16,
 
   /** `--tap-min`, annotated "never smaller" in the token file. */
   tapMin: 44,
@@ -363,12 +460,24 @@ export const RamahLayout = {
   rowH: 56,
   headerH: 56,
 
-  /** The gap between two metrics either side of the hairline divider. */
-  metricGap: 14,
+  /**
+   * The gap between two metrics either side of the hairline divider. 16, up
+   * from 14: a metric card is what a screen is for, so it takes the roomier
+   * side of the grid.
+   */
+  metricGap: 16,
 
-  /** The feature shortcut grid: four columns, and never a fifth. */
+  /**
+   * The feature shortcut grid: four columns, and never a fifth.
+   *
+   * `tileGapY` is 16, up from the guide's 14. Vertical is the free direction —
+   * the four columns are sized by width, and a taller gap between rows costs a
+   * phone in portrait nothing across — and each tile is an icon over a label,
+   * so the space between rows is what keeps a label from reading as the caption
+   * of the icon underneath it.
+   */
   tileColumns: 4,
-  tileGapY: 14,
+  tileGapY: 16,
   tileGapX: 8,
   /** A 3D tile glyph stands alone at this size — see `RamahIcon` for why. */
   tileIcon: 52,
@@ -392,6 +501,69 @@ export const RamahRadius = {
   /** The feature tile's squircle. 14 per the guide, not the token file's 20. */
   tileSquircle: 14,
 } as const;
+
+/**
+ * Elevation: exactly two shadows, and nothing else in the app may cast one
+ * (issue #32).
+ *
+ * Revision 2 banned shadows outright, and it cost one real thing: a surface
+ * that sits *over* the content could not be told from one that sits *in* it. A
+ * docked "Simpan" pill was separated from the list scrolling behind it by one
+ * `#EBEBEB` hairline, which disappears the moment a white row passes under it.
+ *
+ * **A shadow says where a surface is on the z-axis, never how important it
+ * is.** The green pill is not given one to stand out — colour does that. A
+ * card on the grey canvas is not given one either: white on `surfaceSunken`
+ * already separates it, and a card does not float, it is the page.
+ *
+ * - **The light falls straight onto the screen**, so the shadow spreads evenly
+ *   on every side: offset 0,0, never pushed downward as if lit from above.
+ * - **Elevation is measured from base to top**, like a mountain from sea
+ *   level, so the only thing that differs between the two is size: `low` is a
+ *   surface one layer up and casts a narrow shadow, `high` floats clear of the
+ *   layout and casts a wider, spread one.
+ * - **The ink is navy, not black** — `surfaceInverse` at low opacity, the same
+ *   hue as `scrim`, so a shadow reads as the same material as a dimmed page.
+ *
+ * | Surface | Token |
+ * |---|---|
+ * | Every bottom dock (the green pill, the transition buttons) | `low` |
+ * | Kasir's totals foot, keypad foot and docked phone cart | `low` |
+ * | A hand-drawn floating sheet (`role-switcher.tsx`) | `high` |
+ * | Cards, rows, chips, tiles, fields | none |
+ * | `RamahSheet` | none — the native sheet draws the platform's own |
+ *
+ * **It is `boxShadow`, not `elevation` and not the iOS `shadow*` quartet.**
+ * `boxShadow` is the CSS model with spread and colour, drawn the same on both
+ * platforms under the New Architecture; Android's `elevation` ignores colour on
+ * most devices and has no spread, and `shadowOffset`/`shadowRadius` do nothing
+ * on Android. Two things about it bite:
+ *
+ * - **It needs an opaque `backgroundColor`** on the surface that carries it, or
+ *   nothing is drawn. Every dock here already has `surfacePage`.
+ * - **Android draws an outset `boxShadow` only from Android 9 (API 28)**, and
+ *   this app's `minSdk` is 24. Below 9 each token falls back to the hairline it
+ *   replaced — a top line for `low`, whose surfaces all sit on the bottom edge,
+ *   and a ring for `high` — so an old phone keeps today's look rather than
+ *   losing the separation entirely.
+ *
+ * When a surface takes a token, its hairline on that edge goes: two depth cues
+ * for one edge is one too many. And a shadow is never animated on its own; it
+ * moves only with the surface that casts it.
+ */
+const boxShadowDrawn =
+  Platform.OS !== 'android' || (typeof Platform.Version === 'number' && Platform.Version >= 28);
+
+export const RamahElevation = {
+  /** One layer over the content: a dock, a docked foot. */
+  low: boxShadowDrawn
+    ? { boxShadow: [{ offsetX: 0, offsetY: 0, blurRadius: 12, spreadDistance: 0, color: 'rgba(16,51,82,0.12)' }] }
+    : { borderTopWidth: 1, borderTopColor: RamahColors.borderHairline },
+  /** Clear of the layout, over everything: a floating sheet, a menu, a toast. */
+  high: boxShadowDrawn
+    ? { boxShadow: [{ offsetX: 0, offsetY: 0, blurRadius: 32, spreadDistance: 4, color: 'rgba(16,51,82,0.16)' }] }
+    : { borderWidth: 1, borderColor: RamahColors.borderHairline },
+} as const satisfies Record<string, ViewStyle>;
 
 /**
  * Icon sizes (guide §7).
@@ -490,7 +662,9 @@ export function scoreTone(score: number): { tint: string; ink: string; border: s
     return { tint: RamahColors.green50, ink: RamahColors.brandInk, border: RamahColors.green200 };
   }
   if (score >= 60) {
-    return { tint: RamahColors.amber50, ink: RamahColors.amber600, border: RamahColors.amber100 };
+    // amber700, not amber600: `ink` also colours the score's one-line note,
+    // which is small text and needs 4.5:1.
+    return { tint: RamahColors.amber50, ink: RamahColors.amber700, border: RamahColors.amber100 };
   }
   return { tint: RamahColors.red50, ink: RamahColors.red600, border: RamahColors.red50 };
 }

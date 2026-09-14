@@ -568,7 +568,7 @@ export default function BerandaScreen() {
             The feature grid (guide §4). Four columns, never a fifth, eight
             tiles at most, and the ninth sits behind "Lihat semua".
           */}
-          <View style={styles.card}>
+          <View style={[styles.card, styles.groupStart]}>
             <View style={styles.gridHead}>
               <Text style={styles.gridTitle}>Fitur</Text>
               <RamahSecondaryButton
@@ -582,7 +582,7 @@ export default function BerandaScreen() {
 
           {/* The secondary path: the last three invoices, newest first, as the
               server sorted them. */}
-          <View style={styles.group}>
+          <View style={[styles.group, styles.groupStart]}>
             <RamahSectionHeader action="Semua" onAction={() => router.navigate('/pembelian')}>
               Pembelian terakhir
             </RamahSectionHeader>
@@ -667,14 +667,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: L.gutter,
     paddingTop: L.space2,
     paddingBottom: L.space4,
-    gap: L.cardGap,
+    gap: L.space3,
   },
-  identityRow: { flexDirection: 'row', alignItems: 'flex-start', gap: L.cardGap },
+  identityRow: { flexDirection: 'row', alignItems: 'flex-start', gap: L.space3 },
   // 4 between the two controls, which is the board's number: they are one group
   // of chrome, not two unrelated buttons.
   identityActions: { flexDirection: 'row', flexShrink: 0, gap: L.space1 },
-  shopName: { ...T.identity, color: C.textTitle },
-  shopSub: { ...T.caption, color: C.textBody },
+  shopName: { ...T.titleModerate, color: C.textTitle },
+  shopSub: { ...T.bodySmall, color: C.textBody },
   iconBtn: {
     width: L.tapMin,
     height: L.tapMin,
@@ -685,17 +685,27 @@ const styles = StyleSheet.create({
   konteks: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: L.space3,
     paddingVertical: L.space3,
-    paddingHorizontal: 14,
+    paddingHorizontal: L.space4,
     borderRadius: R.field,
     backgroundColor: C.white,
   },
-  konteksText: { ...T.rowTitle, color: C.textTitle, flex: 1, minWidth: 0 },
+  konteksText: { ...T.titleTiny, color: C.textTitle, flex: 1, minWidth: 0 },
 
-  // 12 between cards, which is the whole stack: the board's home has no two
-  // cards far enough apart in subject to earn the 16pt group gap.
-  body: { paddingHorizontal: L.gutter, paddingTop: L.cardGap, gap: L.cardGap },
+  /*
+    Three groups, not one stack of four cards. The two-metric card and the score
+    card under it answer the same question — what needs attention — and sit a
+    `stack` apart; the feature grid is a map of the app and the invoice preview
+    is a different list again, so each of those opens a group of its own
+    (`groupStart`). When all four were 12 apart the grid read as a third
+    metric.
+
+    16 on top rather than 12: the metric card is what this screen is for, and
+    it is the first thing under the orange block.
+  */
+  body: { paddingHorizontal: L.gutter, paddingTop: L.space4, gap: L.stack },
+  groupStart: { marginTop: L.group - L.stack },
 
   card: {
     borderRadius: R.card,
@@ -705,41 +715,41 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   metricRow: { flexDirection: 'row', padding: L.cardPad },
-  metric: { flex: 1, minWidth: 0, gap: 6, paddingRight: L.metricGap },
+  metric: { flex: 1, minWidth: 0, gap: L.inline, paddingRight: L.metricGap },
   metricRight: { paddingRight: 0, paddingLeft: L.metricGap },
   metricDivider: { width: 1, backgroundColor: C.borderHairline },
-  metricLabel: { ...T.caption, color: C.textBody },
+  metricLabel: { ...T.bodySmall, color: C.textBody },
   /**
    * Always `--text-title`, never toned. Guide §3 is flat about it: the *value*
-   * is `T.metric`, bold, in the title colour, and the tone lives in the delta
+   * is `T.titleLarge`, bold, in the title colour, and the tone lives in the delta
    * chip beside it. An earlier version painted the reorder count orange, which
    * read as urgency the number does not carry on its own — seven items below
    * minimum is not alarming in a shop that stocks four hundred.
    */
-  metricValue: { ...T.metric, color: C.textTitle },
+  metricValue: { ...T.titleLarge, color: C.textTitle },
   cardFoot: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: L.space2,
-    paddingVertical: 11,
+    paddingVertical: L.space3,
     paddingHorizontal: L.cardPad,
     backgroundColor: C.grey50,
     borderTopWidth: 1,
     borderTopColor: C.borderHairline,
   },
-  cardFootText: { ...T.caption, color: C.textMuted },
+  cardFootText: { ...T.bodySmall, color: C.textMuted },
 
   gridHead: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: L.cardGap,
+    gap: L.space3,
     paddingHorizontal: L.cardPad,
     paddingTop: L.cardPad,
   },
-  gridTitle: { ...T.groupTitle, color: C.textTitle },
-  // 14 vertical / 8 horizontal is the guide's grid gap; the tiles carry half of
+  gridTitle: { ...T.titleSmall, color: C.textTitle },
+  // 16 vertical / 8 horizontal is the grid gap (`tileGapY`); the tiles carry half of
   // the horizontal one each, so the row lines up with the card's own padding.
   grid: {
     flexDirection: 'row',
@@ -756,8 +766,8 @@ const styles = StyleSheet.create({
     paddingBottom: L.space4,
   },
 
-  group: { gap: L.space2 },
-  groupNote: { ...T.caption, color: C.textMuted },
+  group: { gap: L.related },
+  groupNote: { ...T.bodySmall, color: C.textMuted },
   list: {
     borderRadius: R.card,
     backgroundColor: C.surfaceCard,
@@ -771,5 +781,5 @@ const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: C.borderHairline, marginHorizontal: L.cardPad },
 
   kosong: { alignItems: 'center', gap: L.space3, paddingHorizontal: L.gutter, paddingVertical: L.space6 },
-  kosongText: { ...T.caption, color: C.textMuted, textAlign: 'center' },
+  kosongText: { ...T.bodySmall, color: C.textMuted, textAlign: 'center' },
 });

@@ -307,9 +307,9 @@ export default function ProfilScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: C.surfaceSunken },
   grow: { flex: 1, minWidth: 0 },
-  content: { paddingHorizontal: L.gutter, paddingTop: L.space2, paddingBottom: L.space6, gap: L.cardGap },
+  content: { paddingHorizontal: L.gutter, paddingTop: L.space2, paddingBottom: L.space6, gap: L.stack },
 
-  title: { ...T.identity, color: C.textTitle },
+  title: { ...T.titleModerate, color: C.textTitle },
 
   identity: { flexDirection: 'row', alignItems: 'center', gap: L.space3 },
   avatar: {
@@ -320,10 +320,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: C.brandTint,
   },
-  nama: { ...T.groupTitle, color: C.textTitle },
-  email: { ...T.caption, color: C.textBody, marginTop: 2 },
+  nama: { ...T.titleSmall, color: C.textTitle },
+  email: { ...T.bodySmall, color: C.textBody, marginTop: L.inline },
 
-  group: { gap: L.space2 },
+  // Every group on this screen starts with its own heading and is about a
+  // different thing, so each one opens at `group` from what is above it.
+  group: { gap: L.related, marginTop: L.group - L.stack },
   card: {
     borderRadius: R.card,
     backgroundColor: C.surfaceCard,
@@ -332,10 +334,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
 
-  keluarWrap: { paddingTop: L.space2 },
+  // Signing out is not one more setting, so it stands a group away from them.
+  keluarWrap: { marginTop: L.group - L.stack },
 
   sheetBody: { paddingHorizontal: L.gutter, gap: L.space3, paddingBottom: L.space4 },
-  hint: { ...T.caption, color: C.textBody },
-  chipRow: { flexDirection: 'row', gap: 10 },
-  headRow: { flexDirection: 'row', gap: 10 },
+  hint: { ...T.bodySmall, color: C.textBody },
+  chipRow: { flexDirection: 'row', gap: L.related },
+  headRow: { flexDirection: 'row', gap: L.related },
 });

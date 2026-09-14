@@ -251,7 +251,7 @@ function Viewer({
 }
 
 const styles = StyleSheet.create({
-  group: { gap: L.space2 },
+  group: { gap: L.related },
   card: {
     backgroundColor: C.surfaceCard,
     borderWidth: 1,
@@ -260,12 +260,12 @@ const styles = StyleSheet.create({
     padding: L.cardPad,
     gap: L.space3,
   },
-  warn: { ...T.caption, color: C.amber600, lineHeight: 18 },
+  warn: { ...T.bodySmall, color: C.amber700 },
   centerBox: { alignItems: 'center', paddingVertical: L.space5 },
-  emptyText: { ...T.caption, color: C.textBody },
+  emptyText: { ...T.bodySmall, color: C.textBody },
 
   strip: { gap: L.space3 },
-  thumb: { width: 92, gap: 6 },
+  thumb: { width: 92, gap: L.space2 },
   thumbImage: {
     width: 92,
     height: 122,
@@ -284,7 +284,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  thumbLabel: { ...T.micro, color: C.textMuted, textAlign: 'center' },
+  thumbLabel: { ...T.caption, color: C.textMuted, textAlign: 'center' },
 
   viewer: { flex: 1, backgroundColor: '#000' },
   viewerImage: { flex: 1, width: '100%' },
@@ -302,7 +302,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 16,
     right: 16,
-    ...T.caption,
+    ...T.bodySmall,
     color: '#fff',
     textAlign: 'center',
     opacity: 0.85,

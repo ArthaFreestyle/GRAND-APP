@@ -91,7 +91,7 @@ export default function PembelianBaruScreen() {
    * alternatives, never a sum.
    */
   const insets = useSafeAreaInsets();
-  const dockPad = useDockPadding(insets.bottom, L.cardGap);
+  const dockPad = useDockPadding(insets.bottom, L.dockPad);
 
   const [langkah, setLangkah] = useState<Langkah>('barang');
 

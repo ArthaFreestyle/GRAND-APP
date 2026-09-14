@@ -63,6 +63,7 @@ import { DOKUMEN_RAMAH } from '@/components/shell/status-dokumen';
 import { formatRupiah, formatTanggal } from '@/constants/produk';
 import {
   RamahColors as C,
+  RamahElevation as E,
   RamahLayout as L,
   RamahType as T,
 } from '@/constants/theme-ramah';
@@ -526,24 +527,24 @@ const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
 
   body: { flex: 1 },
-  bodyContent: { paddingHorizontal: L.gutter, paddingTop: L.space1, paddingBottom: L.space6, gap: L.groupGap },
+  bodyContent: { paddingHorizontal: L.gutter, paddingTop: L.space1, paddingBottom: L.space6, gap: L.group },
 
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: L.space8, gap: L.space2 },
-  centerTitle: { ...T.groupTitle, color: C.textTitle, textAlign: 'center' },
-  centerSub: { ...T.caption, color: C.textBody, textAlign: 'center' },
+  centerTitle: { ...T.titleSmall, color: C.textTitle, textAlign: 'center' },
+  centerSub: { ...T.bodySmall, color: C.textBody, textAlign: 'center' },
   centerAction: { paddingTop: L.space4 },
 
   identity: { gap: L.space1 },
   identityTop: { flexDirection: 'row', alignItems: 'center', gap: L.space3 },
-  identityName: { ...T.identity, color: C.textTitle, flexShrink: 1 },
-  identitySub: { ...T.caption, color: C.textBody },
+  identityName: { ...T.titleModerate, color: C.textTitle, flexShrink: 1 },
+  identitySub: { ...T.bodySmall, color: C.textBody },
 
   alasanBox: { backgroundColor: C.red50, borderRadius: 16, padding: L.cardPad, gap: L.space1 },
-  alasanLabel: { ...T.rowTitle, color: C.textDanger },
-  alasanText: { ...T.caption, color: C.textTitle },
-  alasanNote: { ...T.micro, color: C.textBody, marginTop: L.space2 },
+  alasanLabel: { ...T.titleTiny, color: C.textDanger },
+  alasanText: { ...T.bodySmall, color: C.textTitle },
+  alasanNote: { ...T.caption, color: C.textBody, marginTop: L.space2 },
 
-  group: { gap: L.space2 },
+  group: { gap: L.related },
   emptyCard: {
     backgroundColor: C.surfaceCard,
     borderWidth: 1,
@@ -551,24 +552,23 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: L.cardPad,
   },
-  emptyTitle: { ...T.rowTitle, color: C.textTitle },
+  emptyTitle: { ...T.titleTiny, color: C.textTitle },
 
   lineRow: { flexDirection: 'row', alignItems: 'flex-start', gap: L.space3, padding: L.cardPad, minHeight: L.rowH },
-  lineNama: { ...T.rowTitle, color: C.textTitle },
-  lineSub: { ...T.caption, color: C.textMuted, marginTop: 2 },
-  lineValue: { ...T.rowTitle, color: C.textTitle },
+  lineNama: { ...T.titleTiny, color: C.textTitle },
+  lineSub: { ...T.bodySmall, color: C.textMuted, marginTop: L.inline },
+  lineValue: { ...T.titleTiny, color: C.textTitle },
 
-  noAksi: { ...T.caption, color: C.textMuted, textAlign: 'center', paddingVertical: L.space2 },
+  noAksi: { ...T.bodySmall, color: C.textMuted, textAlign: 'center', paddingVertical: L.space2 },
 
   dock: {
     paddingHorizontal: L.gutter,
-    paddingTop: 10,
-    gap: 10,
+    paddingTop: L.dockPad,
+    gap: L.related,
     backgroundColor: C.surfacePage,
-    borderTopWidth: 1,
-    borderTopColor: C.borderHairline,
+    ...E.low,
   },
 
   sheetBody: { paddingHorizontal: L.gutter, gap: L.space3, paddingBottom: L.space4 },
-  chipRow: { flexDirection: 'row', gap: 10 },
+  chipRow: { flexDirection: 'row', gap: L.related },
 });

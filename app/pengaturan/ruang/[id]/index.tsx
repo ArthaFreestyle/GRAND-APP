@@ -218,7 +218,9 @@ export default function RuangDetailScreen() {
           )}
         </View>
 
-        <RamahSectionHeader>Unit kerja</RamahSectionHeader>
+        <View style={styles.groupStart}>
+          <RamahSectionHeader>Unit kerja</RamahSectionHeader>
+        </View>
         <RamahStackCard>
           <Baris label="Unit kerja" value={ruang.namaUnitKerja || '—'} />
         </RamahStackCard>
@@ -275,28 +277,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: L.gutter,
     paddingTop: L.space2,
     paddingBottom: L.space10,
-    gap: L.cardGap,
+    gap: L.stack,
   },
+  // A heading in this `stack` column opens a new group: `group` above it.
+  groupStart: { paddingTop: L.group - L.stack },
 
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: L.space6, gap: L.space2 },
-  centerTitle: { ...T.groupTitle, color: C.textTitle },
-  centerSub: { ...T.caption, color: C.textBody, textAlign: 'center' },
+  centerTitle: { ...T.titleSmall, color: C.textTitle },
+  centerSub: { ...T.bodySmall, color: C.textBody, textAlign: 'center' },
   centerAction: { paddingTop: L.space4 },
 
-  identity: { gap: 2, paddingVertical: L.space2 },
-  identityName: { ...T.identity, color: C.textTitle },
-  identitySub: { ...T.caption, color: C.textBody },
+  identity: { gap: L.inline, paddingVertical: L.space2 },
+  identityName: { ...T.titleModerate, color: C.textTitle },
+  identitySub: { ...T.bodySmall, color: C.textBody },
   badgeRow: { flexDirection: 'row', paddingTop: L.space2 },
 
   baris: {
     paddingHorizontal: L.cardPad,
     paddingVertical: L.cardPadDense,
-    gap: 2,
+    gap: L.inline,
     minHeight: L.rowH,
     justifyContent: 'center',
   },
-  barisLabel: { ...T.fieldLabel, color: C.textBody },
-  barisValue: { ...T.body, color: C.textTitle },
+  barisLabel: { ...T.caption, color: C.textBody },
+  barisValue: { ...T.bodyModerate, color: C.textTitle },
 
   bekuCard: {
     flexDirection: 'row',
@@ -306,7 +310,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: C.orange50,
   },
-  bekuLabel: { ...T.fieldLabel, color: C.orange600 },
-  bekuValue: { ...T.rowTitle, color: C.textTitle, marginTop: 2 },
-  bekuSub: { ...T.caption, color: C.textBody, marginTop: 4 },
+  bekuLabel: { ...T.caption, color: C.textWarning },
+  bekuValue: { ...T.titleTiny, color: C.textTitle, marginTop: L.inline },
+  bekuSub: { ...T.bodySmall, color: C.textBody, marginTop: L.inline },
 });

@@ -592,7 +592,7 @@ function SatuanChip({
 
 const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
-  group: { gap: L.cardGap },
+  group: { gap: L.stack },
 
   emptyCard: {
     backgroundColor: C.surfaceCard,
@@ -602,8 +602,8 @@ const styles = StyleSheet.create({
     padding: L.cardPad,
     gap: L.space1,
   },
-  emptyTitle: { ...T.rowTitle, color: C.textTitle },
-  emptySub: { ...T.caption, color: C.textBody },
+  emptyTitle: { ...T.titleTiny, color: C.textTitle },
+  emptySub: { ...T.bodySmall, color: C.textBody },
 
   lineBox: {
     backgroundColor: C.surfaceCard,
@@ -614,27 +614,28 @@ const styles = StyleSheet.create({
     gap: L.space3,
   },
   lineTop: { flexDirection: 'row', alignItems: 'flex-end', gap: L.space2 },
-  lineNo: { ...T.caption, color: C.textMuted, paddingBottom: 10 },
+  lineNo: { ...T.bodySmall, color: C.textMuted, paddingBottom: L.space3 },
 
   fieldRow: { flexDirection: 'row', flexWrap: 'wrap', gap: L.space3 },
   fieldCell: { flexGrow: 1, flexBasis: 130 },
-  miniLabel: { ...T.fieldLabel, color: C.textBody, marginBottom: 6 },
+  miniLabel: { ...T.caption, color: C.textBody, marginBottom: L.inline },
   satuanLoading: { alignSelf: 'flex-start' },
 
   satuanChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: L.space2,
     alignSelf: 'flex-start',
     height: L.controlHSm,
-    paddingHorizontal: 14,
+    // The same insides as `RamahChip`, which this chip sits beside.
+    paddingHorizontal: L.space3,
     borderRadius: R.pill,
     borderWidth: 1.5,
     borderColor: C.borderHairline,
     backgroundColor: C.white,
   },
   satuanChipDown: { backgroundColor: C.surfaceStack },
-  satuanChipText: { ...T.caption, color: C.textTitle },
+  satuanChipText: { ...T.bodySmall, color: C.textTitle },
 
   lineFoot: {
     flexDirection: 'row',
@@ -645,8 +646,8 @@ const styles = StyleSheet.create({
     borderTopColor: C.borderHairline,
     paddingTop: L.space2,
   },
-  lineFootLabel: { ...T.caption, color: C.textBody },
-  lineFootValue: { ...T.rowTitle, color: C.textTitle },
+  lineFootLabel: { ...T.bodySmall, color: C.textBody },
+  lineFootValue: { ...T.titleTiny, color: C.textTitle },
 
   addBar: { alignItems: 'flex-start' },
 });

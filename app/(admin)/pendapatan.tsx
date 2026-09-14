@@ -217,7 +217,9 @@ export default function PendapatanScreen() {
           </View>
         </View>
 
-        <RamahSectionHeader>7 hari terakhir</RamahSectionHeader>
+        <View style={styles.groupStart}>
+          <RamahSectionHeader>7 hari terakhir</RamahSectionHeader>
+        </View>
         <View style={styles.list}>
           {hari.map((h, i) => (
             <View key={h.tanggal}>
@@ -245,9 +247,12 @@ export default function PendapatanScreen() {
  */
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: C.surfaceSunken },
-  content: { paddingHorizontal: L.gutter, paddingTop: L.space2, paddingBottom: L.space6, gap: L.cardGap },
+  // Today's three figures are one group a `stack` apart; the seven-day list is
+  // a different question and opens a group of its own.
+  content: { paddingHorizontal: L.gutter, paddingTop: L.space2, paddingBottom: L.space6, gap: L.stack },
+  groupStart: { paddingTop: L.group - L.stack },
 
-  title: { ...T.identity, color: C.textTitle },
+  title: { ...T.titleModerate, color: C.textTitle },
 
   card: {
     borderRadius: R.card,
@@ -256,23 +261,23 @@ const styles = StyleSheet.create({
     borderColor: C.borderHairline,
     overflow: 'hidden',
   },
-  metricLabel: { ...T.fieldLabel, color: C.textBody, paddingHorizontal: L.cardPad, paddingTop: L.cardPad },
-  metricValue: { ...T.metric, color: C.textTitle, paddingHorizontal: L.cardPad, paddingTop: 2 },
-  metricSub: { ...T.caption, color: C.textBody, paddingHorizontal: L.cardPad, paddingTop: 2, paddingBottom: L.cardPad },
+  metricLabel: { ...T.caption, color: C.textBody, paddingHorizontal: L.cardPad, paddingTop: L.cardPad },
+  metricValue: { ...T.titleLarge, color: C.textTitle, paddingHorizontal: L.cardPad, paddingTop: L.inline },
+  metricSub: { ...T.bodySmall, color: C.textBody, paddingHorizontal: L.cardPad, paddingTop: L.inline, paddingBottom: L.cardPad },
   cardFoot: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: L.space2,
-    paddingVertical: 11,
+    paddingVertical: L.space3,
     paddingHorizontal: L.cardPad,
     backgroundColor: C.grey50,
     borderTopWidth: 1,
     borderTopColor: C.borderHairline,
   },
-  cardFootText: { ...T.caption, color: C.textMuted },
+  cardFootText: { ...T.bodySmall, color: C.textMuted },
 
-  statGrid: { flexDirection: 'row', gap: 10 },
+  statGrid: { flexDirection: 'row', gap: L.stack },
   statCell: { flex: 1 },
 
   list: {
@@ -291,6 +296,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: L.cardPad,
     minHeight: L.rowH,
   },
-  rowLabel: { ...T.body, color: C.textTitle },
-  rowValue: { ...T.rowTitle, color: C.textTitle },
+  rowLabel: { ...T.bodyModerate, color: C.textTitle },
+  rowValue: { ...T.titleTiny, color: C.textTitle },
 });

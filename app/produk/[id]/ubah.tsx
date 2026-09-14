@@ -76,6 +76,7 @@ import {
 import { formatNumber, formatRupiah, formatTanggal, todayISO } from '@/constants/produk';
 import {
   RamahColors as C,
+  RamahElevation as E,
   RamahLayout as L,
   RamahRadius as R,
   RamahType as T,
@@ -268,7 +269,7 @@ function UbahProdukForm({
    * dialog had to pay all four because a `Modal` is its own window and sits
    * outside that box.
    */
-  const dockPad = useDockPadding(insets.bottom, L.cardGap);
+  const dockPad = useDockPadding(insets.bottom, L.dockPad);
   const today = todayISO();
 
   const [nama, setNama] = useState(product.nama);
@@ -639,14 +640,14 @@ const styles = StyleSheet.create({
   // same words: reached cold on this URL, "Barang tidak ditemukan" is the same
   // fact whichever of the two screens the link pointed at.
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: L.space8, gap: L.space2 },
-  centerTitle: { ...T.groupTitle, color: C.textTitle, textAlign: 'center' },
-  centerSub: { ...T.caption, color: C.textBody, textAlign: 'center' },
+  centerTitle: { ...T.titleSmall, color: C.textTitle, textAlign: 'center' },
+  centerSub: { ...T.bodySmall, color: C.textBody, textAlign: 'center' },
   centerAction: { paddingTop: L.space4 },
 
   body: { flex: 1 },
   bodyContent: { paddingHorizontal: L.gutter, paddingTop: L.space1, paddingBottom: L.space6, gap: L.space5 },
 
-  group: { gap: L.cardGap },
+  group: { gap: L.stack },
   satuanCard: {
     backgroundColor: C.surfaceCard,
     borderWidth: 1,
@@ -654,26 +655,25 @@ const styles = StyleSheet.create({
     borderRadius: R.card,
     paddingVertical: L.cardPadDense,
     paddingHorizontal: L.cardPad,
-    gap: 10,
+    gap: L.space3,
   },
-  satuanHead: { gap: 2 },
-  satuanNama: { ...T.rowTitle, color: C.textTitle },
-  satuanKonversi: { ...T.caption, color: C.textBody },
+  satuanHead: { gap: L.inline },
+  satuanNama: { ...T.titleTiny, color: C.textTitle },
+  satuanKonversi: { ...T.bodySmall, color: C.textBody },
 
-  sheetIntro: { paddingHorizontal: L.gutter, gap: L.cardGap, paddingBottom: L.space2 },
-  sheetLead: { ...T.caption, color: C.textBody },
-  sheetEmpty: { ...T.caption, color: C.textMuted, paddingVertical: L.space4 },
+  sheetIntro: { paddingHorizontal: L.gutter, gap: L.stack, paddingBottom: L.space2 },
+  sheetLead: { ...T.bodySmall, color: C.textBody },
+  sheetEmpty: { ...T.bodySmall, color: C.textMuted, paddingVertical: L.space4 },
   sheetForm: { paddingHorizontal: L.gutter, gap: L.space5, paddingBottom: L.space2 },
 
-  preview: { backgroundColor: C.grey50, borderRadius: R.card, padding: L.cardPad, gap: 2 },
-  previewLabel: { ...T.caption, color: C.textBody },
-  previewValue: { ...T.rowTitle, color: C.textTitle },
+  preview: { backgroundColor: C.grey50, borderRadius: R.card, padding: L.cardPad, gap: L.inline },
+  previewLabel: { ...T.bodySmall, color: C.textBody },
+  previewValue: { ...T.titleTiny, color: C.textTitle },
 
   dock: {
     paddingHorizontal: L.gutter,
-    paddingTop: 10,
+    paddingTop: L.dockPad,
     backgroundColor: C.surfacePage,
-    borderTopWidth: 1,
-    borderTopColor: C.borderHairline,
+    ...E.low,
   },
 });
