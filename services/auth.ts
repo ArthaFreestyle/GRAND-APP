@@ -17,6 +17,7 @@ import {
   setSession,
   type LoginResult,
   type Session,
+  type User,
 } from '@/services/session';
 
 /**
@@ -111,6 +112,48 @@ export async function refresh(refreshToken: string): Promise<Session> {
   const session = sessionFromLoginResult(result, getSession());
   setSession(session);
   return session;
+}
+
+/**
+ * Changes the caller's own password. `POST /auth/me/password`, open to any
+ * authenticated caller with no role guard — the same footing as `auth/me` and
+ * `switch-context` — so this is called with the session's own token by hand
+ * (`apiRequest`, not `services/client.ts`'s `authedRequest`) for the same
+ * reason `switchContext` is: `services/client.ts` imports `refresh` from this
+ * module to retry an expired token, and importing `authedRequest` back would
+ * close that into a cycle. A password change is rare enough that skipping the
+ * proactive-refresh-and-retry `authedRequest` gives is not worth it.
+ *
+ * `password_lama` is verified server-side even though the caller is already
+ * authenticated — a stolen access token must not be able to lock the real
+ * owner out of their own account — and a wrong one answers the same message as
+ * `POST /auth/login`, undistinguished from any other cause.
+ *
+ * **Success revokes every refresh token this user holds**, on every device.
+ * That is `POST /auth/me/password`'s own side effect, not something this app
+ * does separately: another session loses access once its access token expires
+ * (`jwt.ttl_minutes`, default 15 minutes), not instantly. This session's own
+ * access token is still the one just used to call this endpoint, so nothing
+ * here needs to sign this device out.
+ */
+export async function changePassword(
+  passwordLama: string,
+  passwordBaru: string
+): Promise<User> {
+  const session = getSession();
+  if (!session) throw new ApiError('Sesi sudah berakhir. Masuk lagi.', 401);
+  try {
+    return await apiRequest<User>('/api/v1/auth/me/password', {
+      method: 'POST',
+      token: session.token,
+      body: { password_lama: passwordLama, password_baru: passwordBaru },
+    });
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 401) {
+      throw new ApiError(GENERIC_LOGIN_FAILURE, 401);
+    }
+    throw e;
+  }
 }
 
 /**

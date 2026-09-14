@@ -222,6 +222,14 @@ function RootNavigator() {
           `app/pembelian/_layout.tsx`.
         */}
         <Stack.Screen name="pembelian" />
+        {/*
+          Nota penjualan, beside the tabs too — issue #25. Riwayat (the list)
+          is the fourth tab; this is only the record a row of it pushes, and it
+          has no `NativeTabs.Trigger` of its own because a sixth tab would sit
+          past the platform's own five-tab ceiling on both bottom-navigation
+          styles. See `app/penjualan/_layout.tsx`.
+        */}
+        <Stack.Screen name="penjualan" />
       </Stack.Protected>
     </Stack>
   );

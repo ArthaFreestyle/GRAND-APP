@@ -87,10 +87,15 @@
  * cannot share an edge with a tab bar, and a POS that shows the rest of the app
  * along its bottom is a POS somebody leaves by accident mid-sale.
  *
- * That is also why the `more-vertical` button exists, opening a sheet with four
- * entries: back to Beranda, switch grant, choose printer, sign out. With the
- * bar hidden it is the only way out, and it has to be — a cashier whose
- * `homeRouteFor` is this screen would otherwise never reach a sign-out.
+ * That is also why the `more-vertical` button exists. With the bar hidden it
+ * is the only way out, and it has to be. **It carries two or three entries
+ * now, not four — issue #25 moved "ganti wewenang", "printer struk" and
+ * "keluar akun" to Profil**, the fifth tab: none of the three is about the
+ * till itself, and once every tab is a thumb's reach away regardless of which
+ * one is open, they no longer need to squat in this screen's overflow just to
+ * stay reachable. What the sheet keeps is "Kembali" (the way out — the bar is
+ * hidden, so this is what un-hides it), "Gudang" (only when there is a second
+ * one to pick), and PPN, a setting this screen alone owns.
  *
  * **Insets: this screen owns its bottom edge and nothing else.** The group
  * layout pads top, left and right outside the navigator, so those are already
@@ -185,7 +190,6 @@ import {
   RamahSheetOption,
   RamahTertiaryButton,
 } from '@/components/shell/ramah';
-import { RoleSwitcherSheet } from '@/components/shell/role-switcher';
 import { formatNumber, formatRupiah } from '@/constants/produk';
 import {
   RamahColors as C,
@@ -198,7 +202,6 @@ import {
 } from '@/constants/theme-ramah';
 import { atLeast, useBreakpoint } from '@/hooks/use-breakpoint';
 import { messageOf } from '@/services/api';
-import { logout } from '@/services/auth';
 import * as printer from '@/services/bluetooth-printer';
 import { decimalToNumber, rupiahToDecimal } from '@/services/decimal';
 import {
@@ -511,7 +514,6 @@ export default function KasirScreen() {
   const [printed, setPrinted] = useState(false);
 
   const [menuOpen, setMenuOpen] = useState(false);
-  const [roleOpen, setRoleOpen] = useState(false);
   const [printerOpen, setPrinterOpen] = useState(false);
   const [ppnOpen, setPpnOpen] = useState(false);
   const [ruangOpen, setRuangOpen] = useState(false);
@@ -1134,7 +1136,7 @@ export default function KasirScreen() {
    */
   async function cetak() {
     if (!dev) {
-      setPrinterOpen(true);
+      openPrinter();
       return;
     }
     const data: ReceiptData = {
@@ -1168,7 +1170,7 @@ export default function KasirScreen() {
       setPrinted(true);
     } catch (e) {
       setPrinterErr(e instanceof Error ? e.message : 'Struk gagal dicetak.');
-      setPrinterOpen(true);
+      openPrinter();
     }
   }
 
@@ -1185,6 +1187,16 @@ export default function KasirScreen() {
     }
   }
 
+  /**
+   * Opens the printer sheet with the paired-device list already loading.
+   *
+   * Issue #25 moved proactive printer management to Profil's own "Printer
+   * Bluetooth" entry — the menu below no longer links here on its own — but
+   * this screen still opens the same sheet twice: `cetak()` when no device is
+   * chosen yet, and the success card's printer line to switch mid-shift.
+   * `setMenuOpen(false)` is a harmless no-op from either call site; it only
+   * ever did anything when this was also the menu's own handler.
+   */
   function openPrinter() {
     setMenuOpen(false);
     setPrinterOpen(true);
@@ -1973,7 +1985,7 @@ export default function KasirScreen() {
                 </View>
               </View>
               <Pressable
-                onPress={() => setPrinterOpen(true)}
+                onPress={openPrinter}
                 accessibilityRole="button"
                 accessibilityLabel={`${printerLabel}. Ganti printer`}>
                 <Text style={styles.printerLabel}>{printerLabel}</Text>
@@ -1987,14 +1999,18 @@ export default function KasirScreen() {
         The one piece of app chrome this screen carries — see the file header.
         `/kasir` sits outside the tab navigator, so without it the till is a
         room with no door.
+
+        **Two entries, not five — issue #25.** "Ganti wewenang", "Printer
+        struk" and "Keluar akun" moved to Profil, the fifth tab: none of the
+        three is about the till itself, and now that every tab is a thumb's
+        reach away regardless of which one is open, they no longer need to
+        squat in this screen's overflow to be reachable. What is left is what
+        actually belongs to this screen — the way out, the gudang this till
+        sells out of, and PPN, a per-device setting owned by this screen and
+        nowhere else.
       */}
       <RamahSheet visible={menuOpen} title="Menu kasir" onClose={() => setMenuOpen(false)}>
-        <RamahSheetOption
-          label="Kembali ke beranda"
-          sub="Tutup layar kasir"
-          selected={false}
-          onPress={keluarKasir}
-        />
+        <RamahSheetOption label="Kembali" sub="Tutup layar kasir" selected={false} onPress={keluarKasir} />
         {/*
           The gudang is not a preference, it is what every figure on this screen
           is *about*: `GET /pos/product` requires `id_ruang`, and the nota's own
@@ -2020,27 +2036,6 @@ export default function KasirScreen() {
           onPress={() => {
             setMenuOpen(false);
             setPpnOpen(true);
-          }}
-        />
-        {(session?.grants.length ?? 0) > 1 ? (
-          <RamahSheetOption
-            label="Ganti wewenang"
-            sub="Pilih peran atau unit kerja lain"
-            selected={false}
-            onPress={() => {
-              setMenuOpen(false);
-              setRoleOpen(true);
-            }}
-          />
-        ) : null}
-        <RamahSheetOption label="Printer struk" sub={printerLabel} selected={false} onPress={openPrinter} />
-        <RamahSheetOption
-          label="Keluar akun"
-          sub={cashierName}
-          selected={false}
-          onPress={() => {
-            setMenuOpen(false);
-            void logout();
           }}
         />
       </RamahSheet>
@@ -2126,8 +2121,6 @@ export default function KasirScreen() {
           />
         ))}
       </RamahSheet>
-
-      <RoleSwitcherSheet visible={roleOpen} onClose={() => setRoleOpen(false)} />
 
       <RamahSheet visible={printerOpen} title="Printer struk" onClose={() => setPrinterOpen(false)}>
         <View style={styles.sheetBody}>

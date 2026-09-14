@@ -8,7 +8,7 @@ import { TAB_ITEMS } from '@/components/shell/AppShell';
 import { RamahColors as C, RamahType as T } from '@/constants/theme-ramah';
 
 /**
- * The back office shell: two tab roots, and the sections that hang off them.
+ * The back office shell: five tab roots, and the sections that hang off them.
  *
  * **Native tabs** (`expo-router/unstable-native-tabs`), which render the real
  * platform tab bar — UIKit's on iOS, Material's on Android — rather than a bar
@@ -32,18 +32,22 @@ import { RamahColors as C, RamahType as T } from '@/constants/theme-ramah';
  *    `unstable-`. Treat an SDK bump as a reason to re-read this file, not as a
  *    routine upgrade.
  * 2. **Every tab mounts eagerly and cannot be made lazy.** The native bar needs
- *    each screen present to animate between them, so both roots fire their
- *    first read on launch rather than on first visit. That is documented
- *    behaviour, not a bug to hunt. If one of them ever gets expensive, the two
- *    sanctioned deferrals are `useIsFocused` (unmounts on blur, losing scroll
- *    and form state) or a `useFocusEffect` "has been activated once" flag.
+ *    each screen present to animate between them, so all five roots fire their
+ *    first read on launch rather than on first visit — `pendapatan` and
+ *    `riwayat` (issue #25) included, each a real request the moment the app
+ *    opens. That is documented behaviour, not a bug to hunt. If one of them
+ *    ever gets expensive, the two sanctioned deferrals are `useIsFocused`
+ *    (unmounts on blur, losing scroll and form state) or a `useFocusEffect`
+ *    "has been activated once" flag.
  * 3. **A route reaches the bar only through a `Trigger`, and `hidden` on a
  *    trigger means unreachable.** Not "hidden but linkable" — the docs are
  *    explicit that a hidden tab "cannot be navigated to in any way". That is
  *    why `penerimaan-susulan`, `produk` and `pembelian` all live on the root
- *    stack in `app/_layout.tsx` rather than in this directory. Do not move
- *    them back — `pembelian` was a tab here once and moving it out is what
- *    fixed its docked button sitting under the bar (issue #24).
+ *    stack in `app/_layout.tsx` rather than in this directory, and why
+ *    `penjualan` (issue #25's Riwayat detail) joined them there rather than
+ *    becoming a sixth tab. Do not move any of them back — `pembelian` was a
+ *    tab here once and moving it out is what fixed its docked button sitting
+ *    under the bar (issue #24).
  *
  * ### The till hides the bar
  *

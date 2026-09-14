@@ -1182,6 +1182,7 @@ export function RamahField({
   editable = true,
   maxLength,
   multiline = false,
+  secureTextEntry = false,
   accessibilityLabel,
 }: {
   label: string;
@@ -1198,6 +1199,8 @@ export function RamahField({
   autoFocus?: boolean;
   editable?: boolean;
   maxLength?: number;
+  /** A password field — the only field in this system that needs one. */
+  secureTextEntry?: boolean;
   /**
    * Grows to three lines before it scrolls, for a value that is a sentence
    * rather than a word — a rejection reason, a note naming a delivery order.
@@ -1238,6 +1241,7 @@ export function RamahField({
           editable={editable}
           maxLength={maxLength}
           multiline={multiline}
+          secureTextEntry={secureTextEntry}
           textAlignVertical={multiline ? 'top' : 'center'}
           accessibilityLabel={accessibilityLabel ?? label}
           style={[

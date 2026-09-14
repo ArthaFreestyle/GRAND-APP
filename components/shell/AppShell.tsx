@@ -32,51 +32,78 @@ import { Text } from '@/components/ui/text';
  * silently grow another tab. With native tabs a route reaches the bar *only*
  * through a trigger, so this array is not a convenience: it is the registry.
  *
- * **Two roots, not three.** Nota (`pembelian`) was the third until issue #24
- * moved it to the root stack — its docked "Faktur baru" pill was landing under
- * the bar rather than above it (native tabs' automatic bottom inset,
- * documented in `app/(admin)/_layout.tsx`, reaches a `ScrollView` reliably and
- * a plain docked `View` less so), and Beranda's own "Pembelian" tile already
- * opened the same screen — a second door the grid had just finished removing
- * one of (`Persetujuan`, the same issue). Fixing the inset the way `produk` and
- * `pengaturan` already do — the section pays its own — settled both at once, so
- * pembelian joined Katalog beside the tabs rather than staying a tab with a
- * patched-up inset. What is left is a judgement about what somebody opens this
- * app to *do*: Beranda for "what needs attention", Kasir for the place a
- * cashier stands for a whole shift. Everything else is a tap away from Beranda,
- * same as Katalog always was.
+ * **Five roots now, not two — issue #25.** Beranda and Kasir stood alone for a
+ * while after Nota joined Katalog on the root stack (issue #24); this is the
+ * board's real target, `Papan Layar.dc.html`'s bottom bar as drawn: Beranda ·
+ * Pendapatan · Kasir · Riwayat · Profil. Five is also where Android's Material
+ * bottom navigation and iOS's tab bar both stop offering more room before an
+ * "Lainnya" overflow starts eating the rest — see the SDK 57 docs before adding
+ * a sixth.
  *
- * `penerimaan-susulan` is deliberately absent too, and it does not live under
- * `(admin)` at all. Native tabs treat a `hidden` trigger as unreachable rather
- * than merely unlisted, so the only way to keep
- * `/penerimaan-susulan/baru?idPembelian=` linkable was to move the section onto
- * the root stack beside the tabs — which is also where it belonged, since a
- * susulan is always started from the invoice that recorded the shortfall.
+ * Kasir sits dead centre on purpose: it is the place a cashier stands for a
+ * whole shift, and the middle slot is a thumb's reach on either edge of a
+ * phone. Pendapatan and Riwayat flank it — "how much did today bring in" and
+ * "what did we actually sell" are the two questions somebody standing at that
+ * till all day, or checking in on it, asks *about* Kasir, so they sit next to
+ * it rather than beside Beranda. Profil closes the row because it is the one
+ * root every other screen already assumes exists somewhere reachable — the
+ * `more-vertical` menu inside Kasir used to be the only door to "ganti
+ * wewenang" and "keluar"; most of what lived there moved here, and only the
+ * PPN setting — per-device, owned by the till — and a "Kembali" shortcut stayed
+ * behind.
+ *
+ * **What stayed off the bar, and why.** Katalog (`app/produk/`) and Nota
+ * (`app/pembelian/`) keep the root-stack seats issue #24 gave them: both are
+ * questions you *arrive at* — "how much of this is left", "which invoices are
+ * waiting" — rather than ones anybody opens the app to sit on for a shift, and
+ * both already have a door from Beranda's grid. Adding either here on top of
+ * five would have meant six, past the platform ceiling noted above.
+ * `penerimaan-susulan` is absent for the older reason: native tabs treat a
+ * `hidden` trigger as unreachable rather than merely unlisted, so the only way
+ * to keep `/penerimaan-susulan/baru?idPembelian=` linkable was to move the
+ * section onto the root stack beside the tabs — which is also where it
+ * belonged, since a susulan is always started from the invoice that recorded
+ * the shortfall.
  */
 export const TAB_ITEMS = [
   { key: 'beranda', label: 'Beranda', icon: 'home', sf: 'house' },
   /*
-    The other root is the **till**, not the catalogue.
+    "How much did today bring in" — the daily counterpart to the monthly
+    `app/laporan/` section, which Beranda's own "Laporan" tile still reaches.
+    See `app/(admin)/pendapatan.tsx` for why the two do not overlap.
+  */
+  { key: 'pendapatan', label: 'Pendapatan', icon: 'trending-up', sf: 'chart.line.uptrend.xyaxis' },
+  /*
+    The **till**, dead centre — a place you stand for a whole shift, not a
+    question you arrive at. A cashier's `homeRouteFor` is this screen.
 
-    Which roots the bar carries is a judgement about what somebody opens this
-    app to do. Katalog answers "how much of this is left" — a question you
-    arrive at from Beranda, which already carries a Katalog tile and a reorder
-    count that links into it. The till is a *place you stand*, for a whole
-    shift, and a cashier's `homeRouteFor` is this screen. So Katalog moved to
-    the root stack (`app/produk/`) and this took its slot.
-
-    `ownsBottomInset` is what makes that work: the POS is drawn full-screen with
-    the bar hidden (see `app/(admin)/_layout.tsx`), so the bottom edge is its
-    own to pad and Android's automatic tab-bar inset would be padding for a bar
-    that is not there.
+    `ownsBottomInset` is what makes the bar-hidden layout work: the POS is
+    drawn full-screen with the bar hidden (see `app/(admin)/_layout.tsx`), so
+    the bottom edge is its own to pad, and Android's automatic tab-bar inset
+    would be padding for a bar that is not there.
   */
   { key: 'kasir', label: 'Kasir', icon: 'shopping-cart', sf: 'cart', ownsBottomInset: true },
+  /*
+    "What did we actually sell" — every nota, grouped by day, the record of
+    what the till beside it produced. `app/penjualan/[id].tsx` is where a row
+    opens, and it sits on the root stack rather than in this tab for the same
+    reason every other pushed detail does (see `app/(admin)/riwayat.tsx`).
+  */
+  { key: 'riwayat', label: 'Riwayat', icon: 'clock', sf: 'clock.arrow.circlepath' },
+  /*
+    Account, active grant, printer, sign-out — most of what used to live behind
+    Kasir's `more-vertical` menu because the bar was the only thing hidden
+    there, not because those settings were about the till. Now that every tab
+    is a shortcut away regardless of which one is open, they get their own
+    root instead of squatting in another screen's overflow.
+  */
+  { key: 'profil', label: 'Profil', icon: 'user', sf: 'person.crop.circle' },
 ] as const satisfies readonly {
   key: string;
   /** Feather, via `VectorIcon` — the same family the rest of the app draws in. Used on Android. */
-  icon: 'home' | 'shopping-cart';
+  icon: 'home' | 'trending-up' | 'shopping-cart' | 'clock' | 'user';
   /** SF Symbol, used on iOS where the platform has its own vocabulary for these. */
-  sf: 'house' | 'cart';
+  sf: 'house' | 'chart.line.uptrend.xyaxis' | 'cart' | 'clock.arrow.circlepath' | 'person.crop.circle';
   label: string;
   /**
    * This root pads its own bottom edge, so the navigator must not.
