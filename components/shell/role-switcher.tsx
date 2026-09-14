@@ -27,6 +27,11 @@ import { Box } from '@/components/ui/box';
 import { Pressable as UiPressable } from '@/components/ui/pressable';
 import { Text as UiText } from '@/components/ui/text';
 import { Colors as C } from '@/constants/theme-erp';
+// The palette here is still the old blue-and-gold, because this sheet is
+// raised over ported and unported screens alike. The *typeface* is not
+// palette: a switcher opened from the till in one font and from an invoice
+// in another is one control that looks like two, so it takes Poppins now.
+import { RamahWeight as W } from '@/constants/theme-ramah';
 import { reloadAllRecords } from '@/hooks/use-record-bus';
 import { ApiError } from '@/services/api';
 import { switchContext } from '@/services/auth';
@@ -181,7 +186,7 @@ export function RoleChip() {
 }
 
 const styles = StyleSheet.create({
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(14,36,51,0.35)' },
+  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(14,36,51,0.35)' },
   sheetWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
   sheet: {
     width: '100%',
@@ -193,9 +198,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.borderCard,
   },
-  sheetTitle: { fontSize: 17, fontWeight: '700', letterSpacing: -0.2, color: C.text },
-  sheetSub: { fontSize: 13, lineHeight: 19, color: C.muted2 },
-  error: { fontSize: 13, fontWeight: '500', color: '#B03434' },
+  sheetTitle: { fontSize: 17, ...W.bold, letterSpacing: -0.2, color: C.text },
+  sheetSub: { fontSize: 13, lineHeight: 19, ...W.regular, color: C.muted2 },
+  error: { fontSize: 13, ...W.medium, color: '#B03434' },
   // Capped rather than free-growing: an account with many grants must not push
   // the Batal button off a phone in landscape, which is where kasir lives.
   list: { maxHeight: 260 },
@@ -215,9 +220,9 @@ const styles = StyleSheet.create({
   rowPressed: { borderColor: C.primary },
   rowBusy: { opacity: 0.6 },
   rowText: { flex: 1, gap: 2 },
-  rowRole: { fontSize: 15.5, fontWeight: '700', color: C.text },
-  rowUnit: { fontSize: 12.5, color: C.muted2 },
-  rowMark: { fontSize: 18, fontWeight: '700', color: C.primary },
+  rowRole: { fontSize: 15.5, ...W.bold, color: C.text },
+  rowUnit: { fontSize: 12.5, ...W.regular, color: C.muted2 },
+  rowMark: { fontSize: 18, ...W.bold, color: C.primary },
   cancel: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  cancelText: { fontSize: 14, fontWeight: '600', color: C.muted3 },
+  cancelText: { fontSize: 14, ...W.semibold, color: C.muted3 },
 });

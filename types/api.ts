@@ -574,6 +574,8 @@ export interface paths {
          *     `total_stok` adalah jumlah seluruh ruang dalam `unit_kerja` aktif sesi pemanggil (isu #12 fase 6), dengan rincian per ruang di `per_ruang`. `id_ruang` mempersempit perbandingan ke satu ruang saja — berguna untuk gudang yang sengaja dikosongkan karena stoknya sudah dipindah ke toko, yang kalau dibandingkan terhadap total perusahaan akan menyembunyikan toko yang benar-benar habis.
          *
          *     Hanya produk `is_aktif`. Diurutkan dari yang paling parah — selisih terhadap `stok_minimum`, bukan abjad — karena ini daftar kerja, pola yang sama dengan `GET /supplier/{id}/utang`.
+         *
+         *     `search` menyaring di SQL, bukan di halaman yang sudah termuat. Daftar ini berhalaman, jadi kolom cari di sisi klien hanya pernah menemukan barang yang kebetulan ada di halaman itu — barang yang dicari di halaman dua tidak akan pernah ketemu.
          */
         get: operations["listStokMinimumProduct"];
         put?: never;
@@ -653,7 +655,9 @@ export interface paths {
         };
         /**
          * Laba kotor per bulan
-         * @description Isu #22 fase 3. `SUM(total) - SUM(total_hpp)` atas nota `penjualan` **POSTED**, dikelompokkan per bulan `tanggal`.
+         * @description Isu #22 fase 3. `SUM(total - ppn) - SUM(total_hpp)` atas nota `penjualan` **POSTED**, dikelompokkan per bulan `tanggal`.
+         *
+         *     **`ppn` dikeluarkan dari omzet.** PPN keluaran yang dipungut di kasir adalah uang negara yang kebetulan lewat di nota, bukan pendapatan toko; ikut menghitungnya sebagai omzet akan melebihkan margin tiap bulan persis sebesar pajaknya. Angkanya tetap dilaporkan sendiri di `total_ppn`, jadi `total_penjualan + total_ppn` masih sama dengan jumlah `total` notanya.
          *
          *     Satu-satunya laporan di isu ini yang membaca dokumen, bukan `kartu_stok` — dan itu benar, bukan pengecualian: `total_hpp` sudah disalin dari `RETURNING kartu_stok` saat posting dan dibekukan di sana, jadi membacanya ulang dari `kartu_stok` hanya akan membayar query yang lebih mahal untuk angka yang sama.
          *
@@ -1646,7 +1650,9 @@ export interface paths {
          *
          *     `jenis_pembayaran` default `TUNAI`. **`KREDIT` mewajibkan `id_pelanggan`** (`penjualan_kredit_pelanggan_check`) — nota tunai di depan meja tidak perlu pelanggan terdaftar.
          *
-         *     `subtotal` adalah jumlah `subtotal` setiap baris (`qty_input x harga_satuan_input - diskon_baris`); `total = subtotal - diskon_nota + pembulatan`. `diskon_nota` tidak boleh melebihi `subtotal`, dan `total` tidak boleh negatif. `pembulatan` boleh negatif — itu baris pembulatan nota, bukan galat.
+         *     `subtotal` adalah jumlah `subtotal` setiap baris (`qty_input x harga_satuan_input - diskon_baris`); `total = subtotal - diskon_nota + ppn + pembulatan`. `diskon_nota` tidak boleh melebihi `subtotal`, `ppn` tidak boleh negatif, dan `total` tidak boleh negatif. `pembulatan` boleh negatif — itu baris pembulatan nota, bukan galat.
+         *
+         *     `ppn` adalah **nominal rupiah, bukan tarif** — bentuk yang sama persis dengan `pembelian.ppn`. Kliennya yang menghitung 11% (atau tarif apa pun yang berlaku) dan mengirim hasilnya; yang dibekukan dokumen adalah uangnya, angka yang harus tetap benar ketika tarif nasional berubah. Sifatnya *exclusive*: harga di `product_harga_jual` adalah DPP, dan piutang nota `KREDIT` ikut naik sebesar pajaknya — memang itu yang ditagih. Tidak ada pasangan `ppn_dikreditkan` seperti di pembelian: PPN keluaran itu utang ke negara, tidak pernah jadi harga pokok, jadi tidak pernah menyentuh `kartu_stok`.
          *
          *     `harga_pokok_satuan_dasar`/`hpp_total`/`total_hpp` baru terisi saat posting, dari apa yang benar-benar dicatat `kartu_stok` — bukan dihitung di sini.
          *
@@ -1678,6 +1684,8 @@ export interface paths {
          * @description **Hanya saat `DRAFT`.** `id_ruang`, `id_pelanggan`, dan `jenis_pembayaran` boleh semua diubah — tidak ada baris detail yang menunjuk salah satunya, jadi tidak ada yang tertinggal salah. `nomor`, `total_hpp`, dan `status_pembayaran` tidak pernah ada di sini: yang pertama identitas, dua lainnya turunan.
          *
          *     Aturan KREDIT-wajib-pelanggan diperiksa ulang terhadap nilai efektif setelah patch, bukan hanya field yang dikirim — mengirim `jenis_pembayaran: KREDIT` saat `id_pelanggan` tersimpan masih kosong tetap ditolak.
+         *
+         *     `total` dihitung ulang setelah patch, karena `diskon_nota`, `ppn`, dan `pembulatan` semuanya masuk ke dalamnya. Ketiganya divalidasi terhadap `subtotal` yang **tersimpan** — patch header tidak pernah menyentuh baris.
          */
         patch: operations["updatePenjualan"];
         trace?: never;
@@ -4115,11 +4123,16 @@ export interface components {
             subtotal?: string;
             /** @example 0.00 */
             diskon_nota?: string;
+            /**
+             * @description PPN keluaran, *exclusive*: ditambahkan di atas DPP, bukan dipecah dari harga. Nominal rupiah yang diketik klien, bukan tarif — cermin `pembelian.ppn`, tanpa pasangan `ppn_dikreditkan` karena PPN keluaran tidak pernah jadi harga pokok.
+             * @example 16500.00
+             */
+            ppn?: string;
             /** @example 0.00 */
             pembulatan?: string;
             /**
-             * @description `subtotal - diskon_nota + pembulatan`.
-             * @example 150000.00
+             * @description `subtotal - diskon_nota + ppn + pembulatan`.
+             * @example 166500.00
              */
             total?: string;
             /**
@@ -4335,8 +4348,10 @@ export interface components {
         LabaKotor: {
             /** @example 2026-08 */
             bulan?: string;
-            /** @description SUM(total) nota POSTED. */
+            /** @description `SUM(total - ppn)` nota POSTED — omzet **bersih dari PPN keluaran**. PPN yang dipungut di kasir itu uang negara yang cuma lewat di nota, bukan pendapatan toko; membiarkannya di sini akan melebihkan margin tiap bulan persis sebesar pajaknya. */
             total_penjualan?: string;
+            /** @description `SUM(ppn)` nota POSTED, dilaporkan terpisah supaya `total_penjualan + total_ppn` tetap sama dengan jumlah `total` notanya sendiri. */
+            total_ppn?: string;
             /** @description SUM(total_hpp) nota POSTED. */
             total_hpp?: string;
             /** @description total_penjualan - total_hpp. */
@@ -5606,6 +5621,8 @@ export interface operations {
             query?: {
                 page?: components["parameters"]["Page"];
                 size?: components["parameters"]["Size"];
+                /** @description Menyaring `nama` dan `kode_barang`, lewat EscapeLike. */
+                search?: string;
                 id_ruang?: number;
             };
             header?: never;
@@ -7340,6 +7357,11 @@ export interface operations {
                     jenis_pembayaran?: "TUNAI" | "KREDIT";
                     /** @example 0 */
                     diskon_nota?: string;
+                    /**
+                     * @description Nominal PPN keluaran dalam rupiah, bukan tarif. Kosong berarti nol — nota yang tidak memungut PPN.
+                     * @example 10450
+                     */
+                    ppn?: string;
                     /** @example 0 */
                     pembulatan?: string;
                     detail?: components["schemas"]["PenjualanDetailInput"][];
@@ -7409,6 +7431,7 @@ export interface operations {
                     /** @enum {string} */
                     jenis_pembayaran?: "TUNAI" | "KREDIT";
                     diskon_nota?: string;
+                    ppn?: string;
                     pembulatan?: string;
                 };
             };

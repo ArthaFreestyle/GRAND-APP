@@ -306,6 +306,39 @@ export async function getPembelian(id: number): Promise<PembelianDoc> {
 }
 
 /**
+ * The three counts the list's "Perlu diurus" card and Beranda's "Menunggu
+ * persetujuan" metric both read — one function so the two screens cannot
+ * disagree about what one word means. Each is `paging.total_item` from its own
+ * `size=1` query, never summed from a page of rows already in hand, which
+ * would count only what happens to be loaded rather than the whole queue.
+ *
+ * `-1` on any one of the three means that count specifically could not be
+ * read — distinct from a real zero, and independent of the other two: one
+ * failing does not blank the card, the same convention `waiting` already uses
+ * on Beranda.
+ */
+export interface PembelianCounts {
+  draft: number;
+  menungguPosting: number;
+  kirimanKurang: number;
+}
+
+export async function getPembelianCounts(): Promise<PembelianCounts> {
+  const [draft, diajukan, kurang] = await Promise.allSettled([
+    listPembelian({ page: 1, size: 1, status: 'DRAFT' }),
+    listPembelian({ page: 1, size: 1, status: 'DIAJUKAN' }),
+    listPembelian({ page: 1, size: 1, status: 'POSTED', statusPenerimaan: 'KURANG' }),
+  ]);
+  const total = (r: PromiseSettledResult<Paged<PembelianRow>>) =>
+    r.status === 'fulfilled' ? (r.value.paging.total_item ?? 0) : -1;
+  return {
+    draft: total(draft),
+    menungguPosting: total(diajukan),
+    kirimanKurang: total(kurang),
+  };
+}
+
+/**
  * Only the lines still short — the ones whose `qty_diterima_dasar` is under
  * `qty_dasar`. Lines that arrived complete are absent by design: this is the
  * chase-up list for a follow-up delivery, and a complete line is not on it.

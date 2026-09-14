@@ -5,8 +5,13 @@
  * pieces where behaviour matters — focus, pressed and disabled states — and
  * styled with NativeWind classes drawn from the palette in
  * `tailwind.config.js`, which mirrors `constants/theme-erp.ts`. The look is the
- * ported design's, not gluestack's defaults. `ModalShell` is the exception: it
- * is React Native's own `Modal`, for the reasons written above it.
+ * ported design's, not gluestack's defaults.
+ *
+ * `ModalShell` (React Native's own `Modal`, for a dialog decided about a record
+ * already on screen) lived here until the pembelian section — its last
+ * caller — moved to `RamahSheet`. Every dialog left in the app is now either a
+ * Ramah sheet or a route; see the screen-architecture note on the two, in
+ * CLAUDE.md, for why a dialog and a route are never the same component.
  *
  * Where a colour is genuinely chosen at runtime (a status badge whose tint comes
  * from data), it stays a `className` string picked by the caller rather than a
@@ -20,13 +25,6 @@
  */
 import Feather from '@expo/vector-icons/Feather';
 import { type ComponentProps, type ReactNode } from 'react';
-import {
-  KeyboardAvoidingView,
-  Modal as RNModal,
-  Platform,
-  Pressable as RNPressable,
-  StyleSheet,
-} from 'react-native';
 
 import { Badge as GBadge, BadgeText } from '@/components/ui/badge';
 import { Box } from '@/components/ui/box';
@@ -343,121 +341,6 @@ export function Toast({ message }: { message: string | null }) {
       pointerEvents="none"
       className="absolute bottom-5 left-5 right-5 self-center rounded-[10px] bg-toast px-4 py-3">
       <Text className="text-[13.5px] font-medium text-white">{message}</Text>
-    </Box>
-  );
-}
-
-// ---- modal building blocks ----
-
-/**
- * A dialog, on React Native's own `Modal`.
- *
- * This is the shape the Expo docs point at for this kind of content: a
- * self-contained confirmation or edit form that is *not* a place in the app.
- * Nothing here deserves a URL — "ubah pelanggan" is a decision taken about the
- * record already on screen, and it is reached from that record's detail route,
- * which is where the deep link and the history entry live. A route modal
- * (`presentation: 'modal'` on a `Stack.Screen`) is for the other case: a flow
- * with steps to link into and a screen of its own. The create forms already
- * are that — `<section>/baru.tsx`.
- *
- * `transparent` is the RN `Modal` prop that stops the modal *window* from
- * painting an opaque page over the app. It is not a colour choice and it is not
- * optional: without it there is no dimmed app behind the card, just a white
- * full-screen sheet. The two layers it lets us draw are both deliberate — a
- * scrim, which has to be translucent to be a scrim at all, and the card itself,
- * which is flat opaque `bg-card`.
- *
- * `onRequestClose` is what makes the Android hardware back button close the
- * dialog instead of leaving the screen underneath it, and it is required on
- * Android; tapping the scrim does the same thing for the pointer.
- */
-export function ModalShell({
-  visible,
-  width,
-  onRequestClose,
-  children,
-}: {
-  visible: boolean;
-  width: number;
-  onRequestClose: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <RNModal
-      visible={visible}
-      onRequestClose={onRequestClose}
-      transparent
-      animationType="fade"
-      // The scrim covers the status and navigation bars too — a dialog that
-      // dims everything except a strip at each end reads as a rendering fault.
-      statusBarTranslucent
-      navigationBarTranslucent>
-      <KeyboardAvoidingView
-        style={modalStyles.centre}
-        // Android already resizes the window for the keyboard; adding padding
-        // on top of that pushes the dialog off its own scrim.
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <RNPressable
-          style={modalStyles.scrim}
-          accessibilityRole="button"
-          accessibilityLabel="Tutup dialog"
-          onPress={onRequestClose}
-        />
-        <Box
-          className="w-full overflow-hidden rounded-2xl border border-line-card bg-card p-0"
-          style={[modalStyles.card, { maxWidth: width }]}>
-          {children}
-        </Box>
-      </KeyboardAvoidingView>
-    </RNModal>
-  );
-}
-
-const modalStyles = StyleSheet.create({
-  centre: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 18 },
-  /**
-   * The one place in the app that is translucent on purpose: it exists to show
-   * the app underneath, dimmed. #0E2433 is the palette's text colour rather
-   * than black, so the dim keeps the blue cast the rest of the screen has.
-   */
-  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(14,36,51,0.35)' },
-  /**
-   * gluestack's `shadow-hard-2` is not in this project's Tailwind theme, and a
-   * card floating on a scrim needs the lift to read as being in front of it.
-   * Both platforms are set: `elevation` is Android's, the rest is iOS's.
-   */
-  card: {
-    shadowColor: '#0E2433',
-    shadowOpacity: 0.22,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 12,
-  },
-});
-
-export function ModalHead({ title, sub }: { title: string; sub: string }) {
-  return (
-    <Box className="gap-1 border-b border-line-light px-5 pb-4 pt-5">
-      <Text className="text-[17px] font-bold text-foreground">{title}</Text>
-      <Text className="text-[13.5px] text-muted-foreground">{sub}</Text>
-    </Box>
-  );
-}
-
-export function ModalFooter({
-  onCancel,
-  onSave,
-  saveLabel,
-}: {
-  onCancel: () => void;
-  onSave: () => void;
-  saveLabel: string;
-}) {
-  return (
-    <Box className="flex-row justify-end gap-2.5 border-t border-line-light bg-thead px-5 py-4">
-      <SecondaryButton label="Batal" onPress={onCancel} tone="text-dark2" />
-      <PrimaryButton label={saveLabel} onPress={onSave} />
     </Box>
   );
 }

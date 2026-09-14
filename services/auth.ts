@@ -1,19 +1,23 @@
 /**
- * The three `auth` calls the login flow needs. Sign-in is two steps whenever the
- * user holds more than one usable grant: `login` returns a token with no active
- * context, and `switchContext` exchanges it for one that actually authorizes
- * something.
+ * The `auth` calls the login flow needs. **Sign-in is always two steps**:
+ * `login` proves who you are, and the grant to work as is picked afterwards on
+ * `/pilih-peran`. The contract makes the second step mandatory only when more
+ * than one grant is usable — with exactly one it activates that grant itself,
+ * and `login` comes back already authorizing things — but the app asks either
+ * way, so the person can see the role and unit kerja they are about to write to
+ * before they write to it. `Session.contextChosen` is what carries that
+ * distinction; the server has no notion of it.
  */
 import { ApiError, apiRequest } from '@/services/api';
 import {
   clearSession,
   getSession,
-  recallGrant,
   rememberGrant,
   sessionFromLoginResult,
   setSession,
   type LoginResult,
   type Session,
+  type User,
 } from '@/services/session';
 
 /**
@@ -73,41 +77,15 @@ export async function switchContext(idUserRole: number): Promise<Session> {
     throw e;
   }
 
-  const session = sessionFromLoginResult(result, previous);
+  // A switch *is* the choice, so the session it produces is a chosen one — both
+  // for the picker after login and for the role switcher inside the app.
+  const session = { ...sessionFromLoginResult(result, previous), contextChosen: true };
   setSession(session);
   // Recorded after the server accepted it, not when it was tapped: what gets
   // remembered has to be a choice that actually worked, or tomorrow's sign-in
   // resumes straight into a grant that will only be refused again.
   void rememberGrant(session.user.id, idUserRole);
   return session;
-}
-
-/**
- * Re-activates the grant this user last worked as on this device.
- *
- * Login leaves `active: null` whenever more than one grant is usable, and the
- * honest answer to that is usually not a question — the same person picks the
- * same grant nearly every day. This resumes it silently and hands back the
- * activated session; the picker is then only shown to someone who genuinely has
- * a choice to make for the first time.
- *
- * Returns `null` when there is nothing to resume, which covers every way this
- * can go stale at once: nothing remembered here yet, a grant the server no
- * longer lists (revoked, or its role or unit retired), or a switch the server
- * refused. All of them mean the same thing to the caller — ask.
- */
-export async function resumeLastGrant(session: Session): Promise<Session | null> {
-  if (session.active) return session;
-  const remembered = await recallGrant(session.user.id);
-  if (remembered === null) return null;
-  // The remembered id is not evidence of anything on its own; `grants` is the
-  // server's current list of what this login may actually become.
-  if (!session.grants.some((g) => g.id_user_role === remembered)) return null;
-  try {
-    return await switchContext(remembered);
-  } catch {
-    return null;
-  }
 }
 
 /**
@@ -126,11 +104,56 @@ export async function refresh(refreshToken: string): Promise<Session> {
     method: 'POST',
     body: { refresh_token: refreshToken },
   });
-  // Deliberately no `previous`: refresh always issues a new refresh token, and
-  // carrying the old one forward would keep a value the server just deleted.
-  const session = sessionFromLoginResult(result);
+  // `previous` is passed for `contextChosen` alone — a refresh happens mid-work
+  // and must not throw the user back to the picker. The refresh token itself is
+  // not carried: refresh always issues a new one, and keeping the old would
+  // hold a value the server just deleted. `sessionFromLoginResult` prefers the
+  // response's own token, so passing `previous` cannot resurrect it.
+  const session = sessionFromLoginResult(result, getSession());
   setSession(session);
   return session;
+}
+
+/**
+ * Changes the caller's own password. `POST /auth/me/password`, open to any
+ * authenticated caller with no role guard — the same footing as `auth/me` and
+ * `switch-context` — so this is called with the session's own token by hand
+ * (`apiRequest`, not `services/client.ts`'s `authedRequest`) for the same
+ * reason `switchContext` is: `services/client.ts` imports `refresh` from this
+ * module to retry an expired token, and importing `authedRequest` back would
+ * close that into a cycle. A password change is rare enough that skipping the
+ * proactive-refresh-and-retry `authedRequest` gives is not worth it.
+ *
+ * `password_lama` is verified server-side even though the caller is already
+ * authenticated — a stolen access token must not be able to lock the real
+ * owner out of their own account — and a wrong one answers the same message as
+ * `POST /auth/login`, undistinguished from any other cause.
+ *
+ * **Success revokes every refresh token this user holds**, on every device.
+ * That is `POST /auth/me/password`'s own side effect, not something this app
+ * does separately: another session loses access once its access token expires
+ * (`jwt.ttl_minutes`, default 15 minutes), not instantly. This session's own
+ * access token is still the one just used to call this endpoint, so nothing
+ * here needs to sign this device out.
+ */
+export async function changePassword(
+  passwordLama: string,
+  passwordBaru: string
+): Promise<User> {
+  const session = getSession();
+  if (!session) throw new ApiError('Sesi sudah berakhir. Masuk lagi.', 401);
+  try {
+    return await apiRequest<User>('/api/v1/auth/me/password', {
+      method: 'POST',
+      token: session.token,
+      body: { password_lama: passwordLama, password_baru: passwordBaru },
+    });
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 401) {
+      throw new ApiError(GENERIC_LOGIN_FAILURE, 401);
+    }
+    throw e;
+  }
 }
 
 /**

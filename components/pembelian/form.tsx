@@ -1,58 +1,65 @@
 /**
  * The pembelian header — the document minus its lines.
  *
- * Creating one is a route (`pembelian/baru`) and correcting one is a dialog on
- * the detail, so the fields belong to neither and live here. The two modes
- * differ by exactly three fields: `id_supplier` and `id_ruang` are choosable
- * only while creating, and `tanggal` is in both.
+ * Creating one is a route (`pembelian/baru`) and correcting one is a sheet on
+ * the detail, so the fields belong to neither and live here. `tanggal` is the
+ * one field both would share; the rest — freight, PPN, the invoice's own
+ * number — only ever get edited here, on a saved `DRAFT`, because `baru.tsx`'s
+ * flow asks two questions (what, and from whom) and lands on the draft with
+ * everything else optional.
  *
- * **Those two are missing from `PATCH /pembelian/{id}` on purpose.** The
- * supplier decides whose debt the document is, and the ruang decides which
- * stock balance every line touches. Getting one wrong is a cancel-and-retype,
- * not an edit — so the dialog does not offer them, and the create form marks
- * them as the decisions they are.
+ * **`id_supplier` and `id_ruang` are missing from `PATCH /pembelian/{id}` on
+ * purpose**, and so from this file: the supplier decides whose debt the
+ * document is, and the ruang decides which stock balance every line touches.
+ * Getting one wrong is a cancel-and-retype, not an edit, which is why they are
+ * chosen once on `pembelian/baru` and never appear on this sheet.
  *
  * Freight sits in its own section because it is a different bill. `biaya_angkut`
  * is `total_koli x tarif_per_koli` and is **not** part of `total`: the carrier
  * charges it, not the supplier, and it reaches the books through each line's
  * `alokasi_biaya` at posting. Adding the two together anywhere overstates what
  * is owed.
+ *
+ * Ported to Ramah with the rest of the section — a `RamahSheet` rather than
+ * `ModalShell`, which after this port has no caller left in the app; see
+ * CLAUDE.md's screen-architecture note on the two ever being right for the same
+ * screen. The ekspedisi field, the only lookup on this form, opens
+ * `RamahSearchSheet` the same way a product line does.
  */
-import { useCallback } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Feather from '@expo/vector-icons/Feather';
 
-import { SearchPicker, type PickerOption } from '@/components/shell/search-picker';
 import {
-  CheckBox,
-  ErrorBanner,
-  Field,
-  ModalFooter,
-  ModalHead,
-  ModalShell,
-  OptionPicker,
-  TextField,
-} from '@/components/shell/ui';
-import { Colors as C, todayISO } from '@/constants/theme-erp';
+  RamahField,
+  RamahInlineError,
+  RamahPickerField,
+  RamahPrimaryButton,
+  RamahSearchSheet,
+  RamahSectionHeader,
+  RamahSheet,
+  type RamahSearchOption,
+} from '@/components/shell/ramah';
+import { todayISO } from '@/constants/produk';
+import {
+  RamahColors as C,
+  RamahLayout as L,
+  RamahRadius as R,
+  RamahType as T,
+  RamahWeight as W,
+} from '@/constants/theme-ramah';
 import { numericToDecimal, rupiahToDecimal, rupiahToDecimalSigned } from '@/services/decimal';
 import { listEkspedisi } from '@/services/ekspedisi';
 import type {
-  CreatePembelianBody,
   JenisPembayaran,
   MetodeAlokasiAngkut,
   PembelianDoc,
   PembelianHeaderBody,
-  PembelianLineInput,
 } from '@/services/pembelian';
-import { listRuang } from '@/services/ruang';
-import { listSupplier } from '@/services/supplier';
 
 const PICKER_SIZE = 8;
 
 export interface PembelianHeaderValues {
-  idSupplier: number | null;
-  namaSupplier: string;
-  idRuang: number | null;
-  namaRuang: string;
   tanggal: string;
   noFaktur: string;
   tanggalFaktur: string;
@@ -71,10 +78,6 @@ export interface PembelianHeaderValues {
 }
 
 export const EMPTY_HEADER: PembelianHeaderValues = {
-  idSupplier: null,
-  namaSupplier: '',
-  idRuang: null,
-  namaRuang: '',
   tanggal: todayISO(),
   noFaktur: '',
   tanggalFaktur: '',
@@ -93,20 +96,16 @@ export const EMPTY_HEADER: PembelianHeaderValues = {
 };
 
 /**
- * Fills the dialog from a document already on screen.
+ * Fills the sheet from a document already on screen.
  *
  * `namaEkspedisi` comes in from outside because the document does not carry it:
  * `Pembelian` has `id_ekspedisi` and no name, so the detail resolves it once and
- * hands it over rather than the dialog opening with a blank carrier field.
+ * hands it over rather than the sheet opening with a blank carrier field.
  */
 export function headerOf(doc: PembelianDoc, namaEkspedisi = ''): PembelianHeaderValues {
   const money = (v: string) => (Number(v) ? String(Math.round(Number(v))) : '');
   const qty = (v: string) => (Number(v) ? String(Number(v)) : '');
   return {
-    idSupplier: doc.idSupplier,
-    namaSupplier: doc.namaSupplier,
-    idRuang: doc.idRuang,
-    namaRuang: doc.namaRuang,
     // `tanggal` is a date-time on the way back and a date on the way in.
     tanggal: doc.tanggal.slice(0, 10),
     noFaktur: doc.noFakturSupplier,
@@ -126,39 +125,10 @@ export function headerOf(doc: PembelianDoc, namaEkspedisi = ''): PembelianHeader
   };
 }
 
-/** Freight only needs splitting when there is freight to split. */
-export function pakaiKoli(v: PembelianHeaderValues): boolean {
-  return !v.ditanggungSupplier && Number(numericToDecimal(v.totalKoli) ?? '0') > 0;
-}
-
 export type HeaderResult<T> = { ok: true; body: T } | { ok: false; error: string };
 
 function ymd(value: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
-}
-
-/**
- * The fields common to POST and PATCH. `null` clears a nullable column and
- * `undefined` would leave it alone, so an emptied field is sent as `null` — a
- * removed carrier or resi has to actually come off the document.
- */
-function commonBody(v: PembelianHeaderValues): PembelianHeaderBody {
-  return {
-    tanggal: v.tanggal,
-    no_faktur_supplier: v.noFaktur.trim() || null,
-    tanggal_faktur: v.tanggalFaktur.trim() || null,
-    diskon_nota: rupiahToDecimal(v.diskonNota || '0'),
-    ppn: rupiahToDecimal(v.ppn || '0'),
-    ppn_dikreditkan: v.ppnDikreditkan,
-    pembulatan: rupiahToDecimalSigned(v.pembulatan || '0'),
-    id_ekspedisi: v.idEkspedisi,
-    no_resi: v.noResi.trim() || null,
-    total_koli: numericToDecimal(v.totalKoli) ?? null,
-    tarif_per_koli: numericToDecimal(v.tarifPerKoli) ?? null,
-    ditanggung_supplier: v.ditanggungSupplier,
-    metode_alokasi_angkut: v.metode,
-    jenis_pembayaran: v.jenis,
-  };
 }
 
 function validate(v: PembelianHeaderValues): string | null {
@@ -177,65 +147,56 @@ function validate(v: PembelianHeaderValues): string | null {
 
 export function headerBody(v: PembelianHeaderValues): HeaderResult<PembelianHeaderBody> {
   const error = validate(v);
-  return error ? { ok: false, error } : { ok: true, body: commonBody(v) };
-}
-
-export function createBody(
-  v: PembelianHeaderValues,
-  detail: PembelianLineInput[]
-): HeaderResult<CreatePembelianBody> {
-  const error = validate(v);
   if (error) return { ok: false, error };
-  if (v.idSupplier === null) return { ok: false, error: 'Pilih supplier dulu.' };
-  if (v.idRuang === null) return { ok: false, error: 'Pilih ruang tujuan dulu.' };
   return {
     ok: true,
     body: {
-      ...commonBody(v),
       tanggal: v.tanggal,
-      id_supplier: v.idSupplier,
-      id_ruang: v.idRuang,
-      detail,
+      no_faktur_supplier: v.noFaktur.trim() || null,
+      tanggal_faktur: v.tanggalFaktur.trim() || null,
+      diskon_nota: rupiahToDecimal(v.diskonNota || '0'),
+      ppn: rupiahToDecimal(v.ppn || '0'),
+      ppn_dikreditkan: v.ppnDikreditkan,
+      pembulatan: rupiahToDecimalSigned(v.pembulatan || '0'),
+      id_ekspedisi: v.idEkspedisi,
+      no_resi: v.noResi.trim() || null,
+      total_koli: numericToDecimal(v.totalKoli) ?? null,
+      tarif_per_koli: numericToDecimal(v.tarifPerKoli) ?? null,
+      ditanggung_supplier: v.ditanggungSupplier,
+      metode_alokasi_angkut: v.metode,
+      jenis_pembayaran: v.jenis,
     },
   };
 }
 
-// ---- the fields ----
-
-export interface HeaderFieldsProps {
-  /** Creating: supplier and ruang are choosable, and required. */
-  isNew: boolean;
+export interface PembelianHeaderSheetProps {
+  visible: boolean;
   values: PembelianHeaderValues;
-  /** Patch, not a callback per field: the header has eighteen and one owner. */
+  /** Patch, not a callback per field: the header has fifteen and one owner. */
   onChange: (patch: Partial<PembelianHeaderValues>) => void;
   error: string;
+  busy: boolean;
+  onCancel: () => void;
+  onSave: () => void;
 }
 
-export function PembelianHeaderFields({ isNew, values, onChange, error }: HeaderFieldsProps) {
-  const cariSupplier = useCallback(async (term: string): Promise<PickerOption[]> => {
-    const page = await listSupplier({ search: term || undefined, size: PICKER_SIZE, is_aktif: true });
-    return page.data.map((s) => ({
-      value: String(s.id),
-      label: s.nama,
-      sub: s.kode || 'tanpa kode',
-    }));
-  }, []);
+/**
+ * Editing only — creating is `app/pembelian/baru.tsx`, and it never
+ * shows this sheet: the supplier and the ruang it also decides are chosen on
+ * that flow's own screens, not here.
+ */
+export function PembelianHeaderSheet({
+  visible,
+  values: v,
+  onChange,
+  error,
+  busy,
+  onCancel,
+  onSave,
+}: PembelianHeaderSheetProps) {
+  const [ekspedisiSheet, setEkspedisiSheet] = useState(false);
 
-  const cariRuang = useCallback(async (term: string): Promise<PickerOption[]> => {
-    const page = await listRuang({ search: term || undefined, size: PICKER_SIZE, is_aktif: true });
-    return page.data.map((r) => ({
-      value: String(r.id),
-      label: r.nama,
-      // A frozen room accepts the document but will refuse the posting, from
-      // this module or any other, until the stock take that froze it closes.
-      sub: r.nomorOpnameBeku
-        ? `dibekukan opname ${r.nomorOpnameBeku} — tidak bisa diposting`
-        : [r.kode || 'tanpa kode', r.namaUnitKerja].filter(Boolean).join(' · '),
-      disabled: r.nomorOpnameBeku !== null,
-    }));
-  }, []);
-
-  const cariEkspedisi = useCallback(async (term: string): Promise<PickerOption[]> => {
+  const cariEkspedisi = useCallback(async (term: string): Promise<RamahSearchOption[]> => {
     const page = await listEkspedisi({
       search: term || undefined,
       size: PICKER_SIZE,
@@ -245,225 +206,306 @@ export function PembelianHeaderFields({ isNew, values, onChange, error }: Header
   }, []);
 
   return (
-    <View style={styles.fields}>
-      {isNew && (
-        <>
-          <Field
-            label="Supplier"
-            hint="Menentukan utang ini milik siapa — tidak bisa diubah setelah dokumen dibuat.">
-            <SearchPicker
-              chosen={values.idSupplier === null ? null : values.namaSupplier}
-              onPick={(o) =>
-                onChange({ idSupplier: Number(o.value), namaSupplier: o.label })
-              }
-              search={cariSupplier}
-              placeholder="Cari nama atau kode supplier"
-              emptyHint="Tidak ada supplier aktif yang cocok."
-            />
-          </Field>
-          <Field
-            label="Ruang tujuan"
-            hint="Seluruh baris masuk ke satu ruang. Juga tidak bisa diubah setelahnya.">
-            <SearchPicker
-              chosen={values.idRuang === null ? null : values.namaRuang}
-              onPick={(o) => onChange({ idRuang: Number(o.value), namaRuang: o.label })}
-              search={cariRuang}
-              placeholder="Cari nama atau kode ruang"
-              emptyHint="Tidak ada ruang aktif di unit kerja sesi ini."
-            />
-          </Field>
-        </>
-      )}
+    <RamahSheet visible={visible} title="Ubah header faktur" onClose={onCancel}>
+      <View style={styles.body}>
+        <Text style={styles.lead}>
+          Hanya selama DRAFT. Supplier dan ruang tidak ada di sini — keduanya menentukan utang dan
+          saldo stok mana yang tersentuh, jadi keliru di situ berarti batalkan dan input ulang.
+        </Text>
 
-      <View style={styles.row}>
-        <View style={styles.cell}>
-          <Field label="Tanggal dokumen" hint="Menentukan bulan penomoran dan periodenya.">
-            <TextField
-              value={values.tanggal}
-              onChangeText={(v) => onChange({ tanggal: v })}
+        <View style={styles.fieldRow}>
+          <View style={styles.fieldCell}>
+            <RamahField
+              label="Tanggal dokumen"
+              value={v.tanggal}
+              onChangeText={(t) => onChange({ tanggal: t })}
               placeholder="YYYY-MM-DD"
-              mono
+              helper="Menentukan bulan penomoran dan periodenya."
+              autoCapitalize="none"
+              maxLength={10}
             />
-          </Field>
-        </View>
-        <View style={styles.cell}>
-          <Field label="Tanggal faktur supplier">
-            <TextField
-              value={values.tanggalFaktur}
-              onChangeText={(v) => onChange({ tanggalFaktur: v })}
+          </View>
+          <View style={styles.fieldCell}>
+            <RamahField
+              label="Tanggal faktur supplier"
+              value={v.tanggalFaktur}
+              onChangeText={(t) => onChange({ tanggalFaktur: t })}
               placeholder="YYYY-MM-DD"
-              mono
+              autoCapitalize="none"
+              maxLength={10}
             />
-          </Field>
+          </View>
         </View>
-      </View>
 
-      <Field
-        label="No. faktur supplier"
-        hint="Unik per supplier. Tanpa purchase order ini satu-satunya penjaga agar satu nota tidak diinput dua kali.">
-        <TextField
-          value={values.noFaktur}
-          onChangeText={(v) => onChange({ noFaktur: v })}
+        <RamahField
+          label="No. faktur supplier"
+          value={v.noFaktur}
+          onChangeText={(t) => onChange({ noFaktur: t })}
           placeholder="INV/2026/VIII/1180"
-          mono
+          helper="Unik per supplier. Tanpa purchase order ini satu-satunya penjaga agar satu nota tidak diinput dua kali."
+          autoCapitalize="characters"
         />
-      </Field>
 
-      <Field label="Jenis pembayaran">
-        <OptionPicker
+        <ChipField
+          label="Jenis pembayaran"
           options={[
             { value: 'TUNAI', label: 'Tunai' },
             { value: 'KREDIT', label: 'Kredit' },
           ]}
-          value={values.jenis}
-          onChange={(v) => onChange({ jenis: v as JenisPembayaran })}
+          value={v.jenis}
+          onChange={(val) => onChange({ jenis: val as JenisPembayaran })}
         />
-      </Field>
 
-      <View style={styles.row}>
-        <View style={styles.cell}>
-          <Field label="Diskon nota" hint="Tidak boleh melebihi subtotal.">
-            <TextField
-              value={values.diskonNota}
-              onChangeText={(v) => onChange({ diskonNota: v })}
+        <View style={styles.fieldRow}>
+          <View style={styles.fieldCell}>
+            <RamahField
+              label="Diskon nota"
+              prefix="Rp"
+              value={v.diskonNota}
+              onChangeText={(t) => onChange({ diskonNota: t })}
+              keyboardType="numeric"
+              placeholder="0"
+              helper="Tidak boleh melebihi subtotal."
+            />
+          </View>
+          <View style={styles.fieldCell}>
+            <RamahField
+              label="PPN"
+              prefix="Rp"
+              value={v.ppn}
+              onChangeText={(t) => onChange({ ppn: t })}
               keyboardType="numeric"
               placeholder="0"
             />
-          </Field>
-        </View>
-        <View style={styles.cell}>
-          <Field label="PPN">
-            <TextField
-              value={values.ppn}
-              onChangeText={(v) => onChange({ ppn: v })}
-              keyboardType="numeric"
+          </View>
+          <View style={styles.fieldCell}>
+            <RamahField
+              label="Pembulatan"
+              value={v.pembulatan}
+              onChangeText={(t) => onChange({ pembulatan: t })}
               placeholder="0"
+              helper="Boleh negatif."
             />
-          </Field>
+          </View>
         </View>
-        <View style={styles.cell}>
-          <Field label="Pembulatan" hint="Boleh negatif.">
-            <TextField
-              value={values.pembulatan}
-              onChangeText={(v) => onChange({ pembulatan: v })}
-              placeholder="0"
-            />
-          </Field>
-        </View>
-      </View>
 
-      <CheckBox
-        checked={values.ppnDikreditkan}
-        onPress={() => onChange({ ppnDikreditkan: !values.ppnDikreditkan })}
-        label="PPN dikreditkan — jadi pajak masukan, tidak menyentuh harga pokok"
-      />
+        <CheckRow
+          checked={v.ppnDikreditkan}
+          onPress={() => onChange({ ppnDikreditkan: !v.ppnDikreditkan })}
+          label="PPN dikreditkan — jadi pajak masukan, tidak menyentuh harga pokok"
+        />
 
-      <View style={styles.divider} />
-      <Text style={styles.sectionTitle}>Ongkos angkut</Text>
-      <Text style={styles.sectionNote}>
-        Tagihan ekspedisi, bukan utang ke supplier — biaya angkut tidak pernah masuk total faktur.
-        Ia masuk ke harga pokok lewat alokasi per baris saat posting.
-      </Text>
+        <View style={styles.divider} />
+        <RamahSectionHeader>Ongkos angkut</RamahSectionHeader>
+        <Text style={styles.sectionNote}>
+          Tagihan ekspedisi, bukan utang ke supplier — biaya angkut tidak pernah masuk total
+          faktur. Ia masuk ke harga pokok lewat alokasi per baris saat posting.
+        </Text>
 
-      <Field label="Ekspedisi">
-        <SearchPicker
-          chosen={values.idEkspedisi === null ? null : values.namaEkspedisi}
-          onPick={(o) => onChange({ idEkspedisi: Number(o.value), namaEkspedisi: o.label })}
-          search={cariEkspedisi}
+        <RamahPickerField
+          label="Ekspedisi"
+          value={v.idEkspedisi === null ? '' : v.namaEkspedisi}
           placeholder="Cari nama atau telepon ekspedisi"
-          emptyHint="Tidak ada ekspedisi aktif yang cocok."
+          onPress={() => setEkspedisiSheet(true)}
         />
-      </Field>
 
-      <View style={styles.row}>
-        <View style={styles.cell}>
-          <Field label="No. resi">
-            <TextField
-              value={values.noResi}
-              onChangeText={(v) => onChange({ noResi: v })}
+        <View style={styles.fieldRow}>
+          <View style={styles.fieldCell}>
+            <RamahField
+              label="No. resi"
+              value={v.noResi}
+              onChangeText={(t) => onChange({ noResi: t })}
               placeholder="JNE-00281911"
-              mono
+              autoCapitalize="characters"
             />
-          </Field>
-        </View>
-        <View style={styles.cell}>
-          <Field label="Total koli">
-            <TextField
-              value={values.totalKoli}
-              onChangeText={(v) => onChange({ totalKoli: v })}
+          </View>
+          <View style={styles.fieldCell}>
+            <RamahField
+              label="Total koli"
+              value={v.totalKoli}
+              onChangeText={(t) => onChange({ totalKoli: t })}
               keyboardType="numeric"
               placeholder="0"
             />
-          </Field>
-        </View>
-        <View style={styles.cell}>
-          <Field label="Tarif per koli">
-            <TextField
-              value={values.tarifPerKoli}
-              onChangeText={(v) => onChange({ tarifPerKoli: v })}
+          </View>
+          <View style={styles.fieldCell}>
+            <RamahField
+              label="Tarif per koli"
+              prefix="Rp"
+              value={v.tarifPerKoli}
+              onChangeText={(t) => onChange({ tarifPerKoli: t })}
               keyboardType="numeric"
               placeholder="0"
             />
-          </Field>
+          </View>
         </View>
-      </View>
 
-      <Field label="Metode alokasi" hint="KOLI jatuh ke QTY sendiri kalau seluruh koli baris nol.">
-        <OptionPicker
+        <ChipField
+          label="Metode alokasi"
           options={[
             { value: 'KOLI', label: 'Per koli' },
             { value: 'QTY', label: 'Per qty dasar' },
           ]}
-          value={values.metode}
-          onChange={(v) => onChange({ metode: v as MetodeAlokasiAngkut })}
+          value={v.metode}
+          onChange={(val) => onChange({ metode: val as MetodeAlokasiAngkut })}
+          helper="KOLI jatuh ke QTY sendiri kalau seluruh koli baris nol."
         />
-      </Field>
 
-      <CheckBox
-        checked={values.ditanggungSupplier}
-        onPress={() => onChange({ ditanggungSupplier: !values.ditanggungSupplier })}
-        label="Ongkir ditanggung supplier — sudah termasuk nota, tidak dialokasikan lagi"
+        <CheckRow
+          checked={v.ditanggungSupplier}
+          onPress={() => onChange({ ditanggungSupplier: !v.ditanggungSupplier })}
+          label="Ongkir ditanggung supplier — sudah termasuk nota, tidak dialokasikan lagi"
+        />
+
+        {error ? <RamahInlineError message={error} /> : null}
+
+        <RamahPrimaryButton
+          label={busy ? 'Menyimpan…' : 'Simpan header'}
+          onPress={onSave}
+          busy={busy}
+          disabled={busy}
+        />
+      </View>
+
+      <RamahSearchSheet
+        visible={ekspedisiSheet}
+        title="Cari ekspedisi"
+        onClose={() => setEkspedisiSheet(false)}
+        search={cariEkspedisi}
+        onPick={(o) => onChange({ idEkspedisi: Number(o.value), namaEkspedisi: o.label })}
+        placeholder="Cari nama atau telepon ekspedisi"
+        emptyHint="Tidak ada ekspedisi aktif yang cocok."
       />
+    </RamahSheet>
+  );
+}
 
-      <ErrorBanner message={error} />
+/** A labelled pair of chips for a two-option field — jenis pembayaran, metode alokasi. */
+function ChipField({
+  label,
+  options,
+  value,
+  onChange,
+  helper,
+}: {
+  label: string;
+  options: { value: string; label: string }[];
+  value: string;
+  onChange: (v: string) => void;
+  helper?: string;
+}) {
+  return (
+    <View style={styles.chipField}>
+      <Text style={styles.miniLabel}>{label}</Text>
+      <View style={styles.chipRow}>
+        {options.map((o) => (
+          <ChipOption
+            key={o.value}
+            label={o.label}
+            selected={o.value === value}
+            onPress={() => onChange(o.value)}
+          />
+        ))}
+      </View>
+      {helper ? <Text style={styles.helper}>{helper}</Text> : null}
     </View>
   );
 }
 
-export interface PembelianFormModalProps extends Omit<HeaderFieldsProps, 'isNew'> {
-  visible: boolean;
-  onCancel: () => void;
-  onSave: () => void;
+function ChipOption({
+  label,
+  selected,
+  onPress,
+}: {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  const [down, setDown] = useState(false);
+  return (
+    <Pressable
+      onPress={onPress}
+      onPressIn={() => setDown(true)}
+      onPressOut={() => setDown(false)}
+      accessibilityRole="radio"
+      accessibilityState={{ selected }}
+      style={[
+        styles.chip,
+        { backgroundColor: selected ? C.brandTintSoft : C.white, borderColor: selected ? C.borderBrand : C.borderHairline },
+        down && { opacity: 0.85 },
+      ]}>
+      <Text style={[styles.chipLabel, { color: selected ? C.brandInk : C.textTitle }]}>{label}</Text>
+    </Pressable>
+  );
 }
 
-/** Editing only — creating is `app/(admin)/pembelian/baru.tsx`. */
-export function PembelianFormModal(p: PembelianFormModalProps) {
+/**
+ * The system's boolean toggle — a 20pt check box and a sentence, for the two
+ * fields on this form that are genuinely a yes/no rather than a chosen value.
+ * There is no `RamahCheckbox` in `shell/ramah.tsx` yet; this stays local until
+ * a second screen needs one.
+ */
+function CheckRow({
+  checked,
+  onPress,
+  label,
+}: {
+  checked: boolean;
+  onPress: () => void;
+  label: string;
+}) {
+  const [down, setDown] = useState(false);
   return (
-    <ModalShell visible={p.visible} width={620} onRequestClose={p.onCancel}>
-      <ModalHead
-        title="Ubah header faktur"
-        sub="Hanya selama DRAFT. Supplier dan ruang tidak ada di sini — keduanya menentukan utang dan saldo stok mana yang tersentuh, jadi keliru di situ berarti batalkan dan input ulang."
-      />
-      {/* The header is eighteen fields; a dialog that cannot scroll would put
-          half of them past the bottom of a phone. */}
-      <ScrollView style={{ maxHeight: 460 }} keyboardShouldPersistTaps="handled">
-        <PembelianHeaderFields
-          isNew={false}
-          values={p.values}
-          onChange={p.onChange}
-          error={p.error}
-        />
-      </ScrollView>
-      <ModalFooter onCancel={p.onCancel} onSave={p.onSave} saveLabel="Simpan header" />
-    </ModalShell>
+    <Pressable
+      onPress={onPress}
+      onPressIn={() => setDown(true)}
+      onPressOut={() => setDown(false)}
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked }}
+      accessibilityLabel={label}
+      style={[styles.checkRow, down && { opacity: 0.85 }]}>
+      <View style={[styles.checkBox, checked && styles.checkBoxOn]}>
+        {checked ? <Feather name="check" size={14} color={C.white} /> : null}
+      </View>
+      <Text style={styles.checkLabel}>{label}</Text>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  fields: { padding: 20, gap: 14 },
-  row: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  cell: { flexGrow: 1, flexBasis: 150 },
-  divider: { height: 1, backgroundColor: C.borderLight, marginTop: 4 },
-  sectionTitle: { fontSize: 15, fontWeight: '700', color: C.text },
-  sectionNote: { fontSize: 12.5, color: C.muted3, lineHeight: 17, marginTop: -8 },
+  body: { paddingHorizontal: L.gutter, paddingBottom: L.space4, gap: L.space5 },
+  lead: { ...T.caption, color: C.textBody },
+
+  fieldRow: { flexDirection: 'row', flexWrap: 'wrap', gap: L.space3 },
+  fieldCell: { flexGrow: 1, flexBasis: 130 },
+  miniLabel: { ...T.fieldLabel, color: C.textBody },
+  helper: { ...T.caption, color: C.textBody },
+
+  chipField: { gap: 6 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: L.space2 },
+  chip: {
+    height: L.controlHSm,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    borderRadius: R.pill,
+    borderWidth: 1.5,
+  },
+  chipLabel: { ...T.caption, ...W.medium },
+
+  checkRow: { flexDirection: 'row', alignItems: 'flex-start', gap: L.space3 },
+  checkBox: {
+    width: 20,
+    height: 20,
+    marginTop: 1,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    borderColor: C.borderStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkBoxOn: { backgroundColor: C.brand, borderColor: C.brand },
+  checkLabel: { ...T.caption, color: C.textTitle, flex: 1, minWidth: 0 },
+
+  divider: { height: 1, backgroundColor: C.borderHairline, marginTop: L.space1 },
+  sectionNote: { ...T.caption, color: C.textBody, marginTop: -L.space3 },
 });

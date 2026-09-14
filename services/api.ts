@@ -31,6 +31,16 @@ if (!__DEV__ && !API_BASE_URL.startsWith('https://')) {
 
 const REQUEST_TIMEOUT_MS = 15_000;
 
+/**
+ * Uploads get their own, much longer budget.
+ *
+ * `dokumen.max_size_mb` defaults to 10 MB, and a phone camera photo lands near
+ * the top of that. Fifteen seconds is generous for a JSON round trip and cruel
+ * for ten megabytes over a shop's 3G — the request would be aborted at the
+ * moment it was doing exactly what it was asked to.
+ */
+const UPLOAD_TIMEOUT_MS = 90_000;
+
 type ErrorEnvelope = components['responses']['ValidationError']['content']['application/json'];
 
 
@@ -143,6 +153,20 @@ async function requestEnvelope<T>(
     clearTimeout(timeout);
   }
 
+  return parseEnvelope<T>(response);
+}
+
+/**
+ * Turns one `Response` into the contract's envelope, or throws.
+ *
+ * Shared by the JSON path and the multipart one below. The two differ in what
+ * they *send* — a serialized body against a streamed file, fifteen seconds
+ * against ninety — and in nothing at all about what comes back: every route in
+ * this contract answers `{ data }` or `{ errors }`, uploads included.
+ */
+async function parseEnvelope<T>(
+  response: Response
+): Promise<ErrorEnvelope & { data?: T; paging?: PageMetadata }> {
   // A proxy or a wrong base URL can answer with HTML; treat unparseable bodies
   // as an empty envelope rather than letting the JSON error escape as-is.
   let envelope: (ErrorEnvelope & { data?: T; paging?: PageMetadata }) | null = null;
@@ -165,6 +189,86 @@ async function requestEnvelope<T>(
   }
 
   return envelope;
+}
+
+/**
+ * One file, in the shape React Native's `FormData` accepts.
+ *
+ * `uri` is a `file://` path handed over by the image picker, **not** bytes.
+ * React Native's `fetch` streams the file from disk when it sees this shape, so
+ * a ten-megabyte photo never lands on the JS heap — which is also why there is
+ * no `base64` variant here and should not be one.
+ */
+export interface UploadFile {
+  uri: string;
+  /**
+   * The name shown back to a reader. `POST /dokumen` stores it verbatim for
+   * display and **never** uses it as a path — the stored name is a UUID the
+   * server generates — so a caller does not have to sanitise it.
+   */
+  name: string;
+  /**
+   * What the client believes the file is. The server decides for itself from
+   * the magic bytes and will refuse an HTML file called `faktur.pdf` with a
+   * 400, so this is a hint for the multipart part header, not a claim anyone
+   * downstream trusts.
+   */
+  type: string;
+}
+
+/**
+ * Performs one multipart upload and returns the `data` payload.
+ *
+ * `Content-Type` is deliberately **not** set. Its value has to carry the
+ * multipart boundary, and only the runtime that serialised the `FormData` knows
+ * what that boundary was; setting the header by hand replaces it with one that
+ * has no boundary at all, and the server then reads a body it cannot split into
+ * parts. This is the single most common way an RN upload fails, and it fails as
+ * a validation error rather than as anything that points at the header.
+ */
+export async function apiUpload<T>(
+  path: string,
+  field: string,
+  file: UploadFile,
+  token?: string | null
+): Promise<T> {
+  const form = new FormData();
+  // The cast is unavoidable and is not a lie about the runtime: RN's FormData
+  // accepts this object shape and streams the file behind it, while the DOM
+  // lib's type for `append` only knows about `Blob | string`.
+  form.append(field, file as unknown as Blob);
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        Accept: 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : null),
+      },
+      body: form,
+    });
+  } catch (e) {
+    const aborted = e instanceof Error && e.name === 'AbortError';
+    throw new ApiError(
+      aborted
+        ? 'Unggahan tidak selesai tepat waktu. Coba lagi dengan sinyal yang lebih baik.'
+        : 'Tidak bisa menghubungi server. Periksa koneksi Anda.',
+      0
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  const envelope = await parseEnvelope<T>(response);
+  if (envelope.data === undefined) {
+    throw new ApiError('Jawaban server tidak sesuai kontrak.', 200);
+  }
+  return envelope.data;
 }
 
 /** Performs one API call and returns the `data` payload. */

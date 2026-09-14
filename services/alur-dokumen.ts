@@ -1,30 +1,47 @@
 /**
- * The approval flow that `pembelian`, `penerimaan-susulan`, and
- * `retur-pembelian` all run, and the one part of it that is **not** shared.
+ * The document flow the stock-writing modules run, and the one part of it that
+ * is **not** shared.
  *
- * All three move `DRAFT → DIAJUKAN → POSTED` plus `BATAL`, over four endpoints
- * with the same names, the same bodies, and the same role split: `INVENTARIS`
- * types and submits, `SUPERADMIN` posts, rejects, and cancels. That much is
- * mechanism, and it lives here so three copies of it cannot drift apart.
+ * `pembelian`, `penerimaan-susulan`, and `retur-pembelian` move `DRAFT →
+ * DIAJUKAN → POSTED` plus `BATAL`, over four endpoints with the same names, the
+ * same bodies, and the same role split: `INVENTARIS` types and submits,
+ * `SUPERADMIN` posts, rejects, and cancels.
+ *
+ * `penjualan` runs a **subset**: `DRAFT → POSTED → BATAL`, with no `ajukan` and
+ * no `tolak` endpoint at all, because a cashier cannot make a buyer at the
+ * counter wait for approval. Its two-person control moved to the other end —
+ * `CASHIER` types and posts, `SUPERADMIN` alone may cancel — so the same three
+ * pieces of vocabulary describe it exactly. That is why `StatusAlur` and
+ * `AksiKey` are the union of what any of them can be rather than what all of
+ * them are, and why `pilihAksi` filters instead of assuming: a module simply
+ * never lists the rows it has no endpoints for.
  *
  * What does **not** live here is the table itself. Every module declares its own
  * `AKSI`, because the sentence each transition shows is the only thing standing
- * between an operator and an irreversible write, and the three are not the same
+ * between an operator and an irreversible write, and they are not the same
  * sentence: posting a pembelian values stock at the invoice, posting a susulan
- * copies the harga pokok the invoice already fixed, and posting a retur takes
- * goods back out at today's moving average. A shared table would have to say
- * "menulis ke kartu stok" and stop there, which is the part everybody already
- * knows.
+ * copies the harga pokok the invoice already fixed, posting a retur takes goods
+ * back out at today's moving average, and posting a penjualan charges stock out
+ * at that average while enforcing the customer's credit limit — the only place
+ * that check happens at all. A shared table would have to say "menulis ke kartu
+ * stok" and stop there, which is the part everybody already knows.
  *
  * The screens hide what the active grant may not run rather than letting the
  * button fail — `role tidak mencukupi` after a press teaches nobody who to ask.
  */
 import type { RoleName } from '@/services/permissions';
 
-/** The four positions every one of these documents can be in. */
+/**
+ * Every position one of these documents can be in — the union, not the set any
+ * one of them uses. `penjualan` never reaches `DIAJUKAN`; its own `status` type
+ * is narrower and assignable to this.
+ */
 export type StatusAlur = 'DRAFT' | 'DIAJUKAN' | 'POSTED' | 'BATAL';
 
-/** The path segment each transition posts to, which is also its identity. */
+/**
+ * The path segment each transition posts to, which is also its identity. Again
+ * the union: `ajukan` and `tolak` have no endpoint in the penjualan group.
+ */
 export type AksiKey = 'ajukan' | 'tolak' | 'posting' | 'batal';
 
 export interface AksiDokumen {

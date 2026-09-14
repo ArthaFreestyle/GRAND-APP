@@ -35,6 +35,24 @@ export interface Session {
   grants: Grant[];
   /** `null` means more than one usable grant and none picked yet: the token authorizes nothing until `auth/switch-context`. */
   active: ActiveContext | null;
+  /**
+   * Whether the person has *chosen* this session's context on this device,
+   * rather than having had one handed to them.
+   *
+   * The contract activates a grant server-side whenever exactly one is usable,
+   * so `active` alone cannot tell "I picked this" from "this is all there was".
+   * Every sign-in now goes through `/pilih-peran` regardless — a shared counter
+   * terminal is signed into by whoever is on shift, and the screen that names
+   * the unit kerja and role they are about to work as is the last cheap moment
+   * to catch a wrong one. This flag is what makes that possible without asking
+   * a second time on every token refresh.
+   *
+   * **In-memory only.** `StoredProfile` does not carry it, and
+   * `hydrateSession` restores it as `true`: reopening the app is not a sign-in,
+   * and someone whose session survived a restart answered this question
+   * already.
+   */
+  contextChosen: boolean;
 }
 
 const SECURE_KEY = 'grand.session.credentials';
@@ -141,7 +159,10 @@ export async function hydrateSession(): Promise<Session | null> {
       const profile = JSON.parse(rawProfile) as StoredProfile;
       const usable = credentials.refreshToken || credentials.expiresAt > Date.now();
       if (usable) {
-        current = { ...credentials, ...profile };
+        // `contextChosen` is not stored: see the field's note. A restored
+        // session is one whose grant was picked before the app was closed, so
+        // reopening must not send the user back to the picker.
+        current = { ...credentials, ...profile, contextChosen: true };
       } else {
         await forget();
       }
@@ -157,7 +178,10 @@ export async function hydrateSession(): Promise<Session | null> {
 
 /**
  * Turns a `LoginResult` into a session. `previous` carries the refresh token
- * across `auth/switch-context`, whose response leaves `refresh_token` null.
+ * across `auth/switch-context`, whose response leaves `refresh_token` null, and
+ * carries `contextChosen` across a token refresh — a refresh mid-shift is not a
+ * new sign-in and must not re-ask which grant to work as. A `login` passes no
+ * `previous`, which is exactly why it comes out unchosen.
  */
 export function sessionFromLoginResult(result: LoginResult, previous?: Session | null): Session {
   if (!result.token || !result.expires_at || !result.user) {
@@ -171,7 +195,21 @@ export function sessionFromLoginResult(result: LoginResult, previous?: Session |
     user: result.user,
     grants: result.grants ?? [],
     active: result.aktif ?? null,
+    contextChosen: previous?.contextChosen ?? false,
   };
+}
+
+/**
+ * Records that the active context on screen is the one the person picked.
+ *
+ * Only `/pilih-peran` calls it, and only for the grant the server had already
+ * activated — the single-grant case, where `auth/switch-context` would issue a
+ * second token for the context the session is already running as. Every other
+ * choice goes through `switchContext`, which sets the same flag as part of a
+ * real switch.
+ */
+export function markContextChosen() {
+  if (current && !current.contextChosen) setSession({ ...current, contextChosen: true });
 }
 
 // ---- the grant each user last worked as ----
@@ -234,4 +272,17 @@ export type ActiveSession = Session & { active: ActiveContext };
 /** True once the session has an active grant — the only state in which it authorizes anything. */
 export function hasActiveContext(session: Session | null): session is ActiveSession {
   return session !== null && session.active !== null;
+}
+
+/**
+ * True once the session both authorizes something **and** is running as the
+ * grant the person picked — the state the app's own screens are guarded on.
+ *
+ * The two halves are separate because the server closes the first one by itself
+ * for a single-grant login: such a token authorizes plenty while its holder has
+ * not yet been shown, let alone confirmed, which unit kerja they are about to
+ * write to.
+ */
+export function hasChosenContext(session: Session | null): session is ActiveSession {
+  return hasActiveContext(session) && session.contextChosen;
 }

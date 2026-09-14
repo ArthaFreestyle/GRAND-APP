@@ -139,9 +139,12 @@ const ModalContent = React.forwardRef<
   return (
     <UIModal.Content
       ref={ref}
+      // Reanimated 4.5 types `withInitialValues` on ZoomIn as transform-only
+      // (`Partial<TransformsConfig<[Scale]>>`). `opacity: 0` was never animated
+      // by ZoomIn anyway — the backdrop's own FadeOut carries the fade — so it
+      // is dropped rather than cast away.
       entering={ZoomIn.duration(200).withInitialValues({
         transform: [{ scale: 0.9 }],
-        opacity: 0,
       })}
       exiting={FadeOut.duration(200)}
       {...props}
