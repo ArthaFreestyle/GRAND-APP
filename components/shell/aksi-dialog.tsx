@@ -46,6 +46,7 @@
  * explanation it sits under ("Nota kembali ke staf gudang sebagai draf") already
  * says this is a round trip rather than a deletion.
  */
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -53,6 +54,7 @@ import {
   RamahField,
   RamahInlineError,
   RamahPrimaryButton,
+  RamahSecondaryButton,
   RamahSheet,
   RamahTertiaryButton,
 } from '@/components/shell/ramah';
@@ -64,6 +66,8 @@ import {
   RamahType as T,
 } from '@/constants/theme-ramah';
 import type { AksiDokumen } from '@/services/alur-dokumen';
+import { namaBulan } from '@/services/laporan';
+import { periodeTertutup } from '@/services/periode';
 
 export function AksiDialog({
   aksi,
@@ -83,6 +87,8 @@ export function AksiDialog({
   onConfirm: () => void;
   busy: boolean;
 }) {
+  const router = useRouter();
+  const tertutup = error ? periodeTertutup(error) : null;
   return (
     <RamahSheet visible={aksi !== null} title={aksi?.judul ?? ''} onClose={onCancel}>
       {aksi ? (
@@ -114,6 +120,25 @@ export function AksiDialog({
           )}
 
           {error ? <RamahInlineError message={error} /> : null}
+          {/* Issue #12: a posting refused because its month is closed is a
+              failure nothing on the document can fix, so the message alone
+              leaves the reader stuck. The link lands on that month, where a
+              superadmin can reopen it and anybody else can see who closed it. */}
+          {tertutup ? (
+            <RamahSecondaryButton
+              label={`Lihat tutup buku ${namaBulan(`${tertutup.tahun}-${String(tertutup.bulan).padStart(2, '0')}`)}`}
+              icon="calendar"
+              fullWidth
+              height={L.controlH}
+              onPress={() => {
+                onCancel();
+                router.push({
+                  pathname: '/periode',
+                  params: { tahun: tertutup.tahun, bulan: tertutup.bulan },
+                });
+              }}
+            />
+          ) : null}
 
           <View style={styles.actions}>
             {aksi.danger ? (

@@ -140,6 +140,8 @@ It and `ui.tsx` never meet in one screen: `ui.tsx` is gluestack over `theme-erp`
 2. There is no price tier. `product_harga_jual_no_overlap` guarantees exactly **one active price per (product, satuan) per date**, so the kasir board's "Umum / Langganan" chip has nothing behind it (the board fakes it with a hardcoded 7%).
 3. No endpoint *produces* a PDF — `/dokumen` only accepts an uploaded invoice photo, and `laporan` answers JSON. A printed nota has to be rendered on the client or wait for a `GET /pembelian/{id}/cetak`. (The board's "PPN 11%" line is no longer on this list: `POST /penjualan` gained a `ppn` field on this branch. It is a **rupiah amount, not a rate** — the client computes 11% and sends the money, exclusive of the price, mirroring `pembelian.ppn` — so `total = subtotal - diskon_nota + ppn + pembulatan`.)
 
+**Tutup buku (`/periode`, issue #12) is the one module every posting depends on without importing it.** Closing a month makes the trigger refuse any `kartu_stok` row dated inside it, from every module. Three things to keep: a month with **no row is open** (`GET /periode` lists closings, not a calendar — `app/periode/index.tsx` draws twelve months and fills in the rows it got); both `tutup` and `buka` are `SUPERADMIN` (`WriteArea` `periode`); and the server names the month in the 400 ("periode 2026-07 sudah TUTUP"), which `periodeTertutup()` in `services/periode.ts` parses so `AksiDialog` can link straight to that month. That link is the point of the module — without it a closed month fails postings with nothing in the app able to say why. An unrecognised message returns `null` and the error shows as it came.
+
 ## Auth, session, and permissions
 
 Three layers that only make sense together:
