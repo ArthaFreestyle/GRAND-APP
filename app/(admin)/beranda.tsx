@@ -96,7 +96,12 @@ import {
 import { useRecordBus } from '@/hooks/use-record-bus';
 import { messageOf } from '@/services/api';
 import { logout } from '@/services/auth';
-import { listPembelian, pembelianBus, type PembelianRow } from '@/services/pembelian';
+import {
+  getPembelianCounts,
+  listPembelian,
+  pembelianBus,
+  type PembelianRow,
+} from '@/services/pembelian';
 import { roleLabel } from '@/services/permissions';
 import { listProducts, listStokMinimum, produkBus } from '@/services/produk';
 import { useSession } from '@/services/session';
@@ -339,13 +344,20 @@ export default function BerandaScreen() {
   useEffect(() => {
     let alive = true;
     (async () => {
-      const [reorder, aktif, recent, pending] = await Promise.allSettled([
-        // `size: 1` throughout where only `paging.total_item` is wanted: the
-        // rows themselves belong to the screens those counts link into.
-        listStokMinimum({ page: 1, size: 1 }),
-        listProducts({ page: 1, size: 1, is_aktif: true }),
-        listPembelian({ page: 1, size: DOC_PREVIEW }),
-        listPembelian({ page: 1, size: 1, status: 'DIAJUKAN' }),
+      // `getPembelianCounts()` (issue #26) is one function that Nota's own
+      // "Perlu diurus" card reads too, so this metric and that card cannot
+      // quietly disagree about what "menunggu persetujuan" means — it never
+      // rejects, using the same `-1`-means-unreadable convention as the other
+      // two counts here, so it sits outside the `allSettled` below.
+      const [[reorder, aktif, recent], counts] = await Promise.all([
+        Promise.allSettled([
+          // `size: 1` throughout where only `paging.total_item` is wanted: the
+          // rows themselves belong to the screens those counts link into.
+          listStokMinimum({ page: 1, size: 1 }),
+          listProducts({ page: 1, size: 1, is_aktif: true }),
+          listPembelian({ page: 1, size: DOC_PREVIEW }),
+        ]),
+        getPembelianCounts(),
       ]);
       if (!alive) return;
 
@@ -370,7 +382,7 @@ export default function BerandaScreen() {
       // A failed count is shown as an em dash rather than as a zero: "none
       // waiting" and "could not ask" are different facts, and only one of them
       // means there is nothing to do.
-      setWaiting(pending.status === 'fulfilled' ? (pending.value.paging.total_item ?? 0) : -1);
+      setWaiting(counts.menungguPosting);
 
       setReadAt(new Date());
       setLoadedToken(reloadToken);

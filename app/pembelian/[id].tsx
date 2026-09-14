@@ -52,10 +52,25 @@
  * — `dismiss()` to this section's own Stack, `replace('/pembelian')` for a cold
  * deep link — because a detail pushed from a tab root and one pushed from a
  * root-stack section pop the same way.
+ *
+ * ## Reordered for issue #26: angka dulu, aksi sesudahnya
+ *
+ * The body used to bury the one thing that actually blocks posting — cartons
+ * that do not add up — under eight rows of reference data and the lampiran.
+ * It now reads identity, then every **blocker** there is (a rejection reason,
+ * a mismatched carton total, a draft with no lines at all) on one shared
+ * `RamahBarrierCard`, then money, then goods, then the line items and their
+ * total, then reference data, then the trail — each its own card, each with
+ * its fix (if it has one) at its own foot rather than scattered across the
+ * screen or hung off two pencils in the header. `headerRight` is empty now:
+ * "Ubah header" and "Ubah baris" are `action` words on the two cards they
+ * actually change, because a standing header icon is chrome only when it
+ * means the same thing on every record, and these two only ever appear on a
+ * `DRAFT`.
  */
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -73,12 +88,11 @@ import {
   type LineDraft,
 } from '@/components/pembelian/lines';
 import { LampiranCard } from '@/components/pembelian/lampiran';
-import { TERIMA_META } from '@/components/pembelian/status';
 import { AksiDialog } from '@/components/shell/aksi-dialog';
 import {
   RamahBadge,
+  RamahBarrierCard,
   RamahHeader,
-  RamahIconButton,
   RamahInlineError,
   RamahNote,
   RamahPrimaryButton,
@@ -94,9 +108,9 @@ import { formatRupiah, formatTanggal } from '@/constants/produk';
 import {
   RamahColors as C,
   RamahLayout as L,
-  RamahRadius as R,
   RamahType as T,
   RamahWeight as W,
+  stempelPembaruan,
 } from '@/constants/theme-ramah';
 import { useDockPadding } from '@/hooks/use-keyboard-height';
 import { messageOf } from '@/services/api';
@@ -172,6 +186,16 @@ export default function PembelianDetailScreen() {
   const [loadedId, setLoadedId] = useState(0);
   const loading = idValid && loadedId !== id;
   const loadErr = idValid ? loadErrState : 'Alamat dokumen tidak dikenali.';
+
+  /** When the document was last (re)read — the identity block's own timestamp. */
+  const [readAt, setReadAt] = useState<Date | null>(null);
+  /**
+   * Bumped by pull-to-refresh, on the same `id`. Separate from `loadedId`:
+   * a manual refresh must not re-trigger the failure page's "not found" logic
+   * or the one-shot `?ubah=1` / `?baru=1` handling, which already fired.
+   */
+  const [refreshToken, setRefreshToken] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
 
   const [namaEkspedisi, setNamaEkspedisi] = useState('');
   const [sisa, setSisa] = useState<SisaPembelian | null>(null);
@@ -309,6 +333,7 @@ export default function PembelianDetailScreen() {
         if (!alive()) return;
         setDoc(current);
         setLoadErr('');
+        setReadAt(new Date());
         if (announceCreated.current) {
           announceCreated.current = false;
           setKabar(`Dokumen ${current.nomor} tersimpan sebagai DRAFT.`);
@@ -331,13 +356,21 @@ export default function PembelianDetailScreen() {
         setLoadErr(messageOf(e, 'Gagal memuat dokumen pembelian.'));
       })
       .finally(() => {
-        if (alive()) setLoadedId(id);
+        if (alive()) {
+          setLoadedId(id);
+          setRefreshing(false);
+        }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [id, loadSideReads]);
+  }, [id, loadSideReads, refreshToken]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    setRefreshToken((n) => n + 1);
+  }, []);
 
   /**
    * Every write answers with the whole document, including the four
@@ -347,6 +380,7 @@ export default function PembelianDetailScreen() {
   const applyDoc = useCallback(
     (saved: PembelianDoc, message: string) => {
       setDoc(saved);
+      setReadAt(new Date());
       if (message) setKabar(message);
       pembelianBus.publish({ kind: 'saved', row: rowOf(saved) });
       const mine = ++generation.current;
@@ -497,6 +531,8 @@ export default function PembelianDetailScreen() {
     Math.abs(koliBaris - totalKoli) > KOLI_EPSILON;
 
   const sisaUtang = utang ? decimalToNumber(utang.sisa_utang) : 0;
+  /** Lines still short a delivery — the number the old "Penerimaan" card spent a word on instead. */
+  const sisaBarisCount = doc.lines.filter((l) => l.sisaDasar > 0).length;
 
   /**
    * The one document that can still be written against this one, and only while
@@ -529,34 +565,20 @@ export default function PembelianDetailScreen() {
 
   return (
     <View style={styles.screen}>
-      <RamahHeader
-        title={doc.nomor || 'Detail faktur'}
-        onBack={goBack}
-        right={
-          bolehUbah && !editing ? (
-            <View style={styles.headerActions}>
-              <RamahIconButton
-                icon="edit-2"
-                label="Ubah header dokumen"
-                onPress={() => setDraft(headerOf(doc, namaEkspedisi))}
-              />
-              <RamahIconButton
-                icon="list"
-                label="Ubah baris faktur"
-                onPress={() => {
-                  setLines(doc.lines.map(draftOfLine));
-                  setLinesErr('');
-                }}
-              />
-            </View>
-          ) : undefined
-        }
-      />
+      <RamahHeader title={doc.nomor || 'Detail faktur'} onBack={goBack} />
 
       <ScrollView
         style={styles.body}
         contentContainerStyle={styles.bodyContent}
-        keyboardShouldPersistTaps="handled">
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={C.brand}
+            colors={[C.brand]}
+          />
+        }>
         {kabar ? <RamahNote icon="check-circle">{kabar}</RamahNote> : null}
 
         <View style={styles.identity}>
@@ -569,82 +591,229 @@ export default function PembelianDetailScreen() {
           <Text style={styles.identitySub}>
             {`${doc.nomor} · ${formatTanggal(doc.tanggal)} · ruang ${doc.namaRuang || '—'}`}
           </Text>
+          <Text style={styles.identityStamp}>
+            {readAt ? `Dibaca ${stempelPembaruan(readAt)}` : 'Membaca…'}
+          </Text>
         </View>
 
+        {/* Setiap penghalang, di satu tempat, sebelum apa pun yang lain — issue
+            #26: yang menghentikan dokumen ini maju dibaca duluan, bukan
+            terkubur di bawah delapan baris data referensi. */}
         {doc.status === 'DRAFT' && doc.alasanTolak ? (
-          <View style={styles.alasanBox}>
-            <Text style={styles.alasanLabel}>Pengajuan sebelumnya ditolak</Text>
-            <Text style={styles.alasanText}>{doc.alasanTolak}</Text>
-          </View>
+          <RamahBarrierCard
+            tone="danger"
+            title="Pengajuan sebelumnya ditolak"
+            description={doc.alasanTolak}
+          />
         ) : null}
         {doc.status === 'BATAL' && doc.alasanBatal ? (
-          <View style={styles.alasanBox}>
-            <Text style={styles.alasanLabel}>Dokumen dibatalkan</Text>
-            <Text style={styles.alasanText}>{doc.alasanBatal}</Text>
-            <Text style={styles.alasanNote}>
-              Baris pembaliknya bertanggal hari pembatalan, bukan tanggal dokumen — laporan per
-              periode harus dibaca dari kartu stok, bukan dari status ini.
-            </Text>
-          </View>
+          <RamahBarrierCard
+            tone="danger"
+            title="Dokumen dibatalkan"
+            description={doc.alasanBatal}
+            note="Baris pembaliknya bertanggal hari pembatalan, bukan tanggal dokumen — laporan per periode harus dibaca dari kartu stok, bukan dari status ini."
+          />
+        ) : null}
+        {koliTimpang ? (
+          <RamahBarrierCard
+            tone="warn"
+            title="Koli baris belum cocok dengan header"
+            description={`Header menyebut ${formatDesimal(doc.totalKoli)} koli, seluruh baris berjumlah ${formatDesimal(String(koliBaris))}. Posting akan ditolak selama keduanya berbeda.`}
+            error={koliErr}
+            actionLabel={bolehUbah ? 'Bagi rata koli' : undefined}
+            onAction={bolehUbah ? () => void ratakanKoli() : undefined}
+          />
+        ) : null}
+        {isDraft && doc.lines.length === 0 ? (
+          <RamahBarrierCard
+            tone="warn"
+            title="Dokumen belum punya baris"
+            description='Dokumen tanpa baris tidak bisa diajukan. Tambahkan lewat "Ubah" di bagian Baris faktur di bawah.'
+          />
         ) : null}
 
+        {/* Uang: apa yang dibayar, dan berapa sisanya — hanya sekali dokumen
+            ini benar-benar jadi utang. Sebelum diposting itu satu kartu, bukan
+            kartu kedua berisi tanda pisah. */}
         <View style={styles.statGrid}>
-          <View style={styles.statCell}>
-            <RamahStatCard
-              label="Total faktur"
-              value={formatRupiah(doc.total)}
-              note={`${doc.lines.length} baris · ${doc.jenis === 'KREDIT' ? 'kredit' : 'tunai'}`}
-            />
-          </View>
-          <View style={styles.statCell}>
-            <RamahStatCard
-              label="Biaya angkut"
-              value={formatRupiah(doc.biayaAngkut)}
-              note={doc.ditanggungSupplier ? 'Ditanggung supplier' : 'Tagihan ekspedisi, di luar total faktur'}
-            />
-          </View>
-          <View style={styles.statCell}>
-            <RamahStatCard
-              label="Sisa utang"
-              value={
-                doc.status !== 'POSTED'
-                  ? '—'
-                  : doc.statusBayar === 'LUNAS'
-                    ? formatRupiah(0)
-                    : utangState === 'memuat'
-                      ? '…'
-                      : utangState === 'ada'
-                        ? formatRupiah(sisaUtang)
-                        : '—'
-              }
-              tone={sisaUtang > 0 || utangState === 'gagal' ? 'warn' : 'plain'}
-              note={
-                doc.status !== 'POSTED'
-                  ? 'Belum diposting — belum jadi utang'
-                  : utangState === 'gagal'
-                    ? utangErr || 'Gagal dimuat'
-                    : utangState === 'takTerjangkau'
-                      ? `${BAYAR_META[doc.statusBayar].label} · nilainya di luar halaman antrean`
-                      : BAYAR_META[doc.statusBayar].label
-              }
-            />
-          </View>
-          <View style={styles.statCell}>
-            <RamahStatCard
-              label="Penerimaan"
-              value={TERIMA_META[doc.statusTerima].label}
-              tone={doc.statusTerima === 'KURANG' ? 'warn' : 'plain'}
-              note={
-                doc.statusTerima === 'LENGKAP'
-                  ? 'Semua yang difakturkan datang'
-                  : `${doc.lines.filter((l) => l.sisaDasar > 0).length} baris masih ditunggu`
-              }
-            />
-          </View>
+          {doc.status === 'POSTED' ? (
+            <>
+              <View style={styles.statCell}>
+                <RamahStatCard
+                  label="Total faktur"
+                  value={formatRupiah(doc.total)}
+                  note="Termasuk diskon, PPN, dan pembulatan"
+                />
+              </View>
+              <View style={styles.statCell}>
+                <RamahStatCard
+                  label="Sisa utang"
+                  value={
+                    doc.statusBayar === 'LUNAS'
+                      ? formatRupiah(0)
+                      : utangState === 'memuat'
+                        ? '…'
+                        : utangState === 'ada'
+                          ? formatRupiah(sisaUtang)
+                          : '—'
+                  }
+                  tone={sisaUtang > 0 || utangState === 'gagal' ? 'warn' : 'plain'}
+                  note={
+                    utangState === 'gagal'
+                      ? utangErr || 'Gagal dimuat'
+                      : utangState === 'takTerjangkau'
+                        ? `${BAYAR_META[doc.statusBayar].label} · nilainya di luar halaman antrean`
+                        : BAYAR_META[doc.statusBayar].label
+                  }
+                />
+              </View>
+            </>
+          ) : (
+            <View style={styles.statCellFull}>
+              <RamahStatCard
+                label="Total faktur"
+                value={formatRupiah(doc.total)}
+                note={
+                  doc.status === 'BATAL'
+                    ? 'Dibatalkan — tidak lagi jadi utang'
+                    : 'Belum diposting — belum jadi utang'
+                }
+              />
+            </View>
+          )}
         </View>
 
+        {/* Barang: berapa baris, dan berapa yang belum datang — angka, bukan
+            kata "Lengkap"/"Kurang". Daftar belum-datang dan "Buat kiriman
+            susulan" hidup di kartu yang sama saat ada yang kurang, bukan di
+            kotak "Dokumen lanjutan" terpisah. */}
         <View style={styles.group}>
-          <RamahSectionHeader>Detail faktur</RamahSectionHeader>
+          <View style={styles.statGrid}>
+            <View style={styles.statCell}>
+              <RamahStatCard
+                label="Baris"
+                value={String(doc.lines.length)}
+                note={doc.jenis === 'KREDIT' ? 'Kredit' : 'Tunai'}
+              />
+            </View>
+            <View style={styles.statCell}>
+              <RamahStatCard
+                label="Belum datang"
+                value={String(sisaBarisCount)}
+                tone={sisaBarisCount > 0 ? 'warn' : 'plain'}
+                note={
+                  sisaBarisCount > 0
+                    ? 'Dikejar lewat kiriman susulan'
+                    : 'Semua yang difakturkan datang'
+                }
+              />
+            </View>
+          </View>
+          {doc.statusTerima === 'KURANG' ? (
+            <>
+              {sisaErr !== '' ? (
+                <RamahInlineError message={sisaErr} onRetry={retrySideReads} />
+              ) : (sisa?.baris?.length ?? 0) > 0 ? (
+                <RamahStackCard>
+                  {sisa?.baris?.map((b) => <SisaLineRow key={b.id_pembelian_detail} baris={b} />)}
+                </RamahStackCard>
+              ) : null}
+              {/* `bisaSusulan` also needs POSTED: before that the invoice has
+                  no harga pokok for a susulan to copy yet. */}
+              {bisaSusulan ? (
+                <>
+                  <View style={styles.barangAction}>
+                    <RamahSecondaryButton
+                      label="Buat kiriman susulan"
+                      onPress={() =>
+                        router.push({
+                          pathname: '/penerimaan-susulan/baru',
+                          params: { idPembelian: doc.id },
+                        })
+                      }
+                    />
+                  </View>
+                  <Text style={styles.sisaNote}>
+                    Dokumen tersendiri yang menambah stok tanpa menambah utang, karena fakturnya
+                    sudah terbit penuh di kiriman pertama. Bukan dengan retur: yang tidak pernah
+                    datang tidak bisa dikirim balik.
+                  </Text>
+                </>
+              ) : null}
+            </>
+          ) : null}
+        </View>
+
+        {editing && lines ? (
+          <>
+            <PembelianLineEditor
+              lines={lines}
+              onChange={updateLines}
+              idSupplier={doc.idSupplier}
+              pakaiKoli={!doc.ditanggungSupplier && totalKoli > 0}
+              editable
+            />
+            <Text style={styles.editNote}>
+              Menyimpan mengganti seluruh baris dokumen sekaligus — itu satu-satunya bentuk yang
+              ditawarkan kontrak, karena baris satu dokumen adalah satu kesatuan yang diketik dari
+              satu lembar kertas.
+              {totalKoli > 0
+                ? ` Koli baris saat ini ${formatDesimal(String(linesKoli(lines)))} dari ${formatDesimal(doc.totalKoli)}.`
+                : ''}
+            </Text>
+            {linesErr ? <RamahInlineError message={linesErr} /> : null}
+          </>
+        ) : (
+          <View style={styles.group}>
+            {/* "Ubah" replaces the second header pencil: it only ever appears
+                on a DRAFT, which makes it content for this one card rather
+                than chrome for every record. */}
+            <RamahSectionHeader
+              action={bolehUbah ? 'Ubah' : undefined}
+              onAction={
+                bolehUbah
+                  ? () => {
+                      setLines(doc.lines.map(draftOfLine));
+                      setLinesErr('');
+                    }
+                  : undefined
+              }>
+              {`Baris faktur · ${doc.lines.length} baris`}
+            </RamahSectionHeader>
+            {doc.lines.length > 0 ? (
+              <RamahStackCard>
+                {doc.lines.map((line) => (
+                  <FakturLineRow key={line.id} line={line} />
+                ))}
+              </RamahStackCard>
+            ) : null}
+            {/* Subtotal → total, and only that — biaya angkut is deliberately
+                not part of it (see the module header). */}
+            <RamahSummaryCard
+              rows={[
+                { label: 'Subtotal', value: formatRupiah(doc.subtotal) },
+                { label: 'Diskon nota', value: `− ${formatRupiah(doc.diskonNota)}` },
+                {
+                  label: 'PPN',
+                  value: `${formatRupiah(doc.ppn)}${doc.ppnDikreditkan ? ' · dikreditkan' : ''}`,
+                },
+                { label: 'Pembulatan', value: formatRupiah(doc.pembulatan) },
+                { label: 'Total faktur', value: formatRupiah(doc.total) },
+              ]}
+            />
+          </View>
+        )}
+
+        <View style={styles.group}>
+          {/* "Ubah" replaces the first header pencil, for the same reason:
+              only a DRAFT shows it. */}
+          <RamahSectionHeader
+            action={bolehUbah && !editing ? 'Ubah' : undefined}
+            onAction={
+              bolehUbah && !editing ? () => setDraft(headerOf(doc, namaEkspedisi)) : undefined
+            }>
+            Detail faktur
+          </RamahSectionHeader>
           <RamahSummaryCard
             rows={[
               { label: 'Tanggal dokumen', value: formatTanggal(doc.tanggal) },
@@ -670,8 +839,8 @@ export default function PembelianDetailScreen() {
                 value: doc.metodeAlokasi === 'KOLI' ? 'Per koli' : 'Per qty dasar',
               },
               {
-                label: 'PPN',
-                value: `${formatRupiah(doc.ppn)}${doc.ppnDikreditkan ? ' · dikreditkan' : ''}`,
+                label: 'Biaya angkut',
+                value: `${formatRupiah(doc.biayaAngkut)}${doc.ditanggungSupplier ? ' · ditanggung supplier' : ''}`,
               },
             ]}
           />
@@ -681,117 +850,6 @@ export default function PembelianDetailScreen() {
             Draws nothing at all on a nota with no attachments, which is most
             of them — see the component. */}
         <LampiranCard refTable="pembelian" refId={doc.id} gagalSaatDibuat={lampiranGagal} />
-
-        {koliTimpang ? (
-          <View style={styles.warnBox}>
-            <Text style={styles.warnLabel}>Koli baris belum cocok dengan header</Text>
-            <Text style={styles.warnText}>
-              {`Header menyebut ${formatDesimal(doc.totalKoli)} koli, seluruh baris berjumlah ${formatDesimal(String(koliBaris))}. Posting akan ditolak selama keduanya berbeda.`}
-            </Text>
-            {koliErr ? <RamahInlineError message={koliErr} /> : null}
-            {bolehUbah ? (
-              <View style={styles.warnAction}>
-                <RamahSecondaryButton label="Bagi rata koli" onPress={() => void ratakanKoli()} />
-              </View>
-            ) : null}
-          </View>
-        ) : null}
-
-        {editing && lines ? (
-          <>
-            <PembelianLineEditor
-              lines={lines}
-              onChange={updateLines}
-              idSupplier={doc.idSupplier}
-              pakaiKoli={!doc.ditanggungSupplier && totalKoli > 0}
-              editable
-            />
-            <Text style={styles.editNote}>
-              Menyimpan mengganti seluruh baris dokumen sekaligus — itu satu-satunya bentuk yang
-              ditawarkan kontrak, karena baris satu dokumen adalah satu kesatuan yang diketik dari
-              satu lembar kertas.
-              {totalKoli > 0
-                ? ` Koli baris saat ini ${formatDesimal(String(linesKoli(lines)))} dari ${formatDesimal(doc.totalKoli)}.`
-                : ''}
-            </Text>
-            {linesErr ? <RamahInlineError message={linesErr} /> : null}
-          </>
-        ) : (
-          <View style={styles.group}>
-            <RamahSectionHeader>{`Baris faktur · ${doc.lines.length} baris`}</RamahSectionHeader>
-            {doc.lines.length === 0 ? (
-              <View style={styles.emptyCard}>
-                <Text style={styles.emptyTitle}>Dokumen belum punya baris</Text>
-                <Text style={styles.emptySub}>
-                  Dokumen tanpa baris tidak bisa diajukan. Tambahkan lewat &quot;Ubah baris&quot;.
-                </Text>
-              </View>
-            ) : (
-              <RamahStackCard>
-                {doc.lines.map((line) => (
-                  <FakturLineRow key={line.id} line={line} />
-                ))}
-              </RamahStackCard>
-            )}
-            <RamahSummaryCard
-              rows={[
-                { label: 'Subtotal', value: formatRupiah(doc.subtotal) },
-                { label: 'Diskon nota', value: `− ${formatRupiah(doc.diskonNota)}` },
-                { label: 'PPN', value: formatRupiah(doc.ppn) },
-                { label: 'Pembulatan', value: formatRupiah(doc.pembulatan) },
-                { label: 'Total faktur', value: formatRupiah(doc.total) },
-                { label: 'Biaya angkut (di luar total)', value: formatRupiah(doc.biayaAngkut) },
-              ]}
-            />
-          </View>
-        )}
-
-        {/* Started from here rather than from an empty picker in the other
-            section: the invoice is what somebody is holding when the second
-            delivery turns up, and the form cannot be filled in without choosing
-            it anyway. */}
-        {bisaSusulan && !editing ? (
-          <View style={styles.lanjutanBox}>
-            <Text style={styles.lanjutanLabel}>Dokumen lanjutan</Text>
-            <Text style={styles.lanjutanText}>
-              Faktur ini sudah diposting, jadi barisnya sudah punya harga pokok — kiriman susulan
-              menyalin angka itu, bukan rata-rata bergerak hari ini.
-            </Text>
-            <View style={styles.lanjutanAction}>
-              <RamahSecondaryButton
-                label="Buat kiriman susulan"
-                onPress={() =>
-                  router.push({ pathname: '/penerimaan-susulan/baru', params: { idPembelian: doc.id } })
-                }
-              />
-            </View>
-          </View>
-        ) : null}
-
-        {sisa || sisaErr !== '' ? (
-          <View style={styles.group}>
-            <RamahSectionHeader>{`Belum datang${sisa ? ` · ${sisa.baris?.length ?? 0} baris` : ''}`}</RamahSectionHeader>
-            {sisaErr !== '' ? (
-              <RamahInlineError message={sisaErr} onRetry={retrySideReads} />
-            ) : (sisa?.baris?.length ?? 0) === 0 ? (
-              <View style={styles.emptyCard}>
-                <Text style={styles.emptyTitle}>Tidak ada sisa</Text>
-                <Text style={styles.emptySub}>Semua yang difakturkan sudah tercatat diterima.</Text>
-              </View>
-            ) : (
-              <>
-                <RamahStackCard>
-                  {sisa?.baris?.map((b) => <SisaLineRow key={b.id_pembelian_detail} baris={b} />)}
-                </RamahStackCard>
-                <Text style={styles.sisaNote}>
-                  Kekurangan kiriman dikejar dengan penerimaan susulan — dokumen tersendiri yang
-                  menambah stok tanpa menambah utang, karena fakturnya sudah terbit penuh di kiriman
-                  pertama. Bukan dengan retur: yang tidak pernah datang tidak bisa dikirim balik.
-                </Text>
-              </>
-            )}
-          </View>
-        ) : null}
 
         <View style={styles.group}>
           <RamahSectionHeader>Jejak dokumen</RamahSectionHeader>
@@ -1017,7 +1075,6 @@ function jejakRows(doc: PembelianDoc): { label: string; value: string }[] {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: C.surfaceSunken },
   grow: { flex: 1, minWidth: 0 },
-  headerActions: { flexDirection: 'row', alignItems: 'center', marginRight: -8 },
 
   body: { flex: 1 },
   bodyContent: {
@@ -1036,31 +1093,14 @@ const styles = StyleSheet.create({
   identityTop: { flexDirection: 'row', alignItems: 'center', gap: L.space3 },
   identityName: { ...T.identity, color: C.textTitle, flexShrink: 1 },
   identitySub: { ...T.caption, color: C.textBody },
-
-  alasanBox: { backgroundColor: C.red50, borderRadius: R.card, padding: L.cardPad, gap: L.space1 },
-  alasanLabel: { ...T.rowTitle, color: C.textDanger },
-  alasanText: { ...T.caption, color: C.textTitle },
-  alasanNote: { ...T.micro, ...W.regular, color: C.textBody, marginTop: L.space2 },
-
-  warnBox: { backgroundColor: C.orange50, borderRadius: R.card, padding: L.cardPad, gap: L.space1 },
-  warnLabel: { ...T.rowTitle, color: C.orange600 },
-  warnText: { ...T.caption, color: C.textTitle },
-  warnAction: { paddingTop: L.space2, flexDirection: 'row' },
+  identityStamp: { ...T.micro, ...W.regular, color: C.textMuted, marginTop: 2 },
 
   statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   statCell: { flexBasis: '47%', flexGrow: 1 },
+  statCellFull: { flexBasis: '100%', flexGrow: 1 },
+  barangAction: { paddingTop: L.space1, flexDirection: 'row' },
 
   group: { gap: L.space2 },
-  emptyCard: {
-    backgroundColor: C.surfaceCard,
-    borderWidth: 1,
-    borderColor: C.borderHairline,
-    borderRadius: R.card,
-    padding: L.cardPad,
-    gap: L.space1,
-  },
-  emptyTitle: { ...T.rowTitle, color: C.textTitle },
-  emptySub: { ...T.caption, color: C.textBody },
 
   lineRow: {
     flexDirection: 'row',
@@ -1078,11 +1118,6 @@ const styles = StyleSheet.create({
   lineHarga: { ...T.caption, color: C.textBody, textAlign: 'right' },
 
   editNote: { ...T.micro, ...W.regular, color: C.textBody },
-
-  lanjutanBox: { backgroundColor: C.surfaceCard, borderWidth: 1, borderColor: C.borderHairline, borderRadius: R.card, padding: L.cardPad, gap: L.space1 },
-  lanjutanLabel: { ...T.rowTitle, color: C.textTitle },
-  lanjutanText: { ...T.caption, color: C.textBody },
-  lanjutanAction: { paddingTop: L.space2, flexDirection: 'row' },
 
   sisaNote: { ...T.micro, ...W.regular, color: C.textBody },
 

@@ -19,6 +19,25 @@
  * page rather than the books. The supplier detail has the real balance, one
  * supplier at a time, from `GET /supplier/{id}/utang`.
  *
+ * **"Perlu diurus" (issue #26) is a real answer, not a KPI.** The guide's
+ * "angka dulu, aksi sesudahnya" principle asks this list to answer, inside
+ * three seconds, "ada faktur yang menunggu saya?" — so the card at the top
+ * carries the three counts the contract can actually answer honestly, each a
+ * `size=1` read via `getPembelianCounts()` (shared with Beranda's own
+ * "Menunggu persetujuan" metric, so the two screens cannot disagree about that
+ * number): draf, menunggu posting, dan kiriman kurang. Tapping one sets the
+ * matching filter below it, which is what let the "kiriman" chip row go —
+ * `terima` is still a real filter, just driven from the card instead of a
+ * second row of chips nine readers out of ten never touched.
+ *
+ * The issue leaves one thing to decide — whether SUPERADMIN sees "Menunggu
+ * posting" first, since that count is the one *they* clear. This keeps the
+ * order identical for every role instead: CLAUDE.md already decided the same
+ * question for Beranda ("two people at the same counter should see the same
+ * screen and be able to talk about it"), and a reordered card is one more
+ * thing a gudang and a supervisor standing at the same desk cannot point at
+ * together.
+ *
  * **The table is gone too.** Four fixed columns wanted 880pt; a phone has ~354.
  * Ported to Ramah alongside `app/penerimaan-susulan/index.tsx`, which this
  * screen now matches shape for shape: a docked green pill, cards assembled row
@@ -40,7 +59,16 @@
  */
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
 
@@ -53,7 +81,7 @@ import {
   RamahSearchField,
 } from '@/components/shell/ramah';
 import { BAYAR_META, DOKUMEN_RAMAH } from '@/components/shell/status-dokumen';
-import { formatRupiah, formatTanggal } from '@/constants/produk';
+import { formatNumber, formatRupiah, formatTanggal } from '@/constants/produk';
 import {
   RamahColors as C,
   RamahIcon,
@@ -61,14 +89,17 @@ import {
   RamahRadius as R,
   RamahTileTone,
   RamahType as T,
+  stempelPembaruan,
 } from '@/constants/theme-ramah';
 import { useDockPadding } from '@/hooks/use-keyboard-height';
 import { useRecordBus } from '@/hooks/use-record-bus';
 import { messageOf } from '@/services/api';
 import { decimalToNumber } from '@/services/decimal';
 import {
+  getPembelianCounts,
   listPembelian,
   pembelianBus,
+  type PembelianCounts,
   type PembelianRow,
   type StatusDokumen,
   type StatusPenerimaan,
@@ -87,17 +118,6 @@ const STATUS_OPTIONS: { key: StatusFilter; label: string }[] = [
   { key: 'DIAJUKAN', label: 'Diajukan' },
   { key: 'POSTED', label: 'Posted' },
   { key: 'BATAL', label: 'Batal' },
-];
-
-/**
- * A real query parameter, and the closest thing the contract has to a work
- * queue: `KURANG` is every document still owed goods, which is what a follow-up
- * delivery gets chased from.
- */
-const TERIMA_OPTIONS: { key: TerimaFilter; label: string }[] = [
-  { key: 'semua', label: 'Semua kiriman' },
-  { key: 'KURANG', label: 'Kiriman kurang' },
-  { key: 'LENGKAP', label: 'Lengkap' },
 ];
 
 export default function PembelianListScreen() {
@@ -138,6 +158,41 @@ export default function PembelianListScreen() {
   const listLoading = loadedKey !== requestKey;
 
   const reloadList = useCallback(() => setReloadToken((n) => n + 1), []);
+
+  /**
+   * The "Perlu diurus" card's own three counts, on a token independent of the
+   * search/status/terima filters below it — the card answers the same
+   * question no matter what the list is currently filtered to. Tied to the
+   * same `RefreshControl` and record bus as the list, so a pull-to-refresh or
+   * a document changing elsewhere re-reads both together.
+   */
+  const [countsToken, setCountsToken] = useState(0);
+  const [counts, setCounts] = useState<PembelianCounts | null>(null);
+  const [countsReadAt, setCountsReadAt] = useState<Date | null>(null);
+  const [countsLoadedToken, setCountsLoadedToken] = useState(-1);
+  const countsLoading = countsLoadedToken !== countsToken;
+  const reloadCounts = useCallback(() => setCountsToken((n) => n + 1), []);
+
+  useEffect(() => {
+    let alive = true;
+    getPembelianCounts().then((c) => {
+      if (!alive) return;
+      setCounts(c);
+      setCountsReadAt(new Date());
+      setCountsLoadedToken(countsToken);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [countsToken]);
+
+  // The pull spinner just mirrors `listLoading` rather than tracking its own
+  // "did a manual refresh land yet" flag — a filter chip tapped mid-pull would
+  // otherwise leave a `refreshing` boolean nothing ever clears.
+  const onRefresh = useCallback(() => {
+    reloadList();
+    reloadCounts();
+  }, [reloadList, reloadCounts]);
 
   useEffect(() => {
     const t = setTimeout(() => setSearch(query.trim()), SEARCH_DEBOUNCE_MS);
@@ -186,6 +241,10 @@ export default function PembelianListScreen() {
   // silently vanishing the record someone just acted on reads as a bug, and the
   // next reload settles it honestly.
   useRecordBus(pembelianBus, (change) => {
+    // Any change to any document can move the three counts — a submission
+    // leaves DRAFT, a posting can leave a short line behind — so every event
+    // re-reads them, not only a full-list "reload".
+    reloadCounts();
     if (change.kind === 'reload') {
       reloadList();
       return;
@@ -256,6 +315,12 @@ export default function PembelianListScreen() {
 
   const filtered = search !== '' || status !== 'semua' || terima !== 'semua';
 
+  /** What each count of "Perlu diurus" filters the list to, when pressed. */
+  const pilihPerlu = (target: 'draft' | 'diajukan' | 'kurang') => {
+    setStatus(target === 'draft' ? 'DRAFT' : target === 'diajukan' ? 'DIAJUKAN' : 'POSTED');
+    setTerima(target === 'kurang' ? 'KURANG' : 'semua');
+  };
+
   return (
     <View style={styles.screen}>
       <RamahHeader title="Pembelian" onBack={goBack} />
@@ -269,17 +334,72 @@ export default function PembelianListScreen() {
         keyboardShouldPersistTaps="handled"
         onEndReached={() => loadMore()}
         onEndReachedThreshold={0.4}
+        // Only after the first page has actually landed — otherwise the pull
+        // spinner and the empty placeholder's own `ActivityIndicator` show at
+        // once for the very first read.
+        refreshControl={
+          <RefreshControl
+            refreshing={rows.length > 0 && listLoading}
+            onRefresh={onRefresh}
+            tintColor={C.brand}
+            colors={[C.brand]}
+          />
+        }
         ListHeaderComponent={
           <View style={styles.controls}>
+            {/* "Perlu diurus" (issue #26): the three-second question this list
+                answers before anything else — is there a faktur waiting on me,
+                for one of the three reasons the contract can actually answer.
+                Each count is real `total_item`, from `getPembelianCounts()`
+                (shared with Beranda), never summed from the page already on
+                screen. Tapping one sets the filter it names. */}
+            <View style={styles.needCard}>
+              <View style={styles.needRow}>
+                <NeedCell
+                  label="Draf"
+                  value={counts && counts.draft >= 0 ? counts.draft : null}
+                  selected={status === 'DRAFT' && terima === 'semua'}
+                  onPress={() => pilihPerlu('draft')}
+                />
+                <View style={styles.needDivider} />
+                <NeedCell
+                  label="Menunggu posting"
+                  value={counts && counts.menungguPosting >= 0 ? counts.menungguPosting : null}
+                  selected={status === 'DIAJUKAN' && terima === 'semua'}
+                  onPress={() => pilihPerlu('diajukan')}
+                />
+                <View style={styles.needDivider} />
+                <NeedCell
+                  label="Kiriman kurang"
+                  value={counts && counts.kirimanKurang >= 0 ? counts.kirimanKurang : null}
+                  selected={status === 'POSTED' && terima === 'KURANG'}
+                  onPress={() => pilihPerlu('kurang')}
+                />
+              </View>
+              <Pressable
+                onPress={reloadCounts}
+                accessibilityRole="button"
+                accessibilityLabel="Muat ulang hitungan"
+                style={styles.needFoot}>
+                <Text style={styles.needFootText}>
+                  {countsReadAt ? `Terakhir update: ${stempelPembaruan(countsReadAt)}` : 'Membaca…'}
+                </Text>
+                {countsLoading ? (
+                  <ActivityIndicator color={C.iconMuted} size="small" />
+                ) : (
+                  <Feather name="refresh-cw" size={RamahIcon.meta} color={C.iconMuted} />
+                )}
+              </Pressable>
+            </View>
+
             <RamahSearchField
               value={query}
               onChangeText={setQuery}
               placeholder="Cari nomor dokumen atau no. faktur supplier"
             />
-            {/* Two rows, each its own horizontal scroll: wrapped, five status
-                chips plus three kiriman chips push to two lines on a ~354pt
-                phone, and a filter block that changes height as it is used
-                shoves the first record up and down under the reader's thumb. */}
+            {/* One row of status chips. The "kiriman" row is gone — its one
+                query anyone actually used, `KURANG`, is now the "Kiriman
+                kurang" count above, which sets `terima` itself. */}
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -291,20 +411,6 @@ export default function PembelianListScreen() {
                   label={o.label}
                   selected={status === o.key}
                   onPress={() => setStatus(o.key)}
-                />
-              ))}
-            </ScrollView>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              contentContainerStyle={styles.chipRow}>
-              {TERIMA_OPTIONS.map((o) => (
-                <RamahChip
-                  key={o.key}
-                  label={o.label}
-                  selected={terima === o.key}
-                  onPress={() => setTerima(o.key)}
                 />
               ))}
             </ScrollView>
@@ -333,6 +439,42 @@ export default function PembelianListScreen() {
         </View>
       ) : null}
     </View>
+  );
+}
+
+/**
+ * One count of the "Perlu diurus" card. `value: null` covers both "still
+ * reading" and "could not be read" — an em dash either way, distinct from a
+ * real zero, which is shown plainly: zero waiting is an answer, not a gap to
+ * hide. `selected` marks whichever count the list below is currently filtered
+ * to, so the card and the chip row never quietly disagree.
+ */
+function NeedCell({
+  label,
+  value,
+  selected,
+  onPress,
+}: {
+  label: string;
+  value: number | null;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  const [down, setDown] = useState(false);
+  return (
+    <Pressable
+      onPress={onPress}
+      onPressIn={() => setDown(true)}
+      onPressOut={() => setDown(false)}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      accessibilityLabel={`${label}, ${value === null ? 'tidak terbaca' : value}. Saring daftar`}
+      style={[styles.needCell, down && styles.needCellDown]}>
+      <Text style={styles.needLabel} numberOfLines={2}>
+        {label}
+      </Text>
+      <Text style={styles.needValue}>{value === null ? '—' : formatNumber(value)}</Text>
+    </Pressable>
   );
 }
 
@@ -481,6 +623,35 @@ const styles = StyleSheet.create({
 
   controls: { gap: L.cardGap, paddingTop: L.space1, paddingBottom: L.cardGap },
   chipRow: { gap: 10, paddingRight: L.gutter },
+
+  // The "Perlu diurus" card, the same white-card-over-hairline shape Beranda's
+  // own two-metric card uses, extended to three counts with a divider between
+  // each rather than just one.
+  needCard: {
+    borderRadius: R.card,
+    backgroundColor: C.surfaceCard,
+    borderWidth: 1,
+    borderColor: C.borderHairline,
+    overflow: 'hidden',
+  },
+  needRow: { flexDirection: 'row', padding: L.cardPad, gap: L.metricGap },
+  needCell: { flex: 1, minWidth: 0, gap: 6 },
+  needCellDown: { opacity: 0.7 },
+  needDivider: { width: 1, backgroundColor: C.borderHairline },
+  needLabel: { ...T.caption, color: C.textBody },
+  needValue: { ...T.metric, color: C.textTitle },
+  needFoot: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: L.space2,
+    paddingVertical: 11,
+    paddingHorizontal: L.cardPad,
+    backgroundColor: C.grey50,
+    borderTopWidth: 1,
+    borderTopColor: C.borderHairline,
+  },
+  needFootText: { ...T.caption, color: C.textMuted },
 
   // The group card, assembled row by row rather than with `RamahStackCard`:
   // this list appends pages, and wrapping every row in one element would give

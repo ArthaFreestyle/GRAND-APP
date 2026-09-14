@@ -75,6 +75,7 @@ import {
 import { AksiDialog } from '@/components/shell/aksi-dialog';
 import {
   RamahBadge,
+  RamahBarrierCard,
   RamahField,
   RamahHeader,
   RamahIconButton,
@@ -444,22 +445,22 @@ export default function PenerimaanSusulanDetailScreen() {
 
         {/* A rejection and a cancellation both carry a reason the contract made
             mandatory, and both are the first thing somebody opening this document
-            needs. Flat tinted blocks, not banners with headings of their own. */}
+            needs. `RamahBarrierCard` — issue #26's shared "kartu penghalang" —
+            so this and `app/pembelian/[id].tsx` do not each keep their own copy. */}
         {doc.status === 'DRAFT' && doc.alasanTolak ? (
-          <View style={styles.alasanBox}>
-            <Text style={styles.alasanLabel}>Pengajuan sebelumnya ditolak</Text>
-            <Text style={styles.alasanText}>{doc.alasanTolak}</Text>
-          </View>
+          <RamahBarrierCard
+            tone="danger"
+            title="Pengajuan sebelumnya ditolak"
+            description={doc.alasanTolak}
+          />
         ) : null}
         {doc.status === 'BATAL' && doc.alasanBatal ? (
-          <View style={styles.alasanBox}>
-            <Text style={styles.alasanLabel}>Dokumen dibatalkan</Text>
-            <Text style={styles.alasanText}>{doc.alasanBatal}</Text>
-            <Text style={styles.alasanNote}>
-              Baris pembaliknya bertanggal hari pembatalan, bukan tanggal dokumen, dan sisanya sudah
-              dikembalikan ke faktur asal.
-            </Text>
-          </View>
+          <RamahBarrierCard
+            tone="danger"
+            title="Dokumen dibatalkan"
+            description={doc.alasanBatal}
+            note="Baris pembaliknya bertanggal hari pembatalan, bukan tanggal dokumen, dan sisanya sudah dikembalikan ke faktur asal."
+          />
         ) : null}
 
         <View style={styles.statRow}>
@@ -753,16 +754,6 @@ const styles = StyleSheet.create({
   identitySub: { ...T.caption, color: C.textBody },
 
   statRow: { flexDirection: 'row', gap: 10 },
-
-  alasanBox: {
-    backgroundColor: C.red50,
-    borderRadius: R.card,
-    padding: L.cardPad,
-    gap: L.space1,
-  },
-  alasanLabel: { ...T.rowTitle, color: C.textDanger },
-  alasanText: { ...T.caption, color: C.textTitle },
-  alasanNote: { ...T.micro, ...W.regular, color: C.textBody, marginTop: L.space2 },
 
   group: { gap: L.space2 },
   emptyCard: {

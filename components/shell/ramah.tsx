@@ -1493,6 +1493,56 @@ export function RamahStatCard({
   );
 }
 
+/**
+ * The "kartu penghalang" — one card for one thing standing between the reader
+ * and moving a document forward: a rejection reason, cartons that do not add
+ * up, a draft with nothing in it to submit. `alasanBox` and `warnBox` used to
+ * be near-identical local style blocks on `app/pembelian/[id].tsx` and
+ * `app/penerimaan-susulan/[id].tsx`; issue #26 asks for the one copy, so both
+ * document screens render every blocker off this shape rather than drifting
+ * apart wording by wording.
+ *
+ * The fix, when there is one, is a `RamahSecondaryButton` at the card's own
+ * foot (`actionLabel` / `onAction`) — never a solid pill, and never placed
+ * anywhere else on the screen: the guide's one-solid-pill rule is spent on the
+ * dock, and an action that only makes sense once its card is understood
+ * belongs where that understanding just happened.
+ */
+export function RamahBarrierCard({
+  tone,
+  title,
+  description,
+  note,
+  error,
+  actionLabel,
+  onAction,
+}: {
+  tone: 'danger' | 'warn';
+  title: string;
+  description: string;
+  /** A second, quieter line under the description — why a reversal is dated today, say. */
+  note?: string;
+  error?: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
+  const paint =
+    tone === 'danger' ? { bg: C.red50, ink: C.textDanger } : { bg: C.orange50, ink: C.orange600 };
+  return (
+    <View style={[styles.barrier, { backgroundColor: paint.bg }]}>
+      <Text style={[styles.barrierLabel, { color: paint.ink }]}>{title}</Text>
+      <Text style={styles.barrierText}>{description}</Text>
+      {note ? <Text style={styles.barrierNote}>{note}</Text> : null}
+      {error ? <RamahInlineError message={error} /> : null}
+      {actionLabel && onAction ? (
+        <View style={styles.barrierAction}>
+          <RamahSecondaryButton label={actionLabel} onPress={onAction} />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
 
@@ -1800,4 +1850,10 @@ const styles = StyleSheet.create({
   // The figure, and it is never toned — see the note on the component.
   statValue: { ...T.groupTitle, color: C.textTitle },
   statNote: { ...T.micro, ...W.regular, color: C.textMuted },
+
+  barrier: { borderRadius: R.card, padding: L.cardPad, gap: L.space1 },
+  barrierLabel: { ...T.rowTitle },
+  barrierText: { ...T.caption, color: C.textTitle },
+  barrierNote: { ...T.micro, ...W.regular, color: C.textBody, marginTop: L.space2 },
+  barrierAction: { paddingTop: L.space2, flexDirection: 'row' },
 });
