@@ -36,7 +36,6 @@ import {
   RamahChip,
   RamahHeader,
   RamahInlineError,
-  RamahNote,
   RamahSectionHeader,
   RamahSheet,
   RamahSheetOption,
@@ -250,18 +249,6 @@ export default function PergerakanScreen() {
             </Text>
           )
         }
-        ListFooterComponent={
-          baris.length ? (
-            <View style={styles.footNote}>
-              {/* Said where somebody would otherwise conclude the report is wrong. */}
-              <RamahNote icon="info">
-                Rentangnya menyaring tanggal pergerakan di kartu stok, bukan tanggal dokumennya.
-                Nota yang diposting bulan lalu lalu dibatalkan bulan ini muncul pembalikannya di
-                bulan ini.
-              </RamahNote>
-            </View>
-          ) : null
-        }
       />
 
       <RamahSheet visible={sheetBulan} title="Pilih periode" onClose={() => setSheetBulan(false)}>
@@ -378,6 +365,4 @@ const styles = StyleSheet.create({
   // These chips carry the actual in/out figures per document kind, which is
   // the answer to "keluar ke mana saja" — read, not glanced at.
   jenisText: { ...T.caption, color: C.textBody },
-
-  footNote: { paddingTop: L.space4 },
 });

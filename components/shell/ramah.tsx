@@ -1467,7 +1467,7 @@ export function RamahStatCard({
 }: {
   label: string;
   value: string;
-  note: string;
+  note?: string;
   tone?: 'plain' | 'warn';
   accessibilityLabel?: string;
 }) {
@@ -1475,7 +1475,7 @@ export function RamahStatCard({
   return (
     <View
       accessible
-      accessibilityLabel={accessibilityLabel ?? `${label} ${value}. ${note}`}
+      accessibilityLabel={accessibilityLabel ?? (note ? `${label} ${value}. ${note}` : `${label} ${value}`)}
       style={[
         styles.stat,
         warn
@@ -1486,9 +1486,11 @@ export function RamahStatCard({
       <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
         {value}
       </Text>
-      <Text style={[styles.statNote, warn && { color: C.orange600 }]} numberOfLines={2}>
-        {note}
-      </Text>
+      {note ? (
+        <Text style={[styles.statNote, warn && { color: C.orange600 }]} numberOfLines={2}>
+          {note}
+        </Text>
+      ) : null}
     </View>
   );
 }

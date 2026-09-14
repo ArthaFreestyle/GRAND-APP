@@ -493,12 +493,11 @@ export default function ProdukDetailScreen() {
 
         <View style={styles.identity}>
           <Text style={styles.identityName}>{product.nama}</Text>
-          <Text style={styles.identitySub}>
-            {/* The kode belongs here and not on a catalogue row: it is how the
-                row is found, and reference data is what you read once you have
-                found the record. */}
-            {`${product.kode} · ${product.satuan.length} satuan · dasar ${dasar}`}
-          </Text>
+          {/* The kode belongs here and not on a catalogue row: it is how the
+              row is found, and reference data is what you read once you have
+              found the record. Unit count and base unit already repeat in the
+              "Satuan & harga jual" card below, so they are not said twice. */}
+          <Text style={styles.identitySub}>{product.kode}</Text>
           {!product.aktif ? (
             <View style={styles.arsipTag}>
               <Text style={styles.arsipText}>Diarsipkan · tidak dijual</Text>
@@ -527,7 +526,6 @@ export default function ProdukDetailScreen() {
           <RamahStatCard
             label="Saldo akhir"
             value={loadingFigures ? '—' : `${formatNumber(saldo)} ${dasar}`}
-            note={`Di ${namaGudang}`}
             accessibilityLabel={
               loadingFigures
                 ? 'Saldo akhir sedang dibaca'
@@ -546,7 +544,7 @@ export default function ProdukDetailScreen() {
             tone={!loadingFigures && low ? 'warn' : 'plain'}
             note={
               !punyaMinimum
-                ? 'Tidak masuk daftar pesan ulang'
+                ? undefined
                 : loadingFigures
                   ? 'Membandingkan saldo…'
                   : low
@@ -594,7 +592,6 @@ export default function ProdukDetailScreen() {
                   // absence on purpose. Saying so beats printing "Rp 0", which
                   // is a price somebody could act on.
                   value={berlaku ? formatRupiah(berlaku.harga) : 'Belum ada harga'}
-                  meta={berlaku ? `berlaku ${formatTanggal(berlaku.dari)}` : undefined}
                 />
               );
             })}
@@ -612,10 +609,9 @@ export default function ProdukDetailScreen() {
               {roomsWithStock.map((r) => (
                 <RamahStackRow
                   key={r.id_ruang}
-                  icon="home"
+                  icon={r.id_ruang === ruangId ? 'eye' : 'home'}
                   tone={r.id_ruang === ruangId ? 'stok' : 'akun'}
                   title={r.nama_ruang ?? ''}
-                  subtitle={r.id_ruang === ruangId ? 'Sedang dilihat' : undefined}
                   value={`${formatNumber(r.stok_akhir ?? 0)} ${dasar}`}
                   onPress={r.id_ruang === ruangId ? undefined : () => pickRuang(r.id_ruang ?? 0)}
                 />
@@ -657,18 +653,15 @@ export default function ProdukDetailScreen() {
                       key={k.id}
                       icon={look.icon}
                       tone={look.tone}
-                      title={k.nomor ?? look.label}
-                      subtitle={`${formatTanggal(k.tanggal)} · ${look.label}`}
+                      title={`${look.label} · ${formatTanggal(k.tanggal)}`}
+                      subtitle={k.nomor ?? undefined}
                       value={`${k.masuk > 0 ? '+' : '−'} ${formatNumber(qty)}`}
                       meta={`sisa ${formatNumber(k.saldo)}`}
                     />
                   );
                 })}
               </RamahStackCard>
-              <Text style={styles.ledgerNote}>
-                Kartu stok hanya mengenal satuan dasar — semua angka di atas dalam {dasar}.
-                Konversi ke satuan lain dihitung dari faktornya.
-              </Text>
+              <Text style={styles.ledgerNote}>{`Semua angka dalam ${dasar}.`}</Text>
             </>
           )}
         </View>

@@ -186,7 +186,6 @@ export default function StokOpnameBaruScreen() {
           autoCapitalize="sentences"
           multiline
           maxLength={1000}
-          helper="Dibaca oleh yang memverifikasi. Bisa diubah selama masih draft."
         />
       </ScrollView>
 

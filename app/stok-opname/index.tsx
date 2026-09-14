@@ -226,7 +226,7 @@ export default function StokOpnameListScreen() {
             {terbukaErr ? <RamahInlineError message={terbukaErr} onRetry={reload} /> : null}
             {terbuka.length ? (
               <RamahNote icon="alert-circle">
-                {`${terbuka.length} gudang sedang dihitung. Selama sesinya belum diposting atau dibatalkan, tidak ada pembelian, penjualan atau kiriman susulan yang bisa diposting ke gudang itu.`}
+                {`${terbuka.length} gudang terkunci selama opname.`}
               </RamahNote>
             ) : null}
           </View>

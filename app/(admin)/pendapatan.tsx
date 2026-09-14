@@ -66,7 +66,7 @@ import Feather from '@expo/vector-icons/Feather';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { RamahInlineError, RamahNote, RamahSectionHeader, RamahStatCard } from '@/components/shell/ramah';
+import { RamahInlineError, RamahSectionHeader, RamahStatCard } from '@/components/shell/ramah';
 import { formatRupiah } from '@/constants/produk';
 import {
   RamahColors as C,
@@ -233,16 +233,6 @@ export default function PendapatanScreen() {
             </View>
           ))}
         </View>
-
-        <RamahNote icon="clock">
-          &quot;Hari ini&quot; mengikuti kalender perangkat ini. Kalau zona waktu server berbeda,
-          batas hari bisa bergeser beberapa jam di sekitar tengah malam.
-        </RamahNote>
-        <RamahNote icon="info">
-          Harga pokok dan laba kotor tampil sama untuk setiap peran — kontrak tidak menulis
-          batasan role untuk laporan apa pun, jadi yang mengetik nota di kasir berhak tahu
-          hasilnya juga.
-        </RamahNote>
       </ScrollView>
     </View>
   );

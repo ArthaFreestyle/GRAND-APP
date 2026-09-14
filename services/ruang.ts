@@ -4,8 +4,8 @@
  * A ruang is the destination of every document that moves stock, so a picker
  * for one is the first thing any of those screens needs — that read is the
  * whole reason this module existed before issue #23. The writes below are
- * `app/pengaturan/`'s: creating a ruang, correcting its name or kode, and
- * retiring one.
+ * `app/pengaturan/`'s: creating a ruang, correcting its name, and retiring
+ * one. `kode` is generated server-side and this app never types it.
  *
  * `GET /ruang` already filters to the ruang inside the session's active unit
  * kerja — rooms outside it are skipped silently, with no error — **except**

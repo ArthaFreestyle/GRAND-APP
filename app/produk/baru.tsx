@@ -68,7 +68,6 @@ import {
   RamahHeader,
   RamahIconButton,
   RamahInlineError,
-  RamahNote,
   RamahPickerField,
   RamahPrimaryButton,
   RamahSearchField,
@@ -364,13 +363,6 @@ export default function ProdukBaruScreen() {
               message={`${created.hargaGagal} harga gagal disimpan. Barangnya sudah ada — atur harganya dari tombol Ubah di detail.`}
             />
           ) : null}
-          {/* Not a failure and not a warning: the reorder list is defined by
-              `stok_minimum > 0`, so a product left at the column default never
-              appears in it. Better said here once than discovered in a month. */}
-          <RamahNote icon="info">
-            Stok minimum masih nol, yang berarti &quot;belum diatur&quot; — barang ini tidak akan
-            muncul di daftar pesan ulang sampai angkanya diisi dari Ubah produk.
-          </RamahNote>
         </ScrollView>
 
         <View style={[styles.dockDone, { paddingBottom: L.space4 + insets.bottom }]}>
@@ -421,7 +413,6 @@ export default function ProdukBaruScreen() {
                 setNamaErr('');
               }}
               placeholder="Map plastik kancing A4"
-              helper="Tulis seperti yang tertera di kemasan pemasok."
               error={namaErr}
               autoCapitalize="words"
               maxLength={255}
@@ -438,7 +429,7 @@ export default function ProdukBaruScreen() {
               placeholder="8991234567890"
               // Said here because it is the one field on this screen that cannot
               // be corrected later: `PATCH /product` does not accept it at all.
-              helper="Barcode kemasan, atau kode rak sendiri. Tidak bisa diubah setelah tersimpan."
+              helper="Tidak bisa diubah setelah tersimpan."
               error={kodeErr}
               autoCapitalize="characters"
               maxLength={64}
@@ -460,7 +451,7 @@ export default function ProdukBaruScreen() {
               required
               value={namaDasar}
               placeholder="Pilih satuan"
-              helper="Setelah ada mutasi, satuan dasar tidak bisa diganti."
+              helper="Tidak bisa diubah nanti."
               error={dasarErr}
               onPress={() => {
                 setSheetQuery('');

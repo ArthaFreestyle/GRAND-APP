@@ -323,13 +323,7 @@ export default function StokOpnameDetailScreen() {
               {doc.uraian ? <Text style={styles.uraian}>{doc.uraian}</Text> : null}
             </View>
 
-            {/* The visible symptom named at its cause. */}
-            {beku ? (
-              <RamahNote icon="lock">
-                Gudang ini sedang beku. Selama sesi ini belum diposting atau dibatalkan, tidak ada
-                pembelian, penjualan atau kiriman susulan yang bisa diposting ke sini.
-              </RamahNote>
-            ) : null}
+            {beku ? <RamahNote icon="lock">Gudang dikunci selama opname.</RamahNote> : null}
 
             {doc.status === 'BATAL' && doc.alasanBatal ? (
               <RamahNote icon="x-circle">{`Dibatalkan: ${doc.alasanBatal}`}</RamahNote>
@@ -366,10 +360,8 @@ export default function StokOpnameDetailScreen() {
         ListFooterComponent={
           doc.jumlahBelumDihitung > 0 && doc.jumlahBaris > 0 ? (
             <View style={styles.footNote}>
-              {/* The single most important sentence in the module, placed where
-                  somebody is about to submit a partial count. */}
               <RamahNote icon="info">
-                {`${formatNumber(doc.jumlahBelumDihitung)} baris belum dihitung. Baris kosong dilewati saat posting — stoknya dibiarkan apa adanya, bukan dianggap nol.`}
+                {`${formatNumber(doc.jumlahBelumDihitung)} barang belum dihitung.`}
               </RamahNote>
             </View>
           ) : null

@@ -206,12 +206,8 @@ export default function UtangPemasokScreen() {
                 <Text style={styles.totalValue}>{formatRupiah(sisaDimuat)}</Text>
               </View>
             ) : null}
-            {/* Said once, at the top, because the ordering is the whole point of
-                this list and it is the opposite of every other list in the app. */}
             {rows.length ? (
-              <RamahNote icon="clock">
-                Urut dari faktur paling lama. Yang paling atas adalah yang berikutnya dibayar.
-              </RamahNote>
+              <RamahNote icon="clock">Faktur terlama di atas.</RamahNote>
             ) : null}
           </View>
         }

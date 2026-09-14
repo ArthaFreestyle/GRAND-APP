@@ -100,7 +100,7 @@ export function AksiDialog({
               value={alasan}
               onChangeText={onChangeAlasan}
               placeholder={aksi.contoh}
-              helper="Maksimal 500 karakter. Tersimpan di dokumen dan tidak bisa dihapus."
+              helper="Tidak bisa dihapus setelah disimpan."
               maxLength={500}
               // A reason is a sentence, and the contract allows 500 characters of
               // it. On one line the beginning scrolls out of sight while it is

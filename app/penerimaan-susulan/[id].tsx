@@ -455,12 +455,7 @@ export default function PenerimaanSusulanDetailScreen() {
           />
         ) : null}
         {doc.status === 'BATAL' && doc.alasanBatal ? (
-          <RamahBarrierCard
-            tone="danger"
-            title="Dokumen dibatalkan"
-            description={doc.alasanBatal}
-            note="Baris pembaliknya bertanggal hari pembatalan, bukan tanggal dokumen, dan sisanya sudah dikembalikan ke faktur asal."
-          />
+          <RamahBarrierCard tone="danger" title="Dokumen dibatalkan" description={doc.alasanBatal} />
         ) : null}
 
         <View style={styles.statRow}>
@@ -488,10 +483,7 @@ export default function PenerimaanSusulanDetailScreen() {
             <RamahSummaryCard
               rows={[{ label: 'Nilai setelah diubah', value: formatRupiah(nilaiTurunan(lines)) }]}
             />
-            <Text style={styles.editNote}>
-              Menyimpan mengganti seluruh baris dokumen sekaligus — itu satu-satunya bentuk yang
-              ditawarkan kontrak, karena baris satu kiriman dihitung bersamaan.
-            </Text>
+            <Text style={styles.editNote}>Menyimpan mengganti seluruh baris sekaligus.</Text>
             {linesErr ? <RamahInlineError message={linesErr} /> : null}
           </>
         ) : (
@@ -626,7 +618,6 @@ export default function PenerimaanSusulanDetailScreen() {
                 setDraftErr('');
               }}
               placeholder="YYYY-MM-DD"
-              helper="Menentukan bulan penomoran dan periodenya."
               error={draftErr}
               autoCapitalize="none"
               maxLength={10}
@@ -635,8 +626,7 @@ export default function PenerimaanSusulanDetailScreen() {
               label="Keterangan"
               value={draft.keterangan}
               onChangeText={(v) => setDraft({ ...draft, keterangan: v })}
-              placeholder="Sisa 5 dus datang menyusul, SJ 00214"
-              helper="Opsional. Dikosongkan berarti keterangannya benar-benar dihapus dari dokumen."
+              placeholder="Opsional"
               multiline
             />
             <RamahPrimaryButton
