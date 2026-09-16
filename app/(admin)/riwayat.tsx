@@ -87,6 +87,7 @@ import {
 import {
   RamahBadge,
   RamahChip,
+  RamahEmptySearch,
   RamahInlineError,
   RamahSearchField,
   RamahSectionHeader,
@@ -414,13 +415,18 @@ function ListPlaceholder({ loading, error, filtered }: { loading: boolean; error
     );
   }
   if (error) return null;
+  if (filtered) {
+    return (
+      <View style={styles.placeholder}>
+        <RamahEmptySearch sub="Coba kata kunci lain, atau lepas filternya." />
+      </View>
+    );
+  }
   return (
     <View style={styles.placeholder}>
-      <Text style={styles.placeholderTitle}>{filtered ? 'Tidak ada yang cocok' : 'Belum ada nota'}</Text>
+      <Text style={styles.placeholderTitle}>Belum ada nota</Text>
       <Text style={styles.placeholderSub}>
-        {filtered
-          ? 'Coba kata kunci lain, atau lepas filternya.'
-          : 'Nota yang diposting dari kasir di unit kerja sesi ini akan terdaftar di sini.'}
+        Nota yang diposting dari kasir di unit kerja sesi ini akan terdaftar di sini.
       </Text>
     </View>
   );

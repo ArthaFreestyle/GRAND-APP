@@ -181,6 +181,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   RamahChip,
+  RamahEmptySearch,
   RamahField,
   RamahIconButton,
   RamahInlineError,
@@ -1483,11 +1484,22 @@ export default function KasirScreen() {
             <RamahInlineError message={katalogErr} onRetry={reloadKatalog} />
           </View>
         ) : (
-          <Text style={styles.kosongCari}>
-            {search
-              ? `Tidak ada barang yang cocok dengan "${search}".`
-              : 'Belum ada barang aktif di gudang ini.'}
-          </Text>
+          /*
+            88 rather than the 160 every other screen uses. The catalogue is one
+            column of a till that also has to hold a cart and a keypad, and on
+            the phone layout it is the only thing between the header and the
+            docked cart — an illustration sized for a full page would push the
+            sentence explaining it off the bottom. The term itself is dropped
+            from the copy for the same reason: it is still legible in the search
+            field directly above.
+          */
+          <View style={styles.kosongCariBox}>
+            {search ? (
+              <RamahEmptySearch sub="Coba kode atau nama lain." size={88} />
+            ) : (
+              <Text style={styles.kosongCari}>Belum ada barang aktif di gudang ini.</Text>
+            )}
+          </View>
         )
       }
       ListFooterComponent={
@@ -2492,6 +2504,7 @@ const styles = StyleSheet.create({
   listNoteGap: { gap: L.space3 },
   produkHarga: { ...T.bodyModerate, color: C.textBody, flexShrink: 1 },
   kosongCari: { ...T.bodySmall, color: C.textMuted, padding: L.gutter },
+  kosongCariBox: { paddingVertical: L.gutter, alignItems: 'center' },
 
   padHead: {
     paddingHorizontal: L.space5,

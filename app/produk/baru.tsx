@@ -372,6 +372,7 @@ export default function ProdukBaruScreen() {
               of the same product. */}
           <RamahPrimaryButton
             label="Lihat detail barang"
+            arrow
             onPress={() => router.replace({ pathname: '/produk/[id]', params: { id: created.id } })}
           />
           <RamahSecondaryButton
@@ -592,6 +593,10 @@ export default function ProdukBaruScreen() {
               step === 1 ? 'Lanjut atur satuan' : step === 2 ? 'Lanjut atur harga jual' : 'Simpan produk'
             }
             icon={step === 3 ? 'check' : undefined}
+            // Steps 1 and 2 open the next question; step 3 writes the product
+            // and ends the flow. An arrow on that last one would promise a
+            // fourth screen, which is why it wears a check instead.
+            arrow={step !== 3}
             onPress={step === 1 ? nextFromStep1 : step === 2 ? nextFromStep2 : save}
             busy={saving}
             disabled={saving}

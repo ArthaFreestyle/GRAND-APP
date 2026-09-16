@@ -69,6 +69,7 @@ import {
 
 import {
   RamahChip,
+  RamahEmptySearch,
   RamahHeader,
   RamahIconButton,
   RamahInlineError,
@@ -422,7 +423,10 @@ export function PilihBarangStep({
         )}
         <RamahPrimaryButton
           label="Lanjut pilih pemasok"
-          icon="arrow-right"
+          // The arrow moved out of the `icon` slot, which draws it
+          // *before* the label — a forward arrow pointing at the words
+          // it is meant to follow (isu #39).
+          arrow
           onPress={onLanjut}
           disabled={dipilih.length === 0}
         />
@@ -651,14 +655,18 @@ function Placeholder({
         <ActivityIndicator color={C.brand} />
       </View>
     );
+  if (searching)
+    return (
+      <View style={styles.placeholder}>
+        <RamahEmptySearch sub="Coba kata kunci lain, atau nomor kode barangnya." />
+      </View>
+    );
   return (
     <View style={styles.placeholder}>
       <Text style={styles.placeholderText}>
-        {searching
-          ? 'Tidak ada barang yang cocok.'
-          : filter === 'menipis'
-            ? 'Tidak ada stok yang menipis di gudang ini.'
-            : 'Belum ada barang aktif.'}
+        {filter === 'menipis'
+          ? 'Tidak ada stok yang menipis di gudang ini.'
+          : 'Belum ada barang aktif.'}
       </Text>
     </View>
   );

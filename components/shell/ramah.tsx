@@ -34,6 +34,7 @@ import {
   BottomSheetView,
   type BottomSheetMethods,
 } from '@expo/ui/community/bottom-sheet';
+import LottieView from 'lottie-react-native';
 import { Children, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
@@ -60,6 +61,7 @@ import {
   scoreTone,
   type RamahTileToneName,
 } from '@/constants/theme-ramah';
+import { useReduceMotion } from '@/hooks/use-reduce-motion';
 
 export type FeatherName = keyof typeof Feather.glyphMap;
 
@@ -337,6 +339,134 @@ export function RamahSectionHeader({
 }
 
 /**
+ * Every animation the app draws, in one table (isu #39).
+ *
+ * Three, and the number is the point — one per *state*, not one per screen.
+ * `require()` is here rather than in the nine screens that draw the first of
+ * them for the same reason `ART` in `app/(admin)/beranda.tsx` gathers the 3D
+ * renders: an asset referenced from one place can be swapped, resized or
+ * dropped by editing one line, and a reviewer can see the whole inventory
+ * without grepping for a file extension.
+ *
+ * They are vendored in `assets/lottie/`, and all three are **pure vector** —
+ * no embedded PNG in any of them — which is why they can be scaled to whatever
+ * a surface needs and why the bundle only grew ~235 KB.
+ *
+ * `still` is the progress value the drawing is legible at when motion is off
+ * (see `useReduceMotion`). It is **not** 0 for either looping asset: both build
+ * themselves up over their first second — `search-not-found`'s magnifier does
+ * not appear until frame 34 of 316 and its "no result" cross until 252 — so
+ * frame 0 is a blank square, and a blank square is what a naive
+ * `progress={0}` fallback would ship to exactly the people who cannot see the
+ * animation play.
+ *
+ * **Nothing here is recoloured, and the search asset's orange is the case that
+ * was actually argued.** Guide §4's "orange means stock" rule governs *chrome*
+ * — a tile's tint, a badge, a metric's note — where a colour is a second,
+ * non-textual way to find a thing. The orange in `search-not-found` is the
+ * magnifying glass itself (`LUPA rotacion 3D` in the source), the one object in
+ * the drawing that names what just failed, and it is read as a lens rather than
+ * as a status the way a filled pill is. Painting it navy would also sink it
+ * into the blue paper behind it, which is the drawing's whole subject. An
+ * illustration is not a token.
+ */
+export const RamahAnim = {
+  /** A search that matched nothing. Blue paper, an orange magnifier, 5.3s. */
+  cariKosong: { source: require('@/assets/lottie/search-not-found.json'), still: 0.9 },
+  /** The wait while Gemini reads a photographed invoice. 6s. */
+  ocrMembaca: { source: require('@/assets/lottie/ocr-membaca.json'), still: 0.5 },
+  /**
+   * The forward arrow on a positive action. White only, so it inherits the
+   * pill it sits on with no tinting at all, and 37 frames at 30fps — short
+   * enough to be press feedback rather than a thing to wait out.
+   */
+  panahMaju: { source: require('@/assets/lottie/arrow-right.json'), frames: 37 },
+} as const;
+
+/**
+ * A decorative animation, with the reduce-motion fallback already paid.
+ *
+ * Every Lottie in the app goes through this or through `RamahPrimaryButton`;
+ * a screen never renders `LottieView` itself. That is the same rule as the one
+ * keeping `const D` palette blocks out of screens — a raw `LottieView` is four
+ * decisions (size, loop, resize mode, what happens when motion is off) made
+ * again on each screen, and the fourth is the one that gets forgotten.
+ *
+ * It is decoration by definition, so it is hidden from the accessibility tree
+ * outright: the sentence underneath is what a screen reader should read, and an
+ * illustration announcing itself in front of that sentence is noise to the one
+ * person who most needs the sentence.
+ */
+export function RamahLottie({
+  name,
+  size,
+}: {
+  name: 'cariKosong' | 'ocrMembaca';
+  /** Square. The asset is `contain`-fitted inside it, so this is a ceiling. */
+  size: number;
+}) {
+  const reduce = useReduceMotion();
+  const anim = RamahAnim[name];
+  // The accessibility props sit on a wrapping `View`, not on `LottieView` —
+  // it does not forward them, which is a compile error rather than a silent
+  // one, but the wrapper is the right shape anyway: one node to hide, whatever
+  // the animation renders inside it.
+  return (
+    <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      <LottieView
+        source={anim.source}
+        style={{ width: size, height: size }}
+        resizeMode="contain"
+        autoPlay={!reduce}
+        loop={!reduce}
+        progress={reduce ? anim.still : undefined}
+      />
+    </View>
+  );
+}
+
+/**
+ * What a list or a picker draws when a search matched nothing.
+ *
+ * **Only when a search matched nothing.** A list that is empty because nothing
+ * has been created yet is a different sentence and gets no illustration: it is
+ * not a failed search, and drawing "tidak ditemukan" over it misstates why the
+ * screen is blank. Every caller keeps that branch — `searching ? <this /> :
+ * <plain text>` — rather than folding the two states together.
+ *
+ * The title is fixed rather than a prop. Nine screens and six pickers say this,
+ * and a status is one phrase in this app for the same reason a document's
+ * status is: two wordings for one state is two states, to the eye. What each
+ * caller does supply is `sub`, because *what to try instead* genuinely differs
+ * — another keyword on Katalog, a different gudang on the till.
+ */
+export function RamahEmptySearch({
+  sub,
+  size = 160,
+}: {
+  sub: string;
+  /**
+   * 160 everywhere except the till, whose catalogue column on a phone does not
+   * have the height to spend on it — see `app/(admin)/kasir.tsx`.
+   */
+  size?: number;
+}) {
+  return (
+    <View style={emptySearchStyles.wrap}>
+      <RamahLottie name="cariKosong" size={size} />
+      <Text style={emptySearchStyles.title}>Tidak ada yang cocok</Text>
+      <Text style={emptySearchStyles.sub}>{sub}</Text>
+    </View>
+  );
+}
+
+const emptySearchStyles = StyleSheet.create({
+  wrap: { alignItems: 'center', gap: L.space2, paddingHorizontal: L.gutter },
+  title: { ...T.titleSmall, color: C.textTitle, textAlign: 'center' },
+  sub: { ...T.bodySmall, color: C.textBody, textAlign: 'center' },
+});
+
+/**
  * The one solid green pill a screen is allowed. Exactly one — the guide is
  * blunt about it, and the reason is that two primary actions are none.
  */
@@ -346,6 +476,7 @@ export function RamahPrimaryButton({
   onPress,
   disabled = false,
   busy = false,
+  arrow = false,
   height = L.controlH,
   type = 'titleTiny',
 }: {
@@ -354,6 +485,23 @@ export function RamahPrimaryButton({
   onPress: () => void;
   disabled?: boolean;
   busy?: boolean;
+  /**
+   * The forward arrow, after the label (isu #39).
+   *
+   * **Opt-in, and it is a promise rather than a decoration.** An arrow says
+   * *there is a screen after this one*: it belongs on "Lanjut" and on the pill
+   * that pushes a detail, and it is wrong on "Simpan", on "Posting" and on the
+   * "Selesai" that closes a flow — those end something, and an arrow on them
+   * promises a step that never comes. That is also why it is not simply on by
+   * default for every green pill in the app.
+   *
+   * It plays **once, on press**, rather than looping. A pill that animates
+   * forever is the only moving thing on a screen somebody reads standing in a
+   * storeroom, and it would pull the eye for as long as the screen is open;
+   * played on touch it is feedback, and it lands with `pressScale` rather than
+   * competing with it.
+   */
+  arrow?: boolean;
   /**
    * 52 everywhere except the till, where `LayarKasir.dc.html` draws the pay
    * button at 96 with a larger label. A cashier hits that button with a queue
@@ -370,10 +518,19 @@ export function RamahPrimaryButton({
 }) {
   const [down, setDown] = useState(false);
   const off = disabled || busy;
+  const reduce = useReduceMotion();
+  const arrowRef = useRef<LottieView>(null);
   return (
     <Pressable
       onPress={onPress}
-      onPressIn={() => setDown(true)}
+      onPressIn={() => {
+        setDown(true);
+        // Explicit bounds rather than a bare `play()`: once a non-looping
+        // animation has finished, iOS resumes from the end frame and nothing
+        // moves on the second press, while Android restarts. `play(0, frames)`
+        // is the one form that replays on both.
+        arrowRef.current?.play(0, RamahAnim.panahMaju.frames);
+      }}
       onPressOut={() => setDown(false)}
       disabled={off}
       accessibilityRole="button"
@@ -391,6 +548,31 @@ export function RamahPrimaryButton({
         <>
           {icon ? <Feather name={icon} size={RamahIcon.row} color={C.textOnBrand} /> : null}
           <Text style={[styles.primaryLabel, T[type]]}>{label}</Text>
+          {/*
+            The arrow is the label's own punctuation, so it takes the row icon
+            size whatever the label's step is — a pay button at Title Moderate
+            does not carry a proportionally larger arrow, and does not ask for
+            one. With motion off it is the static Feather glyph: the promise of
+            a next screen survives without moving, which is why this is the one
+            of the three animations whose fallback is a different drawing rather
+            than a still frame of the same one.
+          */}
+          {arrow ? (
+            reduce ? (
+              <Feather name="arrow-right-circle" size={RamahIcon.row} color={C.textOnBrand} />
+            ) : (
+              <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                <LottieView
+                  ref={arrowRef}
+                  source={RamahAnim.panahMaju.source}
+                  style={{ width: RamahIcon.row, height: RamahIcon.row }}
+                  resizeMode="contain"
+                  autoPlay={false}
+                  loop={false}
+                />
+              </View>
+            )
+          ) : null}
         </>
       )}
     </Pressable>

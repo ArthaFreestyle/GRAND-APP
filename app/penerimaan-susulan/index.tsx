@@ -49,6 +49,7 @@ import Feather from '@expo/vector-icons/Feather';
 import {
   RamahBadge,
   RamahChip,
+  RamahEmptySearch,
   RamahHeader,
   RamahInlineError,
   RamahPrimaryButton,
@@ -414,15 +415,19 @@ function ListPlaceholder({
   }
   // The error already has its own line above the list, with the retry on it.
   if (error) return null;
+  if (filtered) {
+    return (
+      <View style={styles.placeholder}>
+        <RamahEmptySearch sub="Coba kata kunci lain, atau lepas filter statusnya." />
+      </View>
+    );
+  }
   return (
     <View style={styles.placeholder}>
-      <Text style={styles.placeholderTitle}>
-        {filtered ? 'Tidak ada yang cocok' : 'Belum ada kiriman susulan'}
-      </Text>
+      <Text style={styles.placeholderTitle}>Belum ada kiriman susulan</Text>
       <Text style={styles.placeholderSub}>
-        {filtered
-          ? 'Coba kata kunci lain, atau lepas filter statusnya.'
-          : 'Dokumen ini dibuat atas faktur pembelian yang sudah diposting dan kirimannya masih kurang. Biasanya dimulai dari faktur itu sendiri, bukan dari sini.'}
+        Dokumen ini dibuat atas faktur pembelian yang sudah diposting dan kirimannya masih
+        kurang. Biasanya dimulai dari faktur itu sendiri, bukan dari sini.
       </Text>
     </View>
   );

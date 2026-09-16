@@ -33,6 +33,7 @@ import Feather from '@expo/vector-icons/Feather';
 import {
   RamahBadge,
   RamahChip,
+  RamahEmptySearch,
   RamahHeader,
   RamahInlineError,
   RamahPrimaryButton,
@@ -300,12 +301,16 @@ function Placeholder({
         <ActivityIndicator color={C.brand} />
       </View>
     );
+  if (searching)
+    return (
+      <View style={styles.placeholder}>
+        <RamahEmptySearch sub="Coba kata kunci lain — nama unit kerjanya." />
+      </View>
+    );
   return (
     <View style={styles.placeholder}>
       <Text style={styles.placeholderText}>
-        {searching
-          ? 'Tidak ada unit kerja yang cocok dengan pencarian itu.'
-          : 'Belum ada unit kerja. Tambahkan satu untuk mulai mendaftarkan gudangnya.'}
+        Belum ada unit kerja. Tambahkan satu untuk mulai mendaftarkan gudangnya.
       </Text>
     </View>
   );
