@@ -18,9 +18,14 @@
  *   2. `POST /dokumen/{id}/tempel` — `{ ref_table, ref_id }`, once the nota exists.
  *   3. `GET /dokumen?ref_table=pembelian&ref_id=…` — that nota's attachments.
  *
- * The second half of the board's claim stands: `ocr_id` has nothing behind it,
- * because `POST /ocr/faktur` does not exist. That gap is named where it bites,
- * in `app/pembelian/baru.tsx`, not papered over here.
+ * The second half of the board's claim is now stale rather than wrong:
+ * `pembelian.ocr_id` still does not exist, but not because nothing reads a
+ * photograph any more — `POST /pembelian/ocr/faktur-kedatangan` and `/ocr/nota`
+ * do that now (isu #36/#39). Neither takes a `dokumen` id, though: they read a
+ * local file straight from the picker and never store it, so there is still no
+ * field on `pembelian` for this module to grow. That flow is wired in
+ * `services/ocr-pembelian.ts` and `app/pembelian/baru.tsx`, entirely apart from
+ * this module — this one still only moves already-uploaded rows around.
  *
  * ## The orphan tray is a real feature, not a leak
  *

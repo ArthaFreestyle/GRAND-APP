@@ -1,32 +1,33 @@
 /**
- * H1 of `Papan Layar OCR.dc.html` — "Foto nota — kumpulkan halaman".
+ * The manual half of H1 of `Papan Layar OCR.dc.html` — "Foto nota — kumpulkan
+ * halaman", attach-only, no reading.
  *
  * A shop gets a paper faktur. This is where it gets photographed, one tile per
  * page, until the whole sheet is covered. Every page is uploaded the moment it
  * is taken, so the tiles on screen are rows that already exist on the server
  * rather than a queue waiting for a save that might never happen.
  *
- * ## What the board draws that this cannot do, and why it is said here
+ * ## `POST /pembelian/ocr/*` landed (isu #36/#39), and this screen did not become H1→H2
  *
- * The board's primary button is **"Baca isi nota"**, and it leads to H2 (OCR
- * running) and H3 (check the reading, fix the quantities, file each line against
- * the catalogue). Neither is buildable: `POST /ocr/faktur` and
- * `GET /ocr/faktur/{id}` are not in `contracts/openapi.yaml`, and the board's
- * own "Yang butuh dukungan dari server" section says as much — nothing on this
- * server reads a photograph, and nothing scores a faktur line against a product.
+ * The prediction this comment used to make — "when the endpoint lands, this
+ * screen's exit becomes H2 instead of the supplier step" — turned out wrong,
+ * because the endpoint that shipped is not the one the board drew. It takes
+ * **one file per call**, from the picker directly, and never stores it; this
+ * screen's own job is a **tray of up to ten already-uploaded `dokumen` rows**,
+ * which is the wrong shape to hand an endpoint that wants exactly one local
+ * file and nothing it has seen before. So the real OCR flow — supplier picked
+ * first, then one photo, then the read, then the check — is a **separate
+ * branch** of `app/pembelian/baru.tsx` (`ocrPemasok → ocrFoto → ocrBaca →
+ * ocrPeriksa`; see that file's header and `services/ocr-pembelian.ts`), not a
+ * new exit grafted onto this one.
  *
- * Faking it client-side is not on the table: the whole value of H3 is a
- * *confidence* ("Cocok" / "Mirip · konfirmasi dulu") that only a matcher with
- * the catalogue in front of it can produce, and an invented score on a screen
- * whose entire job is to be checked is worse than no screen at all.
- *
- * So this step keeps the half that is real, and that half is worth having on its
- * own: the photos become `dokumen` rows attached to the nota, so the faktur can
- * be read on the phone while the lines are typed from it, and a supervisor
- * deciding on that nota later can open the paper it came from. **When
- * `/ocr/faktur` lands, this screen does not move** — its exit becomes H2 instead
- * of the supplier step, and the page ids it is already holding are exactly what
- * that endpoint takes.
+ * This screen keeps its original job: photographs that become `dokumen` rows
+ * attached to the nota once it exists, so a supervisor deciding on it later can
+ * open the paper it came from. It is also where the OCR branch's H2 sends
+ * somebody who hits a failure it cannot recover from — a 404 because
+ * `gemini.api_key` is unset on this server, or any other read that did not
+ * come back — because attaching the photo and typing the lines by hand is
+ * always available, endpoint or no endpoint.
  *
  * ## Why a page is uploaded immediately rather than at the end
  *
@@ -83,7 +84,7 @@ import { deleteDokumen, uploadDokumen } from '@/services/dokumen';
  * instead, which is what the board draws for *every* tile.
  */
 export interface HalamanNota {
-  /** The `dokumen` row id. This is what `tempel` — and one day `/ocr/faktur` — takes. */
+  /** The `dokumen` row id. This is what `tempel` takes; the OCR endpoints take the local `file://` uri directly instead, never this id. */
   id: number;
   nama: string;
   uriLokal: string | null;

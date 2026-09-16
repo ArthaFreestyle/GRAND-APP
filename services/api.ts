@@ -46,7 +46,12 @@ type ErrorEnvelope = components['responses']['ValidationError']['content']['appl
 
 /** A request that reached the server and came back as a non-2xx envelope, or never got there at all. */
 export class ApiError extends Error {
-  /** 0 when the request never reached the server (offline, DNS, TLS, timeout). */
+  /**
+   * 0 when the request never reached the server (offline, DNS, TLS, timeout).
+   * -1 means the caller cancelled it on purpose (`AbortController.abort()`
+   * from a UI "Batalkan" button) — a screen checks for this to skip showing it
+   * as a failure at all, since the person asked for exactly this outcome.
+   */
   readonly status: number;
   readonly validationErrors?: Record<string, string>;
 
@@ -59,6 +64,10 @@ export class ApiError extends Error {
 
   get isNetworkFailure() {
     return this.status === 0;
+  }
+
+  get isCancelled() {
+    return this.status === -1;
   }
 }
 
@@ -216,6 +225,35 @@ export interface UploadFile {
   type: string;
 }
 
+export interface UploadOptions {
+  /**
+   * Multipart text fields sent alongside the file — `id_supplier`, `id_ruang`,
+   * an optional `tanggal`, for the OCR endpoints. `apiUpload` used to only be
+   * able to send the one file part, which was correct for `POST /dokumen` and
+   * wrong the moment a second endpoint wanted a file **and** parameters in the
+   * same body.
+   */
+  fields?: Record<string, string>;
+  /**
+   * Overrides `UPLOAD_TIMEOUT_MS` for one call.
+   *
+   * That constant is sized for "send N megabytes over a shop's uplink" —
+   * moving bytes, nothing else. A call that also *waits on Gemini* after the
+   * bytes land is a different budget entirely (services/ocr-pembelian.ts's
+   * `OCR_TIMEOUT_MS`), and raising the shared constant to cover it would make
+   * every ordinary photo upload wait three minutes before reporting a dead
+   * connection.
+   */
+  timeoutMs?: number;
+  /**
+   * An external cancel, wired into the same internal `AbortController` that
+   * the timeout uses. This is what lets a "Batalkan" button on screen actually
+   * stop the request — not just navigate away from it — which matters most for
+   * a call that bills a downstream service (Gemini) for every attempt.
+   */
+  signal?: AbortSignal;
+}
+
 /**
  * Performs one multipart upload and returns the `data` payload.
  *
@@ -230,16 +268,22 @@ export async function apiUpload<T>(
   path: string,
   field: string,
   file: UploadFile,
-  token?: string | null
+  token?: string | null,
+  opts: UploadOptions = {}
 ): Promise<T> {
   const form = new FormData();
   // The cast is unavoidable and is not a lie about the runtime: RN's FormData
   // accepts this object shape and streams the file behind it, while the DOM
   // lib's type for `append` only knows about `Blob | string`.
   form.append(field, file as unknown as Blob);
+  for (const [key, value] of Object.entries(opts.fields ?? {})) {
+    form.append(key, value);
+  }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), opts.timeoutMs ?? UPLOAD_TIMEOUT_MS);
+  const onExternalAbort = () => controller.abort();
+  opts.signal?.addEventListener('abort', onExternalAbort);
 
   let response: Response;
   try {
@@ -253,6 +297,9 @@ export async function apiUpload<T>(
       body: form,
     });
   } catch (e) {
+    if (opts.signal?.aborted) {
+      throw new ApiError('Dibatalkan.', -1);
+    }
     const aborted = e instanceof Error && e.name === 'AbortError';
     throw new ApiError(
       aborted
@@ -262,6 +309,7 @@ export async function apiUpload<T>(
     );
   } finally {
     clearTimeout(timeout);
+    opts.signal?.removeEventListener('abort', onExternalAbort);
   }
 
   const envelope = await parseEnvelope<T>(response);
