@@ -666,11 +666,18 @@ export function RamahSheetOption({
   label,
   sub,
   selected,
+  disabled = false,
   onPress,
 }: {
   label: string;
   sub?: string;
   selected: boolean;
+  /**
+   * Drawn but not choosable — a room frozen by stok opname, say. Shown rather
+   * than filtered out, so `sub` can say why the option someone is looking for
+   * cannot be picked.
+   */
+  disabled?: boolean;
   onPress: () => void;
 }) {
   const [down, setDown] = useState(false);
@@ -679,10 +686,15 @@ export function RamahSheetOption({
       onPress={onPress}
       onPressIn={() => setDown(true)}
       onPressOut={() => setDown(false)}
+      disabled={disabled}
       accessibilityRole="button"
-      accessibilityState={{ selected }}
+      accessibilityState={{ selected, disabled }}
       accessibilityLabel={sub ? `${label}, ${sub}` : label}
-      style={[styles.sheetOption, down && { backgroundColor: C.surfaceStack }]}>
+      style={[
+        styles.sheetOption,
+        down && !disabled && { backgroundColor: C.surfaceStack },
+        disabled && styles.tileOff,
+      ]}>
       <View style={styles.grow}>
         <Text style={[styles.sheetOptionLabel, selected && { color: C.brandInk }]}>{label}</Text>
         {sub ? <Text style={styles.sheetOptionSub}>{sub}</Text> : null}

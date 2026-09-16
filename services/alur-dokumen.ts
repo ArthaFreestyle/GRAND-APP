@@ -16,6 +16,12 @@
  * them are, and why `pilihAksi` filters instead of assuming: a module simply
  * never lists the rows it has no endpoints for.
  *
+ * `mutasi` runs that same subset with the control on the other side — only
+ * `SUPERADMIN` posts — and `pemakaian` is the one **superset**: `DRAFT →
+ * DIAJUKAN → DISETUJUI → POSTED`, with a terminal `DITOLAK` off `DIAJUKAN`.
+ * Its `setujui` carries a quantity per line, so it is listed in that module's
+ * table but confirmed on its own sheet rather than through `AksiDialog`.
+ *
  * What does **not** live here is the table itself. Every module declares its own
  * `AKSI`, because the sentence each transition shows is the only thing standing
  * between an operator and an irreversible write, and they are not the same
@@ -33,16 +39,18 @@ import type { RoleName } from '@/services/permissions';
 
 /**
  * Every position one of these documents can be in — the union, not the set any
- * one of them uses. `penjualan` never reaches `DIAJUKAN`; its own `status` type
- * is narrower and assignable to this.
+ * one of them uses. `penjualan` never reaches `DIAJUKAN`, and only `pemakaian`
+ * reaches `DISETUJUI` or `DITOLAK`; each module's own `status` type is narrower
+ * and assignable to this.
  */
-export type StatusAlur = 'DRAFT' | 'DIAJUKAN' | 'POSTED' | 'BATAL';
+export type StatusAlur = 'DRAFT' | 'DIAJUKAN' | 'DISETUJUI' | 'DITOLAK' | 'POSTED' | 'BATAL';
 
 /**
  * The path segment each transition posts to, which is also its identity. Again
- * the union: `ajukan` and `tolak` have no endpoint in the penjualan group.
+ * the union: `ajukan` and `tolak` have no endpoint in the penjualan and mutasi
+ * groups, and `setujui` exists only in pemakaian.
  */
-export type AksiKey = 'ajukan' | 'tolak' | 'posting' | 'batal';
+export type AksiKey = 'ajukan' | 'setujui' | 'tolak' | 'posting' | 'batal';
 
 export interface AksiDokumen {
   key: AksiKey;

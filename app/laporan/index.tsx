@@ -34,7 +34,15 @@
 import { useRouter } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -155,17 +163,26 @@ export default function LaporanScreen() {
 
       <ScrollView
         style={styles.body}
-        contentContainerStyle={[styles.bodyContent, { paddingBottom: insets.bottom + L.space10 }]}>
+        contentContainerStyle={[styles.bodyContent, { paddingBottom: insets.bottom + L.space10 }]}
+        refreshControl={
+          <RefreshControl
+            refreshing={readAt !== null && loading}
+            onRefresh={reload}
+            tintColor={C.brand}
+            colors={[C.brand]}
+          />
+        }>
         {readAt ? (
+          // No visible refresh chrome (issue #37) — pulling the ScrollView
+          // reloads both figures below. The `Pressable` stays, unstyled as a
+          // control, for TalkBack/VoiceOver.
           <Pressable
             onPress={reload}
             accessibilityRole="button"
             accessibilityLabel="Muat ulang laporan"
             style={styles.stamp}
             hitSlop={6}>
-            <Feather name="refresh-cw" size={RamahIcon.meta} color={C.iconMuted} />
             <Text style={styles.stampText}>{`Dibaca ${stempelPembaruan(readAt)}`}</Text>
-            <Text style={styles.stampAction}>Muat ulang</Text>
           </Pressable>
         ) : null}
 
@@ -332,7 +349,6 @@ const styles = StyleSheet.create({
   // Guide §1 wants a time on every operational number, and `T.bodySmall` is the
   // merchant scale's metadata size — the stamp is both.
   stampText: { ...T.bodySmall, color: C.textMuted, flex: 1, minWidth: 0 },
-  stampAction: { ...T.bodySmall, color: C.textLink },
 
   loadingBox: { paddingVertical: L.space6, alignItems: 'center' },
   kosong: { ...T.bodySmall, color: C.textBody, paddingVertical: L.space4 },
