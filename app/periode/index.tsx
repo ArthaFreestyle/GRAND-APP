@@ -117,8 +117,15 @@ export default function PeriodeScreen() {
   const [reloadToken, setReloadToken] = useState(0);
   const requestKey = `${tahun}|${reloadToken}`;
   const loading = loadedKey !== requestKey;
-  // A pull on a year already on screen, as opposed to a year still arriving.
-  const refreshing = loading && loadedKey.startsWith(`${tahun}|`);
+  /**
+   * Narrower than `loading`, which also flips when the year arrows are
+   * pressed. `reloadToken` only moves for an explicit pull or the "Coba
+   * lagi" retry, so this only disagrees with it while that specific read is
+   * still in flight — a year switch shows the full loading box instead (see
+   * `loading && !refreshing` below).
+   */
+  const [loadedToken, setLoadedToken] = useState(-1);
+  const refreshing = rows.length > 0 && loadedToken !== reloadToken;
 
   const [pilih, setPilih] = useState<{ tahun: number; bulan: number; tutup: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -138,7 +145,10 @@ export default function PeriodeScreen() {
         setRows([]);
         setErr(messageOf(e, 'Gagal memuat status tutup buku.'));
       } finally {
-        if (alive) setLoadedKey(requestKey);
+        if (alive) {
+          setLoadedKey(requestKey);
+          setLoadedToken(reloadToken);
+        }
       }
     })();
     return () => {

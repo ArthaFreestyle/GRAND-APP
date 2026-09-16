@@ -22,7 +22,15 @@
  */
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
 import {
@@ -205,7 +213,17 @@ export default function RuangDetailScreen() {
         }
       />
 
-      <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
+      <ScrollView
+        style={styles.body}
+        contentContainerStyle={styles.bodyContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={ruang !== null && loading}
+            onRefresh={reload}
+            tintColor={C.brand}
+            colors={[C.brand]}
+          />
+        }>
         {kabar ? <RamahNote icon="check-circle">{kabar}</RamahNote> : null}
 
         <View style={styles.identity}>

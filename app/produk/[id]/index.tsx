@@ -54,7 +54,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useDockPadding } from '@/hooks/use-keyboard-height';
@@ -141,6 +141,15 @@ export default function ProdukDetailScreen() {
   const [loadedId, setLoadedId] = useState(0);
   const loadingProduct = idValid && loadedId !== id;
 
+  /**
+   * Bumped by pull-to-refresh. `refreshing` tracks it against `loadedToken`
+   * rather than `loadingProduct`, which is keyed on `id` alone and would
+   * never disagree while pulling on the same record.
+   */
+  const [reloadToken, setReloadToken] = useState(0);
+  const [loadedToken, setLoadedToken] = useState(-1);
+  const reload = useCallback(() => setReloadToken((n) => n + 1), []);
+
   // ---- which gudang every figure on this screen belongs to ----
   const [ruangList, setRuangList] = useState<RuangRow[]>([]);
   const [ruangId, setRuangId] = useState<number | null>(null);
@@ -221,12 +230,15 @@ export default function ProdukDetailScreen() {
         setLoadErr(messageOf(e, 'Gagal memuat detail produk.'));
       })
       .finally(() => {
-        if (alive) setLoadedId(id);
+        if (alive) {
+          setLoadedId(id);
+          setLoadedToken(reloadToken);
+        }
       });
     return () => {
       alive = false;
     };
-  }, [id, idValid, router]);
+  }, [id, idValid, router, reloadToken]);
 
   /**
    * The gudang list, and which one this screen opens on.
@@ -317,7 +329,9 @@ export default function ProdukDetailScreen() {
     return () => {
       alive = false;
     };
-  }, [id, idValid, ruangId]);
+    // `reloadToken` is a dependency on purpose: a pull-to-refresh re-reads
+    // the room-scoped figures too, not just the product record above.
+  }, [id, idValid, ruangId, reloadToken]);
 
   const pickRuang = useCallback((next: number) => {
     setRuangSheet(false);
@@ -488,7 +502,17 @@ export default function ProdukDetailScreen() {
         }
       />
 
-      <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
+      <ScrollView
+        style={styles.body}
+        contentContainerStyle={styles.bodyContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={loadedToken !== reloadToken}
+            onRefresh={reload}
+            tintColor={C.brand}
+            colors={[C.brand]}
+          />
+        }>
         {kabar ? <RamahNote icon="check-circle">{kabar}</RamahNote> : null}
 
         <View style={styles.identity}>

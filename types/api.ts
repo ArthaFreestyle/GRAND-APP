@@ -694,6 +694,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/laporan/kesehatan-stok": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Skor kesehatan stok unit kerja aktif (0–100)
+         * @description Isu #37 — bacaan yang bukan modul, tanpa tabel, tanpa migrasi, dan skornya **tidak pernah disimpan**. Satu angka 0–100 untuk unit_kerja aktif sesi pemanggil, **selalu bersama rinciannya**: skor, bobot, dan angka mentah tiap komponen. Konteks global menilai seluruh perusahaan.
+         *
+         *     Empat komponen, rata-rata berbobot: `KETERSEDIAAN` (35) — produk aktif ber-`stok_minimum` yang pernah bergerak di cakupan, `sehat` (> minimum) bernilai 1, `menipis` (0 < total <= minimum) ½, `habis` 0; ambangnya sama persis dengan `GET /product/stok-minimum`. `STOK_MATI` (25) — `1 − nilai stok mati / nilai persediaan`; stok mati adalah barang yang tidak terjual/terpakai di **mana pun dalam unit** selama 90 hari dan kedatangan pertamanya ke unit lebih tua dari itu. Mutasi keluar dan baris pembalik bukan permintaan; mutasi masuk dari ruang dalam unit yang sama bukan kedatangan. `AKURASI_OPNAME` (25) — per ruang pemegang stok, opname `POSTED` terakhir dalam 90 hari: `1 − (surplus + defisit) / nilai dihitung`, surplus dan defisit dijumlahkan mutlak, baris `stok_so` kosong tidak ikut; ruang tanpa opname bernilai **0**; dibobot nilai persediaan ruang. `CAKUPAN_MINIMUM` (15) — porsi produk yang sedang dipegang yang punya `stok_minimum`.
+         *
+         *     Komponen yang tidak berlaku (tidak ada yang bisa dinilai) bernilai `null` dan skor unit dinormalisasi ulang atas bobot sisanya; kalau tidak ada satu pun yang berlaku, `skor` dan `status` `null`. Skor unit dihitung dari nilai eksak komponen lalu dibulatkan sekali. `status`: `SEHAT` ≥ 80, `PERLU_PERHATIAN` 60–79, `KRITIS` < 60.
+         *
+         *     `id_ruang` di luar unit aktif tidak menghasilkan error — cakupannya kosong, jadi `skor: null`, sama seperti bacaan berbentuk daftar lain (isu #12 fase 6).
+         */
+        get: operations["getLaporanKesehatanStok"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/pembelian": {
         parameters: {
             query?: never;
@@ -4496,6 +4522,85 @@ export interface components {
             /** @description Rincian per ruang di balik `total_stok`. */
             per_ruang?: components["schemas"]["StokRuang"][];
         };
+        /** @description Skor kesehatan stok — isu */
+        KesehatanStok: {
+            /**
+             * Format: int64
+             * @description Unit aktif sesi; null untuk konteks global.
+             */
+            id_unit_kerja?: number | null;
+            /** Format: int64 */
+            id_ruang?: number | null;
+            /** @example 74 */
+            skor?: number | null;
+            /** @enum {string|null} */
+            status?: "SEHAT" | "PERLU_PERHATIAN" | "KRITIS" | null;
+            /** Format: date-time */
+            dihitung_pada?: string;
+            /** @description Selalu empat entri, urutan tetap. */
+            komponen?: components["schemas"]["KesehatanStokKomponen"][];
+            /** @description Ruang pemegang stok, terburuk dulu. */
+            ruang?: components["schemas"]["KesehatanStokRuang"][];
+        };
+        KesehatanStokKomponen: {
+            /** @enum {string} */
+            kode?: "KETERSEDIAAN" | "STOK_MATI" | "AKURASI_OPNAME" | "CAKUPAN_MINIMUM";
+            /** @example 35 */
+            bobot?: number;
+            /** @description Dibulatkan untuk tampilan; skor unit memakai nilai eksaknya. */
+            skor?: number | null;
+            /** @description Bentuknya menurut `kode`. */
+            rincian?: {
+                /** Format: int64 */
+                produk_dinilai?: number;
+                /** Format: int64 */
+                sehat?: number;
+                /** Format: int64 */
+                menipis?: number;
+                /** Format: int64 */
+                habis?: number;
+            } | {
+                /** @example 152000000.00 */
+                nilai_persediaan?: string;
+                /** @example 48640000.00 */
+                nilai_stok_mati?: string;
+                /** @example 90 */
+                hari_ambang?: number;
+            } | {
+                /** Format: int64 */
+                ruang_dinilai?: number;
+                /** Format: int64 */
+                ruang_tanpa_opname?: number;
+                /** @description Surplus + defisit, keduanya mutlak. */
+                nilai_selisih?: string;
+                nilai_dihitung?: string;
+                /** @example 90 */
+                hari_ambang?: number;
+            } | {
+                /** Format: int64 */
+                produk_dipegang?: number;
+                /** Format: int64 */
+                produk_berminimum?: number;
+            };
+        };
+        /** @description Rincian per ruang untuk dua komponen yang berwatak ruang. `KETERSEDIAAN` dan `CAKUPAN_MINIMUM` tidak dipecah per ruang karena `stok_minimum` angka per produk. */
+        KesehatanStokRuang: {
+            /** Format: int64 */
+            id_ruang?: number;
+            nama_ruang?: string;
+            /** Format: int64 */
+            total_stok?: number;
+            nilai_persediaan?: string;
+            nilai_stok_mati?: string;
+            skor_stok_mati?: number | null;
+            /** @description Null berarti tidak ada opname POSTED dalam 90 hari. */
+            nomor_opname?: string | null;
+            /** Format: date-time */
+            ts_cutoff_opname?: string | null;
+            nilai_selisih_opname?: string | null;
+            /** @description 0, bukan null, untuk ruang tanpa opname. */
+            skor_akurasi_opname?: number;
+        };
         /** @description Nilai persediaan satu ruang saat ini — isu */
         NilaiPersediaan: {
             /** Format: int64 */
@@ -5918,6 +6023,32 @@ export interface operations {
                 content: {
                     "application/json": {
                         data?: components["schemas"]["Pergerakan"][];
+                    };
+                };
+            };
+            400: components["responses"]["ValidationError"];
+        };
+    };
+    getLaporanKesehatanStok: {
+        parameters: {
+            query?: {
+                /** @description Persempit ke satu ruang. Permintaan dan kedatangan untuk `STOK_MATI` tetap dinilai se-unit — yang dipersempit hanya stok yang dinilai. */
+                id_ruang?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Skor kesehatan stok beserta rinciannya */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["KesehatanStok"];
                     };
                 };
             };

@@ -157,6 +157,13 @@ export default function PembelianListScreen() {
   const requestKey = `${search}|${status}|${terima}|${reloadToken}`;
   const [loadedKey, setLoadedKey] = useState('');
   const listLoading = loadedKey !== requestKey;
+  /**
+   * Narrower than `listLoading`, which also flips on a search keystroke or a
+   * status/terima chip tap — a pull spinner spinning for those reads is the
+   * bug issue #37 calls out. Only a read triggered by the current
+   * `reloadToken` clears it.
+   */
+  const [loadedToken, setLoadedToken] = useState(-1);
 
   const reloadList = useCallback(() => setReloadToken((n) => n + 1), []);
 
@@ -170,8 +177,6 @@ export default function PembelianListScreen() {
   const [countsToken, setCountsToken] = useState(0);
   const [counts, setCounts] = useState<PembelianCounts | null>(null);
   const [countsReadAt, setCountsReadAt] = useState<Date | null>(null);
-  const [countsLoadedToken, setCountsLoadedToken] = useState(-1);
-  const countsLoading = countsLoadedToken !== countsToken;
   const reloadCounts = useCallback(() => setCountsToken((n) => n + 1), []);
 
   useEffect(() => {
@@ -180,16 +185,14 @@ export default function PembelianListScreen() {
       if (!alive) return;
       setCounts(c);
       setCountsReadAt(new Date());
-      setCountsLoadedToken(countsToken);
     });
     return () => {
       alive = false;
     };
   }, [countsToken]);
 
-  // The pull spinner just mirrors `listLoading` rather than tracking its own
-  // "did a manual refresh land yet" flag — a filter chip tapped mid-pull would
-  // otherwise leave a `refreshing` boolean nothing ever clears.
+  // Both re-reads share one pull: a puller does not care that the counts and
+  // the list are two requests.
   const onRefresh = useCallback(() => {
     reloadList();
     reloadCounts();
@@ -225,6 +228,7 @@ export default function PembelianListScreen() {
         if (alive) {
           setMoreErr('');
           setLoadedKey(requestKey);
+          setLoadedToken(reloadToken);
         }
       }
     })();
@@ -340,7 +344,7 @@ export default function PembelianListScreen() {
         // once for the very first read.
         refreshControl={
           <RefreshControl
-            refreshing={rows.length > 0 && listLoading}
+            refreshing={rows.length > 0 && loadedToken !== reloadToken}
             onRefresh={onRefresh}
             tintColor={C.brand}
             colors={[C.brand]}
@@ -377,6 +381,11 @@ export default function PembelianListScreen() {
                   onPress={() => pilihPerlu('kurang')}
                 />
               </View>
+              {/* The icon that made this look like its own "Muat ulang" button
+                  is gone (issue #37) — the card's counts already reload with
+                  everything else on the list's own pull gesture, via
+                  `onRefresh` above. The `Pressable` stays, with no visible
+                  chrome, as the one path a screen reader still has. */}
               <Pressable
                 onPress={reloadCounts}
                 accessibilityRole="button"
@@ -385,11 +394,6 @@ export default function PembelianListScreen() {
                 <Text style={styles.needFootText}>
                   {countsReadAt ? `Terakhir update: ${stempelPembaruan(countsReadAt)}` : 'Membaca…'}
                 </Text>
-                {countsLoading ? (
-                  <ActivityIndicator color={C.iconMuted} size="small" />
-                ) : (
-                  <Feather name="refresh-cw" size={RamahIcon.meta} color={C.iconMuted} />
-                )}
               </Pressable>
             </View>
 

@@ -34,7 +34,15 @@
  */
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import {
   RamahBadge,
@@ -98,6 +106,11 @@ export default function PengaturanDetailScreen() {
 
   const reload = useCallback(() => setReloadToken((n) => n + 1), []);
   const reloadRuang = useCallback(() => setRuangReloadToken((n) => n + 1), []);
+  /** One pull re-reads both the record and its room list. */
+  const onRefresh = useCallback(() => {
+    reload();
+    reloadRuang();
+  }, [reload, reloadRuang]);
 
   useEffect(() => {
     if (!idValid) return;
@@ -264,7 +277,17 @@ export default function PengaturanDetailScreen() {
         }
       />
 
-      <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
+      <ScrollView
+        style={styles.body}
+        contentContainerStyle={styles.bodyContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={unitKerja !== null && loading}
+            onRefresh={onRefresh}
+            tintColor={C.brand}
+            colors={[C.brand]}
+          />
+        }>
         {kabar ? <RamahNote icon="check-circle">{kabar}</RamahNote> : null}
 
         <View style={styles.identity}>

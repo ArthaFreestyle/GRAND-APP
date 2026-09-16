@@ -41,7 +41,14 @@
  */
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AksiDialog } from '@/components/shell/aksi-dialog';
@@ -97,6 +104,15 @@ export default function PenjualanDetailScreen() {
   const loading = idValid && loadedId !== id;
   const loadErr = idValid ? loadErrState : 'Alamat dokumen tidak dikenali.';
 
+  /**
+   * Bumped by pull-to-refresh. `refreshing` tracks it against `loadedToken`
+   * rather than `loading`, which is keyed on `id` alone and would never
+   * disagree while pulling on the same document.
+   */
+  const [reloadToken, setReloadToken] = useState(0);
+  const [loadedToken, setLoadedToken] = useState(-1);
+  const reload = useCallback(() => setReloadToken((n) => n + 1), []);
+
   const [aksi, setAksi] = useState<AksiDokumen | null>(null);
   const [alasan, setAlasan] = useState('');
   const [aksiErr, setAksiErr] = useState('');
@@ -136,13 +152,16 @@ export default function PenjualanDetailScreen() {
         setLoadErr(messageOf(e, 'Gagal memuat nota penjualan.'));
       })
       .finally(() => {
-        if (alive()) setLoadedId(id);
+        if (alive()) {
+          setLoadedId(id);
+          setLoadedToken(reloadToken);
+        }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, reloadToken]);
 
   useEffect(() => {
     let alive = true;
@@ -267,7 +286,17 @@ export default function PenjualanDetailScreen() {
     <View style={styles.screen}>
       <RamahHeader title={doc.nomor || 'Detail nota'} onBack={goBack} />
 
-      <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
+      <ScrollView
+        style={styles.body}
+        contentContainerStyle={styles.bodyContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={loadedToken !== reloadToken}
+            onRefresh={reload}
+            tintColor={C.brand}
+            colors={[C.brand]}
+          />
+        }>
         {kabar ? <RamahNote icon="check-circle">{kabar}</RamahNote> : null}
 
         <View style={styles.identity}>

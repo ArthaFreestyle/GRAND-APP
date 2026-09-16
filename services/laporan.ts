@@ -35,6 +35,7 @@ import { authedRequest } from '@/services/client';
 export type NilaiPersediaan = components['schemas']['NilaiPersediaan'];
 export type LabaKotor = components['schemas']['LabaKotor'];
 export type Pergerakan = components['schemas']['Pergerakan'];
+export type KesehatanStok = components['schemas']['KesehatanStok'];
 
 /**
  * What the stock is worth right now, one row per room.
@@ -86,6 +87,19 @@ export function laporanPergerakan(
   query: { dari?: string; sampai?: string; id_ruang?: number; id_product?: number } = {}
 ): Promise<Pergerakan[]> {
   return authedRequest<Pergerakan[]>(`/api/v1/laporan/pergerakan${buildQuery({ ...query })}`);
+}
+
+/**
+ * Issue #37 — the stock-health score Beranda used to derive from two counts
+ * of its own (`docs/endpoint-api.md` #15, now closed). `skor` and `status` are
+ * `null` when nothing in scope could be scored, never a fabricated 0; a caller
+ * must check for that before drawing the score card. No `page`/`size` — like
+ * the rest of this module, it is one answer, not a list.
+ */
+export function laporanKesehatanStok(query: { id_ruang?: number } = {}): Promise<KesehatanStok> {
+  return authedRequest<KesehatanStok>(
+    `/api/v1/laporan/kesehatan-stok${buildQuery({ ...query })}`
+  );
 }
 
 /**

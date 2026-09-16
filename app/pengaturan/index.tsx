@@ -18,7 +18,15 @@
  */
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
 
@@ -68,6 +76,13 @@ export default function PengaturanListScreen() {
 
   const requestKey = `${search}|${termasukNonaktif}|${reloadToken}`;
   const loading = loadedKey !== requestKey;
+  /**
+   * Narrower than `loading`, which also flips on a search keystroke or the
+   * "termasuk nonaktif" toggle — a pull spinner spinning for those reads is
+   * the bug issue #37 calls out. Only a read triggered by the current
+   * `reloadToken` clears it.
+   */
+  const [loadedToken, setLoadedToken] = useState(-1);
 
   const reload = useCallback(() => setReloadToken((n) => n + 1), []);
 
@@ -100,6 +115,7 @@ export default function PengaturanListScreen() {
         if (!alive) return;
         setMoreErr('');
         setLoadedKey(requestKey);
+        setLoadedToken(reloadToken);
       }
     })();
     return () => {
@@ -179,6 +195,14 @@ export default function PengaturanListScreen() {
         keyboardShouldPersistTaps="handled"
         onEndReached={() => loadMore()}
         onEndReachedThreshold={0.4}
+        refreshControl={
+          <RefreshControl
+            refreshing={rows.length > 0 && loadedToken !== reloadToken}
+            onRefresh={reload}
+            tintColor={C.brand}
+            colors={[C.brand]}
+          />
+        }
         ListHeaderComponent={
           <View style={styles.controls}>
             <RamahSearchField

@@ -24,7 +24,15 @@
  */
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -227,6 +235,14 @@ export default function StokOpnameListScreen() {
         contentContainerStyle={styles.listContent}
         onEndReached={() => loadMore()}
         onEndReachedThreshold={0.4}
+        refreshControl={
+          <RefreshControl
+            refreshing={entries.length > 0 && loading}
+            onRefresh={reload}
+            tintColor={C.brand}
+            colors={[C.brand]}
+          />
+        }
         ListHeaderComponent={
           <View style={styles.controls}>
             {terbukaErr ? <RamahInlineError message={terbukaErr} onRetry={reload} /> : null}

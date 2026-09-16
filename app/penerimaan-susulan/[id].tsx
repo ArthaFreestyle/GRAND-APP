@@ -58,7 +58,14 @@
  */
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useDockPadding } from '@/hooks/use-keyboard-height';
@@ -154,6 +161,14 @@ export default function PenerimaanSusulanDetailScreen() {
    */
   const [loadedId, setLoadedId] = useState(0);
   const loading = idValid && loadedId !== id;
+  /**
+   * Bumped by pull-to-refresh. `refreshing` tracks it against `loadedToken`
+   * rather than `loading`, which is keyed on `id` alone and would never
+   * disagree while pulling on the same document.
+   */
+  const [reloadToken, setReloadToken] = useState(0);
+  const [loadedToken, setLoadedToken] = useState(-1);
+  const reload = useCallback(() => setReloadToken((n) => n + 1), []);
 
   /** The header sheet. `null` means it is closed. */
   const [draft, setDraft] = useState<{ tanggal: string; keterangan: string } | null>(null);
@@ -208,12 +223,15 @@ export default function PenerimaanSusulanDetailScreen() {
         setLoadErr(messageOf(e, 'Gagal memuat dokumen kiriman susulan.'));
       })
       .finally(() => {
-        if (alive) setLoadedId(id);
+        if (alive) {
+          setLoadedId(id);
+          setLoadedToken(reloadToken);
+        }
       });
     return () => {
       alive = false;
     };
-  }, [id, idValid]);
+  }, [id, idValid, reloadToken]);
 
   /** Every write answers with the whole document, so this is the only sync needed. */
   const applyDoc = useCallback((saved: SusulanDoc, message: string) => {
@@ -428,7 +446,15 @@ export default function PenerimaanSusulanDetailScreen() {
       <ScrollView
         style={styles.body}
         contentContainerStyle={styles.bodyContent}
-        keyboardShouldPersistTaps="handled">
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={loadedToken !== reloadToken}
+            onRefresh={reload}
+            tintColor={C.brand}
+            colors={[C.brand]}
+          />
+        }>
         {kabar ? <RamahNote icon="check-circle">{kabar}</RamahNote> : null}
 
         <View style={styles.identity}>

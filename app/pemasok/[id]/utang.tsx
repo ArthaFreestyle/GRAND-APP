@@ -31,7 +31,15 @@
  */
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import {
   RamahBadge,
@@ -75,6 +83,12 @@ export default function UtangPemasokScreen() {
   const requestKey = idValid ? `${id}|${termasukLunas}|${reloadToken}` : '';
   const loading = idValid && loadedKey !== requestKey;
   const listErr = idValid ? listErrState : 'Alamat pemasok tidak dikenali.';
+  /**
+   * Narrower than `loading`, which also flips when "termasuk lunas" is
+   * toggled — a pull spinner spinning for that is the bug issue #37 calls
+   * out. Only a read triggered by the current `reloadToken` clears it.
+   */
+  const [loadedToken, setLoadedToken] = useState(-1);
 
   const reload = useCallback(() => setReloadToken((n) => n + 1), []);
 
@@ -110,6 +124,7 @@ export default function UtangPemasokScreen() {
 
       setMoreErr('');
       setLoadedKey(requestKey);
+      setLoadedToken(reloadToken);
     })();
     return () => {
       alive = false;
@@ -185,6 +200,14 @@ export default function UtangPemasokScreen() {
         contentContainerStyle={styles.listContent}
         onEndReached={() => loadMore()}
         onEndReachedThreshold={0.4}
+        refreshControl={
+          <RefreshControl
+            refreshing={rows.length > 0 && loadedToken !== reloadToken}
+            onRefresh={reload}
+            tintColor={C.brand}
+            colors={[C.brand]}
+          />
+        }
         ListHeaderComponent={
           <View style={styles.controls}>
             <View style={styles.chipRow}>
