@@ -65,6 +65,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AksiDialog } from '@/components/shell/aksi-dialog';
 import {
   RamahBadge,
+  RamahEmptySearch,
   RamahHeader,
   RamahInlineError,
   RamahNote,
@@ -354,9 +355,7 @@ export default function StokOpnameDetailScreen() {
         ListEmptyComponent={
           doc.jumlahBaris === 0 ? null : (
             <View style={styles.placeholder}>
-              <Text style={styles.placeholderText}>
-                Tidak ada barang yang cocok dengan pencarian itu.
-              </Text>
+              <RamahEmptySearch sub="Coba kata kunci lain, atau kosongkan pencariannya." />
             </View>
           )
         }

@@ -70,6 +70,7 @@ import { useDockPadding } from '@/hooks/use-keyboard-height';
 
 import {
   RamahChip,
+  RamahEmptySearch,
   RamahHeader,
   RamahInlineError,
   RamahPrimaryButton,
@@ -752,15 +753,23 @@ function ListPlaceholder({
       </View>
     );
   }
+  // Two different sentences, and only the first is a failed search. A catalogue
+  // that is empty because nothing has been added yet has not failed to find
+  // anything, so it keeps the plain text: the illustration would be saying
+  // "tidak ditemukan" about a shelf nobody has stocked.
+  if (searching) {
+    return (
+      <View style={styles.placeholder}>
+        <RamahEmptySearch sub="Coba kata kunci lain, atau periksa gudang yang sedang dipilih." />
+      </View>
+    );
+  }
   return (
     <View style={styles.placeholder}>
-      <Text style={styles.placeholderTitle}>
-        {searching ? 'Tidak ada yang cocok' : 'Katalog masih kosong'}
-      </Text>
+      <Text style={styles.placeholderTitle}>Katalog masih kosong</Text>
       <Text style={styles.placeholderSub}>
-        {searching
-          ? 'Coba kata kunci lain, atau periksa gudang yang sedang dipilih.'
-          : 'Belum ada produk aktif di gudang ini. Tambahkan produk pertama untuk mulai mencatat stok dan harga.'}
+        Belum ada produk aktif di gudang ini. Tambahkan produk pertama untuk mulai mencatat stok
+        dan harga.
       </Text>
     </View>
   );

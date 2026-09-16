@@ -17,8 +17,9 @@
 import Feather from '@expo/vector-icons/Feather';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
-import { RamahInlineError, RamahTertiaryButton } from '@/components/shell/ramah';
+import { RamahInlineError, RamahLottie, RamahTertiaryButton } from '@/components/shell/ramah';
 import { RamahColors as C, RamahLayout as L, RamahType as T } from '@/constants/theme-ramah';
+import { useReduceMotion } from '@/hooks/use-reduce-motion';
 
 export function OcrBacaStep({
   err,
@@ -33,6 +34,8 @@ export function OcrBacaStep({
   /** The escape hatch isu #36 asks for on a 404 — "belum aktif di server ini". */
   onIsiManual: () => void;
 }) {
+  const reduce = useReduceMotion();
+
   if (err) {
     return (
       <View style={styles.screen}>
@@ -52,7 +55,24 @@ export function OcrBacaStep({
   return (
     <View style={styles.screen}>
       <View style={styles.center}>
-        <ActivityIndicator size="large" color={C.brand} />
+        {/*
+          The one place in the app where a wait is worth an illustration rather
+          than a spinner (isu #39). Every other wait here is a page of a list or
+          a `RefreshControl` and is over in under a second; this one calls
+          Gemini, runs for tens of seconds, and its whole copy is asking
+          somebody to stand still and not leave. A spinner at that length reads
+          as a screen that has hung.
+
+          With "kurangi gerakan" on it falls back to the `ActivityIndicator`
+          this screen drew before — a still picture cannot say "still working",
+          and a platform spinner is both the convention for that sentence and
+          small enough that reduce-motion settings do not target it.
+        */}
+        {reduce ? (
+          <ActivityIndicator size="large" color={C.brand} />
+        ) : (
+          <RamahLottie name="ocrMembaca" size={200} />
+        )}
         <Text style={styles.title}>Membaca isi nota…</Text>
         <Text style={styles.sub}>
           Biasanya beberapa puluh detik. Jangan tinggalkan layar ini — keluar menghentikan

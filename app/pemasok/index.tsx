@@ -42,6 +42,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   RamahBadge,
   RamahChip,
+  RamahEmptySearch,
   RamahHeader,
   RamahInlineError,
   RamahNote,
@@ -368,12 +369,16 @@ function Placeholder({
         <ActivityIndicator color={C.brand} />
       </View>
     );
+  if (searching)
+    return (
+      <View style={styles.placeholder}>
+        <RamahEmptySearch sub="Coba kata kunci lain — nama atau kontak pemasoknya." />
+      </View>
+    );
   return (
     <View style={styles.placeholder}>
       <Text style={styles.placeholderText}>
-        {searching
-          ? 'Tidak ada pemasok yang cocok dengan pencarian itu.'
-          : 'Belum ada pemasok. Tambahkan satu untuk mulai mencatat pembelian.'}
+        Belum ada pemasok. Tambahkan satu untuk mulai mencatat pembelian.
       </Text>
     </View>
   );

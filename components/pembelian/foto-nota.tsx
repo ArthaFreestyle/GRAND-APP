@@ -326,7 +326,10 @@ export function FotoNotaStep({
       <View style={[styles.dock, { paddingBottom: dockPad }]}>
         <RamahPrimaryButton
           label="Lanjut isi nota"
-          icon="arrow-right"
+          // The arrow moved out of the `icon` slot, which draws it
+          // *before* the label — a forward arrow pointing at the words
+          // it is meant to follow (isu #39).
+          arrow
           onPress={onLanjut}
           disabled={busy}
         />

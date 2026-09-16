@@ -75,6 +75,7 @@ import Feather from '@expo/vector-icons/Feather';
 import {
   RamahBadge,
   RamahChip,
+  RamahEmptySearch,
   RamahHeader,
   RamahInlineError,
   RamahPrimaryButton,
@@ -572,15 +573,21 @@ function ListPlaceholder({
   }
   // The error already has its own line above the list, with the retry on it.
   if (error) return null;
+  // `filtered` covers a chip as well as the search box, and both are a query
+  // that found nothing. An unfiltered empty list is not: it is a section
+  // nobody has written a document in yet, and it keeps the plain sentence.
+  if (filtered) {
+    return (
+      <View style={styles.placeholder}>
+        <RamahEmptySearch sub="Coba kata kunci lain, atau lepas filternya." />
+      </View>
+    );
+  }
   return (
     <View style={styles.placeholder}>
-      <Text style={styles.placeholderTitle}>
-        {filtered ? 'Tidak ada yang cocok' : 'Belum ada faktur pembelian'}
-      </Text>
+      <Text style={styles.placeholderTitle}>Belum ada faktur pembelian</Text>
       <Text style={styles.placeholderSub}>
-        {filtered
-          ? 'Coba kata kunci lain, atau lepas filternya.'
-          : 'Dokumen pembelian yang dibuat di unit kerja sesi ini akan terdaftar di sini.'}
+        Dokumen pembelian yang dibuat di unit kerja sesi ini akan terdaftar di sini.
       </Text>
     </View>
   );
