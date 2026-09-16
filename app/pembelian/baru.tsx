@@ -1,6 +1,8 @@
 /**
- * Membuat nota pembelian — E1 → E1b → E2 of `Papan Layar.dc.html`, with H1 of
- * `Papan Layar OCR.dc.html` hanging off the first of them.
+ * Membuat nota pembelian — E1 → E1b → E2 of `Papan Layar.dc.html`, and, as a
+ * second full branch, H1 → H2 → H3 of `Papan Layar OCR.dc.html` (isu #36,
+ * wiring `POST /pembelian/ocr/faktur-kedatangan` and `/ocr/nota` — see
+ * `services/ocr-pembelian.ts` for what the board got wrong about their shape).
  *
  * Pick what to buy, pick who is selling it, say what it costs, and the nota
  * starts existing. The price step ("Harga beli", `components/pembelian/
@@ -9,6 +11,22 @@
  * The board is explicit about where that moment is: E1b's exit note says "di
  * sini nota mulai ada", and everything after it — units, quantities, prices,
  * the faktur number, freight — is edited on the draft, which is E2.
+ *
+ * ## The OCR branch is a separate path through the same route, not a step added to this one
+ *
+ * `langkah` carries eight values now, not four, and the OCR ones
+ * (`ocrPemasok`, `ocrFoto`, `ocrBaca`, `ocrPeriksa`) share no screen with
+ * `barang`/`foto`/`pemasok`/`harga` — only the state that both branches would
+ * otherwise duplicate (`ruangId`, `supplier`, `pages`, `membuat`/`buatErr`).
+ * The order is the reverse of the manual branch's: **supplier before photo**,
+ * because `id_ruang` is validated against the active unit kerja before the
+ * OCR endpoint even reads the file, so a 403 has to arrive before anyone
+ * corrects a single row. `PilihBarangStep`'s "Foto nota pemasok" card is the
+ * one entry into this branch (`onFoto` now opens `ocrPemasok`, not the old
+ * attach-only `foto` step); the manual `foto` step survives as the fallback
+ * the OCR branch's H2 error state (`onIsiManual`) bails out to — see
+ * `components/pembelian/foto-nota.tsx`'s own header for why it can no longer
+ * promise "this screen's exit becomes H2".
  *
  * ## Why this replaced a single long form
  *
@@ -49,12 +67,15 @@
  *   opening prices, so it is read once for both.
  */
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FotoNotaStep, type HalamanNota } from '@/components/pembelian/foto-nota';
 import { IsiHargaStep, type BarisHarga } from '@/components/pembelian/isi-harga';
+import { OcrBacaStep } from '@/components/pembelian/ocr-baca';
+import { OcrFotoStep, type FotoOcr } from '@/components/pembelian/ocr-foto';
+import { OcrPeriksaStep } from '@/components/pembelian/ocr-periksa';
 import {
   PilihBarangStep,
   type BarangDipilih,
@@ -64,9 +85,15 @@ import { PilihPemasokStep, type PemasokRiwayat } from '@/components/pembelian/pi
 import { RamahColors as C, RamahLayout as L } from '@/constants/theme-ramah';
 import { todayISO } from '@/constants/produk';
 import { useDockPadding } from '@/hooks/use-keyboard-height';
-import { messageOf } from '@/services/api';
+import { ApiError, messageOf } from '@/services/api';
 import { decimalToNumber, rupiahToDecimal } from '@/services/decimal';
-import { tempelDokumen } from '@/services/dokumen';
+import { tempelDokumen, uploadDokumen } from '@/services/dokumen';
+import {
+  bacaFakturKedatangan,
+  bacaNota,
+  type JenisDokumenOcr,
+  type OcrPembelianResult,
+} from '@/services/ocr-pembelian';
 import {
   createPembelian,
   pembelianBus,
@@ -76,7 +103,15 @@ import { getProduct, listRiwayatBeli } from '@/services/produk';
 import { listRuang, type RuangRow } from '@/services/ruang';
 import type { Supplier } from '@/services/supplier';
 
-type Langkah = 'barang' | 'foto' | 'pemasok' | 'harga';
+type Langkah =
+  | 'barang'
+  | 'foto'
+  | 'pemasok'
+  | 'harga'
+  | 'ocrPemasok'
+  | 'ocrFoto'
+  | 'ocrBaca'
+  | 'ocrPeriksa';
 
 /**
  * How many suppliers one product's history may report. The endpoint answers one
@@ -136,6 +171,20 @@ export default function PembelianBaruScreen() {
 
   const [membuat, setMembuat] = useState(false);
   const [buatErr, setBuatErr] = useState('');
+
+  // ---- the OCR branch (H1 → H2 → H3 of `Papan Layar OCR.dc.html`) ----
+  const [ocrJenis, setOcrJenis] = useState<JenisDokumenOcr>('faktur-kedatangan');
+  const [ocrFoto, setOcrFoto] = useState<FotoOcr | null>(null);
+  const [ocrHasil, setOcrHasil] = useState<OcrPembelianResult | null>(null);
+  /** A working copy of `ocrHasil.usulan.detail`, edited in place on H3. */
+  const [ocrDetail, setOcrDetail] = useState<PembelianLineInput[]>([]);
+  const [ocrErr, setOcrErr] = useState('');
+  /**
+   * Not `useState`: this is an imperative handle for a "Batalkan" button to
+   * reach into, never a value read during render — the case `useRef` is for,
+   * unlike the stable-value case CLAUDE.md's React Compiler notes cover.
+   */
+  const ocrAbort = useRef<AbortController | null>(null);
 
   /**
    * The gudang list, once. `GET /ruang` already answers only the rooms inside
@@ -460,6 +509,115 @@ export default function PembelianBaruScreen() {
     }
   }, [membuat, supplier, ruangId, selection, barisHarga, pages, router]);
 
+  /**
+   * H1→H2: sends the one OCR photo, with `id_supplier`/`id_ruang` already
+   * fixed by the earlier `ocrPemasok` step — the contract validates `id_ruang`
+   * against the active unit kerja **before** the photo is even read, so this
+   * order avoids a 403 arriving after somebody has already corrected rows.
+   */
+  const mulaiOcrBaca = useCallback(async () => {
+    if (!ocrFoto || !supplier || ruangId === null) return;
+    setLangkah('ocrBaca');
+    setOcrErr('');
+    const controller = new AbortController();
+    ocrAbort.current = controller;
+    const fn = ocrJenis === 'faktur-kedatangan' ? bacaFakturKedatangan : bacaNota;
+    try {
+      const hasil = await fn({
+        file: { uri: ocrFoto.uri, name: ocrFoto.nama, type: ocrFoto.mime },
+        idSupplier: supplier.id,
+        idRuang: ruangId,
+        signal: controller.signal,
+      });
+      setOcrHasil(hasil);
+      setOcrDetail(hasil.usulan.detail);
+      setLangkah('ocrPeriksa');
+    } catch (e) {
+      if (e instanceof ApiError && e.isCancelled) {
+        // The person pressed "Batalkan" — `batalkanOcr` already moved the
+        // screen back, so there is nothing left to report here.
+        return;
+      }
+      setOcrErr(
+        e instanceof ApiError && e.status === 404
+          ? 'Pembacaan foto belum aktif di server ini.'
+          : messageOf(e, 'Pembacaan gagal. Coba lagi.')
+      );
+    } finally {
+      ocrAbort.current = null;
+    }
+  }, [ocrFoto, supplier, ruangId, ocrJenis]);
+
+  const batalkanOcrBaca = useCallback(() => {
+    ocrAbort.current?.abort();
+    setLangkah('ocrFoto');
+  }, []);
+
+  /** The isu #36 escape hatch for a 404 or any other failed read: abandon OCR and start the manual flow. */
+  const isiManualDariOcr = useCallback(() => setLangkah('barang'), []);
+
+  const setOcrQty = useCallback((index: number, value: string) => {
+    setOcrDetail((current) =>
+      current.map((line, i) => (i === index ? { ...line, qty_faktur: value } : line))
+    );
+  }, []);
+
+  const setOcrHarga = useCallback((index: number, value: string) => {
+    setOcrDetail((current) =>
+      current.map((line, i) => (i === index ? { ...line, harga_satuan_input: value } : line))
+    );
+  }, []);
+
+  /**
+   * H3's exit: the same `createPembelian()` the manual flow uses, fed
+   * `ocrHasil.usulan` with `detail` swapped for whatever was edited on screen.
+   * No second "confirm OCR" endpoint exists — the contract is explicit that
+   * `usulan` is already the create body.
+   *
+   * The photo itself was never stored by the OCR endpoint, so it is attached
+   * afterward through the ordinary `POST /dokumen` → `tempel` path, exactly
+   * like every page in `pages` — a failure here is reported on the draft, not
+   * rolled back, for the same reason `buat()` above treats it that way.
+   */
+  const buatDariOcr = useCallback(async () => {
+    if (membuat || !ocrHasil) return;
+    const kosong = ocrDetail.filter((d) => d.qty_faktur === '' || d.harga_satuan_input === '');
+    if (kosong.length) {
+      setBuatErr('Isi qty dan harga setiap baris sebelum melanjutkan.');
+      return;
+    }
+
+    setMembuat(true);
+    setBuatErr('');
+    try {
+      const created = await createPembelian({ ...ocrHasil.usulan, detail: ocrDetail });
+
+      let gagalLampiran = 0;
+      if (ocrFoto) {
+        try {
+          const row = await uploadDokumen({ uri: ocrFoto.uri, name: ocrFoto.nama, type: ocrFoto.mime });
+          await tempelDokumen(row.id, 'pembelian', created.id);
+        } catch {
+          gagalLampiran += 1;
+        }
+      }
+      gagalLampiran += await tempelSemua(pages, created.id);
+
+      pembelianBus.publish({ kind: 'reload' });
+      router.replace({
+        pathname: '/pembelian/[id]',
+        params: {
+          id: created.id,
+          baru: '1',
+          ...(gagalLampiran ? { lampiranGagal: String(gagalLampiran) } : null),
+        },
+      });
+    } catch (e) {
+      setBuatErr(messageOf(e, 'Gagal membuat nota pembelian.'));
+      setMembuat(false);
+    }
+  }, [membuat, ocrHasil, ocrDetail, ocrFoto, pages, router]);
+
   const commonDock = dockPad;
 
   return (
@@ -475,7 +633,7 @@ export default function PembelianBaruScreen() {
           onQty={setQty}
           onSatuan={setSatuan}
           jumlahHalaman={pages.length}
-          onFoto={() => setLangkah('foto')}
+          onFoto={() => setLangkah('ocrPemasok')}
           onBack={keluar}
           onLanjut={() => setLangkah('pemasok')}
           dockPad={commonDock}
@@ -520,6 +678,59 @@ export default function PembelianBaruScreen() {
           }}
           onBack={() => setLangkah('pemasok')}
           onBuat={buat}
+          membuat={membuat}
+          buatErr={buatErr}
+          dockPad={commonDock}
+        />
+      ) : null}
+
+      {langkah === 'ocrPemasok' ? (
+        <PilihPemasokStep
+          // No products picked yet in this branch — the supplier comes first
+          // (isu #36's flipped order), so there is no purchase history to rank
+          // against and every supplier is listed as "Semua pemasok".
+          jumlahBarang={0}
+          riwayat={KOSONG}
+          riwayatLoading={false}
+          riwayatErr=""
+          picked={supplier}
+          onPick={setSupplier}
+          onBack={() => setLangkah('barang')}
+          onLanjut={() => setLangkah('ocrFoto')}
+          dockPad={commonDock}
+        />
+      ) : null}
+
+      {langkah === 'ocrFoto' ? (
+        <OcrFotoStep
+          jenis={ocrJenis}
+          onJenis={setOcrJenis}
+          foto={ocrFoto}
+          onFoto={setOcrFoto}
+          onBack={() => setLangkah('ocrPemasok')}
+          onBaca={mulaiOcrBaca}
+          dockPad={commonDock}
+        />
+      ) : null}
+
+      {langkah === 'ocrBaca' ? (
+        <OcrBacaStep
+          err={ocrErr}
+          onBatal={batalkanOcrBaca}
+          onCobaLagi={mulaiOcrBaca}
+          onIsiManual={isiManualDariOcr}
+        />
+      ) : null}
+
+      {langkah === 'ocrPeriksa' && ocrHasil && supplier ? (
+        <OcrPeriksaStep
+          namaPemasok={supplier.nama}
+          ocr={ocrHasil.ocr}
+          detail={ocrDetail}
+          onQty={setOcrQty}
+          onHarga={setOcrHarga}
+          onBack={() => setLangkah('ocrFoto')}
+          onBuat={buatDariOcr}
           membuat={membuat}
           buatErr={buatErr}
           dockPad={commonDock}

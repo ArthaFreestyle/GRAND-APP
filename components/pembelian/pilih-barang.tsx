@@ -41,10 +41,17 @@
  *
  * ## The green card at the top is the OCR board's whole contribution to E1
  *
- * `Papan Layar OCR.dc.html` adds a card that opens the photo step. Without
- * `/ocr/faktur` it cannot fill the lines, so the photos are collected, ride
- * along with the flow, and end up attached to the nota. The card says how many
- * pages it is holding once it holds any.
+ * `Papan Layar OCR.dc.html` adds a card that opens the photo step. It now
+ * opens the real OCR branch (isu #36/#39: `POST /pembelian/ocr/faktur-
+ * kedatangan` and `/ocr/nota` exist) — `onFoto` starts `ocrPemasok` in
+ * `app/pembelian/baru.tsx`, a separate path through that route that picks a
+ * supplier before the photo (the endpoint validates `id_ruang` before reading
+ * the file) and ends on a reviewed nota, same as this screen's own manual
+ * flow. **The card can never know ahead of time whether OCR is turned on** —
+ * the endpoints are unregistered entirely, a 404, when `gemini.api_key` is
+ * unset, and there is no capability check to ask first — so it stays exactly
+ * this present regardless, and a failed read falls back to attaching the
+ * photo and typing lines by hand (`components/pembelian/foto-nota.tsx`).
  */
 import Feather from '@expo/vector-icons/Feather';
 import { useRouter } from 'expo-router';

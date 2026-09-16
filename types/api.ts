@@ -734,6 +734,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/pembelian/ocr/faktur-kedatangan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Usulkan isi form pembelian dari foto faktur kedatangan (OCR Gemini)
+         * @description isu #39. Foto faktur kedatangan barang — yang sudah dicentang petugas gudang saat mencocokkan fisik barang dengan fakturnya — dibaca oleh Gemini dan setiap barisnya dipetakan ke katalog produk aktif, yang dikirim sebagai system prompt. **Tidak menulis apa pun**: tidak ada `pembelian`, tidak ada nomor dari `document_counter`, tidak ada baris `dokumen`, tidak ada `kartu_stok`. Satu-satunya efek sampingnya adalah panggilan ke Gemini.
+         *
+         *     `usulan` berbentuk persis `CreatePembelianRequest` dan bisa dikirim apa adanya ke `POST /api/v1/pembelian` setelah diperiksa manusia — tidak ada endpoint "konfirmasi OCR" terpisah, dan tidak ada DTO kedua yang bisa bercabang dari yang pertama. Setiap baris di `ocr.baris` menunjuk posisinya di `usulan.detail` lewat `indeks_usulan`, atau `null` untuk baris yang tidak dikenali — id_product-nya tidak yakin dipetakan ke katalog, satuannya tidak terdaftar untuk produk itu, atau qty/harga tidak terbaca sebagai angka yang valid. Baris seperti itu tetap dilaporkan di `ocr.baris` supaya tidak hilang diam-diam dan bisa dipetakan manual.
+         *
+         *     **Baris dicentang** → `qty_diterima = qty_faktur`. **Baris tanpa centang** — termasuk yang centangnya meragukan atau tidak jelas terbaca — → `qty_diterima` diisi dari angka tulisan tangan di baris itu bila ada dan terbaca, atau `"0"` bila tidak. `qty_diterima` **tidak pernah** `null`, karena `POST /pembelian` membaca `qty_diterima` yang dihilangkan sebagai "sama dengan qty_faktur" — usulan yang tidak diubah sama sekali tidak boleh diam-diam mencatat baris yang belum lengkap sebagai lengkap. `keterangan_selisih` otomatis diisi `"OCR: baris tidak dicentang"` pada baris itu, karena `POST /pembelian` mewajibkannya bila ada selisih.
+         *
+         *     `id_ruang` divalidasi terhadap unit_kerja aktif sesi pemanggil (isu #12 fase 5) **sebelum foto sekalipun dibaca**, supaya penolakan 403 terjadi sebelum pengguna mengoreksi puluhan baris, bukan hanya saat submit ke `POST /pembelian`.
+         *
+         *     `no_faktur_supplier` yang sudah dipakai pembelian lain (bukan `BATAL`) untuk supplier yang sama hanya menjadi satu `peringatan` yang menyebut nomor pembelian lamanya — bukan 409. Indeks unik yang sebenarnya tetap jadi penjaga saat submit ke `POST /pembelian`.
+         *
+         *     Field ekspedisi (`id_ekspedisi`, `no_resi`, `total_koli`, `tarif_per_koli`) tidak pernah diisi — biaya angkut bukan bagian faktur supplier.
+         *
+         *     `id_supplier` **tidak ditebak** dari kop faktur — nama supplier di kop sering berbeda dari nama di master, dan salah supplier mencatat utang ke pihak yang salah. Nama yang terbaca dikembalikan sebagai `ocr.supplier_terbaca` untuk dibandingkan mata manusia.
+         *
+         *     Kalau Gemini gagal (timeout, kuota, atau `gemini.model` sudah tidak tersedia lagi), endpoint ini menjawab error dan tidak ada usulan setengah jadi yang dikembalikan.
+         *
+         *     Foto **tidak disimpan** oleh endpoint ini. Kalau ingin dilampirkan, pakai alur yang sudah ada setelah `POST /pembelian` berhasil: `POST /dokumen` lalu `POST /dokumen/{id}/tempel`.
+         *
+         *     Tidak terdaftar sama sekali kalau `gemini.api_key` kosong.
+         */
+        post: operations["ocrPembelianFakturKedatangan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pembelian/ocr/nota": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Usulkan isi form pembelian dari foto nota pembelian vendor (OCR Gemini)
+         * @description isu #39. Mirror dari `POST /pembelian/ocr/faktur-kedatangan` untuk nota pembelian dari vendor (misalnya pembelian langsung di toko, barang dibawa pulang saat itu juga) — dokumen yang tidak punya konvensi centang sama sekali. Baca deskripsi endpoint itu dulu; hanya bedanya yang tercatat di sini.
+         *
+         *     **Konvensi centang tidak berlaku sama sekali.** Tanda apa pun pada nota diabaikan, dan setiap baris yang dikenali dibaca sebagai `qty_diterima = qty_faktur` — tidak ada `keterangan_selisih` otomatis.
+         *
+         *     `jenis_pembayaran` diambil dari cap atau tulisan yang benar-benar ada di nota (mis. "LUNAS", "TUNAI", "KREDIT") — **tidak ditebak**. Kalau tidak ada tanda sama sekali, field ini dikosongkan (default `POST /pembelian` yang berlaku, yaitu `TUNAI`) dan masuk `ocr.peringatan`.
+         *
+         *     Sama seperti faktur kedatangan: tidak menulis apa pun, `usulan` berbentuk persis `CreatePembelianRequest`, `id_ruang` divalidasi terhadap unit_kerja aktif sebelum foto dibaca, `no_faktur_supplier` duplikat hanya jadi peringatan, dan foto tidak pernah disimpan oleh endpoint ini. Tidak terdaftar sama sekali kalau `gemini.api_key` kosong.
+         */
+        post: operations["ocrPembelianNota"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/pembelian/{id}": {
         parameters: {
             query?: never;
@@ -3449,6 +3513,66 @@ export interface components {
             harga_pokok_satuan_dasar?: string | null;
             keterangan_selisih?: string | null;
         };
+        CreatePembelianRequest: {
+            /**
+             * Format: date
+             * @example 2026-08-11
+             */
+            tanggal: string;
+            /** Format: int64 */
+            id_supplier: number;
+            /**
+             * Format: int64
+             * @description Ruang tujuan seluruh baris. Satu dokumen tidak bisa masuk ke dua ruang.
+             *
+             *     Isu #12 fase 5: divalidasi terhadap unit_kerja aktif sesi pemanggil. Konteks aktif global (grant tanpa unit, bentuk SUPERADMIN) tidak dibatasi; konteks aktif yang menyebut satu unit hanya boleh memilih ruang di unit itu, kalau tidak → 403.
+             */
+            id_ruang: number;
+            /** @description Unik per supplier dan tidak peduli huruf besar-kecil. Tanpa purchase order, ini satu-satunya jejak faktur supplier — nota yang sama diinput dua kali akan menaikkan stok dua kali. Dokumen `BATAL` melepas nomornya kembali. Boleh kosong, dan berapa pun dokumen boleh sama-sama kosong. */
+            no_faktur_supplier?: string | null;
+            /** Format: date */
+            tanggal_faktur?: string | null;
+            /**
+             * @description Desimal. Tidak boleh melebihi subtotal.
+             * @example 0
+             */
+            diskon_nota?: string;
+            /** @example 0 */
+            ppn?: string;
+            /**
+             * @description `false` berarti PPN ikut masuk harga pokok; `true` berarti jadi pajak masukan dan tidak menyentuh harga pokok.
+             * @default false
+             */
+            ppn_dikreditkan: boolean;
+            /**
+             * @description Boleh negatif — ini baris pembulatan nota.
+             * @example 0
+             */
+            pembulatan?: string;
+            /** Format: int64 */
+            id_ekspedisi?: number | null;
+            no_resi?: string | null;
+            /** @example 3 */
+            total_koli?: string | null;
+            /** @example 50000 */
+            tarif_per_koli?: string | null;
+            /**
+             * @description `true` berarti ongkir sudah termasuk nota supplier dan **tidak dialokasikan lagi** — mengalokasikannya berarti rupiah yang sama masuk harga pokok dua kali.
+             * @default false
+             */
+            ditanggung_supplier: boolean;
+            /**
+             * @default KOLI
+             * @enum {string}
+             */
+            metode_alokasi_angkut: "KOLI" | "QTY";
+            /**
+             * @default TUNAI
+             * @enum {string}
+             */
+            jenis_pembayaran: "TUNAI" | "KREDIT";
+            detail: components["schemas"]["PembelianDetailInput"][];
+        };
         PembelianDetailInput: {
             /** Format: int64 */
             id_product: number;
@@ -3471,6 +3595,42 @@ export interface components {
             /** @example 0 */
             jumlah_koli?: string;
             keterangan_selisih?: string | null;
+        };
+        /** @description isu #39. Bagian yang tidak pernah dikirim ke `POST /pembelian`: apa yang Gemini baca, apa yang endpoint OCR menghitung sendiri dari `usulan`, dan setiap peringatan yang muncul di sepanjang jalan. Tidak satu pun di sini menolak panggilan — tujuannya `usulan` yang tidak diubah sama sekali lolos `POST /pembelian`, atau pemanggil sudah tahu kenapa tidak sebelum mengoreksi baris satu per satu. */
+        OCRPembelianInfo: {
+            /** @example gemini-3.6-flash */
+            model: string;
+            /** @description Nama supplier seperti terbaca di kop dokumen — dibandingkan mata manusia, tidak pernah dipakai memilih id_supplier. */
+            supplier_terbaca?: string | null;
+            /** @description Total seperti terbaca di dokumen, dinormalisasi ke bentuk desimal biasa. */
+            total_terbaca?: string | null;
+            /** @description Total `usulan` sendiri, dijumlahkan dengan rumus yang sama seperti `POST /pembelian` (subtotal setiap baris dikurangi diskon_nota, ditambah ppn). Dibandingkan dengan total_terbaca untuk peringatan "total terbaca berbeda dari total dihitung"; tidak pernah diambil dari faktur begitu saja. */
+            total_dihitung: string;
+            /** @description Setiap alasan sebuah baris tidak dikenali, angka yang tidak terbaca, no_faktur_supplier duplikat, atau ketidakcocokan total — selalu dalam bahasa yang menyebut nomor barisnya. */
+            peringatan: string[];
+            baris: components["schemas"]["OCRPembelianBaris"][];
+        };
+        /** @description Satu baris pada foto, dipetakan ke posisinya di `usulan.detail` lewat `indeks_usulan` — atau `null` kalau baris itu tidak dikenali, supaya tidak hilang diam-diam dan bisa dipetakan manual. */
+        OCRPembelianBaris: {
+            /**
+             * Format: int64
+             * @description Nomor urut baris pada dokumen.
+             */
+            urutan: number;
+            /** @description Indeks baris ini di usulan.detail, atau null kalau tidak dikenali dan karena itu tidak ikut diusulkan. */
+            indeks_usulan: number | null;
+            /** @description Teks nama barang persis seperti tertulis di foto. */
+            teks_asli: string;
+            /** @description Kode barang milik vendor */
+            kode_vendor?: string | null;
+            /** @description Hanya ada saat baris ini dikenali. */
+            kode_barang?: string;
+            /** @description Hanya ada saat baris ini dikenali. */
+            nama_product?: string;
+            /** @description Hanya dilaporkan untuk baris yang tidak dikenali, sebagai bekas untuk pemetaan manual. */
+            qty?: string | null;
+            /** @description Hanya dilaporkan untuk baris yang tidak dikenali. */
+            harga?: string | null;
         };
         /**
          * @description Pembelian POSTED terakhir satu supplier atas satu produk.
@@ -5809,66 +5969,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    /**
-                     * Format: date
-                     * @example 2026-08-11
-                     */
-                    tanggal: string;
-                    /** Format: int64 */
-                    id_supplier: number;
-                    /**
-                     * Format: int64
-                     * @description Ruang tujuan seluruh baris. Satu dokumen tidak bisa masuk ke dua ruang.
-                     *
-                     *     Isu #12 fase 5: divalidasi terhadap unit_kerja aktif sesi pemanggil. Konteks aktif global (grant tanpa unit, bentuk SUPERADMIN) tidak dibatasi; konteks aktif yang menyebut satu unit hanya boleh memilih ruang di unit itu, kalau tidak → 403.
-                     */
-                    id_ruang: number;
-                    /** @description Unik per supplier dan tidak peduli huruf besar-kecil. Tanpa purchase order, ini satu-satunya jejak faktur supplier — nota yang sama diinput dua kali akan menaikkan stok dua kali. Dokumen `BATAL` melepas nomornya kembali. Boleh kosong, dan berapa pun dokumen boleh sama-sama kosong. */
-                    no_faktur_supplier?: string | null;
-                    /** Format: date */
-                    tanggal_faktur?: string | null;
-                    /**
-                     * @description Desimal. Tidak boleh melebihi subtotal.
-                     * @example 0
-                     */
-                    diskon_nota?: string;
-                    /** @example 0 */
-                    ppn?: string;
-                    /**
-                     * @description `false` berarti PPN ikut masuk harga pokok; `true` berarti jadi pajak masukan dan tidak menyentuh harga pokok.
-                     * @default false
-                     */
-                    ppn_dikreditkan?: boolean;
-                    /**
-                     * @description Boleh negatif — ini baris pembulatan nota.
-                     * @example 0
-                     */
-                    pembulatan?: string;
-                    /** Format: int64 */
-                    id_ekspedisi?: number | null;
-                    no_resi?: string | null;
-                    /** @example 3 */
-                    total_koli?: string | null;
-                    /** @example 50000 */
-                    tarif_per_koli?: string | null;
-                    /**
-                     * @description `true` berarti ongkir sudah termasuk nota supplier dan **tidak dialokasikan lagi** — mengalokasikannya berarti rupiah yang sama masuk harga pokok dua kali.
-                     * @default false
-                     */
-                    ditanggung_supplier?: boolean;
-                    /**
-                     * @default KOLI
-                     * @enum {string}
-                     */
-                    metode_alokasi_angkut?: "KOLI" | "QTY";
-                    /**
-                     * @default TUNAI
-                     * @enum {string}
-                     */
-                    jenis_pembayaran?: "TUNAI" | "KREDIT";
-                    detail: components["schemas"]["PembelianDetailInput"][];
-                };
+                "application/json": components["schemas"]["CreatePembelianRequest"];
             };
         };
         responses: {
@@ -5886,6 +5987,104 @@ export interface operations {
             400: components["responses"]["ValidationError"];
             403: components["responses"]["Error"];
             409: components["responses"]["Error"];
+        };
+    };
+    ocrPembelianFakturKedatangan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /**
+                     * Format: binary
+                     * @description JPEG, PNG, atau WEBP. Jenisnya ditentukan dari isi berkas (magic bytes), bukan dari Content-Type. Dibatasi oleh `dokumen.max_size_mb`, sama seperti `POST /dokumen`, tapi dibaca di memori dan dikirim ke Gemini — tidak pernah disimpan ke storage.
+                     */
+                    file: string;
+                    /**
+                     * Format: int64
+                     * @description Disalin apa adanya ke usulan.id_supplier.
+                     */
+                    id_supplier: number;
+                    /**
+                     * Format: int64
+                     * @description Disalin ke usulan.id_ruang; divalidasi terhadap unit_kerja aktif sesi pemanggil sebelum foto dibaca.
+                     */
+                    id_ruang: number;
+                    /**
+                     * Format: date
+                     * @description Default hari ini (WIB) bila dikosongkan.
+                     */
+                    tanggal?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Usulan isi form pembelian — tidak ada yang tersimpan */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: {
+                            usulan?: components["schemas"]["CreatePembelianRequest"];
+                            ocr?: components["schemas"]["OCRPembelianInfo"];
+                        };
+                    };
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            403: components["responses"]["Error"];
+        };
+    };
+    ocrPembelianNota: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /**
+                     * Format: binary
+                     * @description JPEG, PNG, atau WEBP. Sama seperti endpoint faktur-kedatangan.
+                     */
+                    file: string;
+                    /** Format: int64 */
+                    id_supplier: number;
+                    /** Format: int64 */
+                    id_ruang: number;
+                    /**
+                     * Format: date
+                     * @description Default hari ini (WIB) bila dikosongkan.
+                     */
+                    tanggal?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Usulan isi form pembelian — tidak ada yang tersimpan */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: {
+                            usulan?: components["schemas"]["CreatePembelianRequest"];
+                            ocr?: components["schemas"]["OCRPembelianInfo"];
+                        };
+                    };
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            403: components["responses"]["Error"];
         };
     };
     getPembelian: {

@@ -15,6 +15,7 @@ import {
   type Paged,
   type RequestOptions,
   type UploadFile,
+  type UploadOptions,
 } from '@/services/api';
 import { refresh } from '@/services/auth';
 import { clearSession, getSession, hasActiveContext, type Session } from '@/services/session';
@@ -99,13 +100,36 @@ function translate(e: unknown): unknown {
   return e;
 }
 
-async function withFreshToken<T>(run: (token: string) => Promise<T>): Promise<T> {
+export interface FreshTokenOptions {
+  /**
+   * Renew this long before expiry instead of `REFRESH_SKEW_MS`.
+   *
+   * A call whose own budget is longer than the default 60s skew can have the
+   * token die *during* it with no window left to recover — the OCR endpoints
+   * pass `OCR_TIMEOUT_MS + 60_000` here for exactly that reason (see
+   * `services/ocr-pembelian.ts`).
+   */
+  skewMs?: number;
+  /**
+   * `false` disables the 401-retry-once path below. The retry re-sends the
+   * whole request body, and for an upload that bills a downstream service per
+   * attempt (Gemini, through the OCR endpoints), retrying automatically is
+   * worse than surfacing the failure and letting a human press "Coba lagi".
+   */
+  retryOn401?: boolean;
+}
+
+async function withFreshToken<T>(
+  run: (token: string) => Promise<T>,
+  opts: FreshTokenOptions = {}
+): Promise<T> {
+  const { skewMs = REFRESH_SKEW_MS, retryOn401 = true } = opts;
   let session = getSession();
   if (!session) throw new SessionExpiredError();
 
   // Renew proactively when the window is nearly closed, so a long screen load
   // does not half-succeed against a token that expires mid-flight.
-  if (session.refreshToken && session.expiresAt - Date.now() < REFRESH_SKEW_MS) {
+  if (session.refreshToken && session.expiresAt - Date.now() < skewMs) {
     session = await refreshSession();
   }
 
@@ -114,7 +138,7 @@ async function withFreshToken<T>(run: (token: string) => Promise<T>): Promise<T>
   } catch (e) {
     // A 401 here means the token died earlier than its own `expires_at` said —
     // password change, revoked grants. Renew once and retry; never loop.
-    if (e instanceof ApiError && e.status === 401 && getSession()?.refreshToken) {
+    if (retryOn401 && e instanceof ApiError && e.status === 401 && getSession()?.refreshToken) {
       const renewed = await refreshSession();
       try {
         return await run(renewed.token);
@@ -151,7 +175,18 @@ export function authedList<T>(
  * expire *during* it. The proactive renewal above happens before the file
  * starts moving, and the 401 retry below re-sends it — the one case in this app
  * where a retry costs real bytes, and the reason the skew window exists at all.
+ *
+ * `opts` carries both `UploadOptions` (fields, timeoutMs, an external cancel
+ * signal) and `FreshTokenOptions` (a wider skew, retry-on-401 off) in one bag,
+ * because a caller with an unusual timeout budget — the OCR endpoints — always
+ * needs an unusual skew to match, and passing them separately would let the
+ * two drift apart.
  */
-export function authedUpload<T>(path: string, field: string, file: UploadFile): Promise<T> {
-  return withFreshToken((token) => apiUpload<T>(path, field, file, token));
+export function authedUpload<T>(
+  path: string,
+  field: string,
+  file: UploadFile,
+  opts: UploadOptions & FreshTokenOptions = {}
+): Promise<T> {
+  return withFreshToken((token) => apiUpload<T>(path, field, file, token, opts), opts);
 }
