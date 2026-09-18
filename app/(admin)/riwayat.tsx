@@ -73,7 +73,16 @@
 import Feather from '@expo/vector-icons/Feather';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import {
   RamahBadge,
@@ -183,6 +192,13 @@ export default function RiwayatScreen() {
   const requestKey = `${search}|${status}|${reloadToken}`;
   const [loadedKey, setLoadedKey] = useState('');
   const listLoading = loadedKey !== requestKey;
+  /**
+   * Narrower than `listLoading`, which also flips on a search keystroke or a
+   * status chip tap — a pull spinner spinning for those reads is the bug
+   * issue #37 calls out. Only a read triggered by the current `reloadToken`
+   * clears it.
+   */
+  const [loadedToken, setLoadedToken] = useState(-1);
 
   const reload = useCallback(() => setReloadToken((n) => n + 1), []);
 
@@ -215,6 +231,7 @@ export default function RiwayatScreen() {
         if (alive) {
           setMoreErr('');
           setLoadedKey(requestKey);
+          setLoadedToken(reloadToken);
         }
       }
     })();
@@ -302,6 +319,14 @@ export default function RiwayatScreen() {
         keyboardShouldPersistTaps="handled"
         onEndReached={() => loadMore()}
         onEndReachedThreshold={0.4}
+        refreshControl={
+          <RefreshControl
+            refreshing={rows.length > 0 && loadedToken !== reloadToken}
+            onRefresh={reload}
+            tintColor={C.brand}
+            colors={[C.brand]}
+          />
+        }
         ListHeaderComponent={
           <View style={styles.controls}>
             <Text style={styles.title}>Riwayat</Text>

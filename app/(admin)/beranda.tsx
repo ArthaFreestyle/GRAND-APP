@@ -32,7 +32,7 @@
  * contract one: nothing in `services/presensi.ts` refuses a superadmin's
  * `POST /presensi/masuk`, the app simply never offers the button.
  *
- * ## Where the numbers come from, and the one that is derived
+ * ## Where the numbers come from
  *
  * Four reads, all real, none narrowed to a single ruang: `GET
  * /product/stok-minimum` without `id_ruang` compares each product against its
@@ -41,34 +41,15 @@
  * a room because it answers a different one ("what is on this shelf"), and the
  * board's endpoint note draws the same distinction.
  *
- * **The score card is the one figure this screen computes rather than reads.**
- * No endpoint answers a stock-health score, and inventing "94 / 100" to fill
- * the card is exactly what the layout-economy rule forbids. What is drawn
- * instead is a ratio of two counts the server did answer:
- *
- *     skor = 100 × (1 − produk di titik pesan ulang ÷ produk yang punya stok minimum)
- *
- * — the share of the catalogue *that has a reorder point at all* which is not
- * sitting on or under it. That is a definition, not a guess, and it is stated
- * on the card's accessibility label so nobody has to reverse-engineer it.
- *
- * **The denominator used to be every active product, and that is what made the
- * card read 100 / 100 forever.** Two faults at once. A product with no
- * `stok_minimum` was being counted as healthy when in truth it had never been
- * asked — `GET /product/stok-minimum` never returns `stok_minimum = 0`, that
- * being the column default and meaning "belum diatur" — so an unconfigured
- * catalogue scored full marks for answering nothing. And the ratio could not
- * move anyway: one low item in four hundred is 99.75, which `Math.round` calls
- * 100. `hitungAmbangStok()` in `services/produk.ts` is the fix, and what it
- * costs — there is no filter for "has a reorder point", so it walks the
- * catalogue — is written up there.
- *
- * Two things the score still refuses to do rather than fudge. If **nothing**
- * has a reorder point there is no score, because there is no question yet: the
- * slot carries one line saying so, which is also the only thing the reader can
- * act on. And if the catalogue outran the walk's page cap the denominator is a
- * floor rather than a count, so the card is not drawn — the same as when either
- * read fails outright. A card drawn from half the data is worse than no card.
+ * **The score card used to be the one figure this screen computed rather than
+ * read — `docs/endpoint-api.md` #15, closed by issue #37.** `GET
+ * /laporan/kesehatan-stok` now answers the score itself, weighing four
+ * components (availability, dead stock, opname accuracy, minimum coverage) the
+ * client has no way to reconstruct from list counts alone. `skor` and `status`
+ * come back `null` when nothing in scope could be scored — a fresh unit kerja
+ * with no opname history yet, say — and that is drawn the same way a failed
+ * read is: no card, rather than a card built from half the data or a
+ * fabricated zero.
  *
  * ## What the board draws that this screen still cannot
  *
@@ -89,7 +70,6 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'r
 
 import {
   RamahInlineError,
-  RamahNote,
   RamahPrimaryButton,
   RamahScoreCard,
   RamahSecondaryButton,
@@ -114,6 +94,7 @@ import {
 import { useRecordBus } from '@/hooks/use-record-bus';
 import { ApiError, messageOf } from '@/services/api';
 import { logout } from '@/services/auth';
+import { laporanKesehatanStok } from '@/services/laporan';
 import {
   getPembelianCounts,
   listPembelian,
@@ -133,12 +114,7 @@ import {
   type Shift,
   type ShiftHariIni,
 } from '@/services/presensi';
-import {
-  hitungAmbangStok,
-  listStokMinimum,
-  produkBus,
-  type AmbangStok,
-} from '@/services/produk';
+import { listStokMinimum, produkBus } from '@/services/produk';
 import { useSession } from '@/services/session';
 
 /**
@@ -341,6 +317,30 @@ const FITUR: readonly Fitur[] = [
     art: { kind: 'art3d', source: ART.susulan },
     route: '/penerimaan-susulan',
   },
+  /*
+    Issue #10: the tenth and eleventh, behind "Lihat semua" like the susulan —
+    a transfer and an internal request are errands somebody arrives at, not what
+    the shop opens the app for, so neither takes one of the eight slots.
+
+    **Both are on a line glyph, on purpose.** Neither family on this grid draws a
+    transfer between rooms or goods used in-house, and §8's rule is that a gap is
+    held on a glyph over the matching tone rather than closed with a lookalike
+    from an unrelated pack. Stock-orange, because both move stock. The next step
+    is a render from the same Semusim Kreatif logistics pack as the four above,
+    not a stranger.
+  */
+  {
+    key: 'mutasi',
+    label: 'Mutasi gudang',
+    art: { kind: 'glyph', icon: 'repeat', tone: 'stok' },
+    route: '/mutasi',
+  },
+  {
+    key: 'pemakaian',
+    label: 'Pemakaian',
+    art: { kind: 'glyph', icon: 'tool', tone: 'stok' },
+    route: '/pemakaian',
+  },
 ];
 
 /** Guide §4: "Maksimal 8 petak di beranda; sisanya di balik 'Lihat semua'". */
@@ -368,14 +368,16 @@ export default function BerandaScreen() {
   const [fiturOpen, setFiturOpen] = useState(false);
   const [belOpen, setBelOpen] = useState(false);
 
-  const [lowTotal, setLowTotal] = useState(0);
-  const [lowErr, setLowErr] = useState('');
-  /**
-   * The score's denominator and how far the walk behind it got, or `null` —
-   * still reading, or the read failed. `null` is the state in which no score is
-   * drawn at all, which is deliberate: see the header.
-   */
-  const [ambang, setAmbang] = useState<AmbangStok | null>(null);
+  /** `-1` while unread or unreadable, the same convention `waiting` below
+   *  uses — "none to reorder" and "could not ask" are different facts. */
+  const [lowTotal, setLowTotal] = useState(-1);
+
+  /** `null` while unread, while the read failed, or while the server itself
+   *  found nothing in scope to score — the card draws the same way for all
+   *  three: not drawn. `skorErr` is what tells the first two apart from the
+   *  third for the retry line. */
+  const [skor, setSkor] = useState<number | null>(null);
+  const [skorErr, setSkorErr] = useState('');
 
   const [docs, setDocs] = useState<PembelianRow[]>([]);
   const [waiting, setWaiting] = useState(0);
@@ -408,18 +410,14 @@ export default function BerandaScreen() {
       // `getPembelianCounts()` (issue #26) is one function that Nota's own
       // "Perlu diurus" card reads too, so this metric and that card cannot
       // quietly disagree about what "menunggu persetujuan" means — it never
-      // rejects, using the same `-1`-means-unreadable convention as the other
-      // two counts here, so it sits outside the `allSettled` below.
-      const [[reorder, dasar, recent, presensi], counts] = await Promise.all([
+      // rejects, using the same `-1`-means-unreadable convention as `lowTotal`
+      // below, so it sits outside the `allSettled` below.
+      const [[reorder, kesehatan, recent, presensi], counts] = await Promise.all([
         Promise.allSettled([
           // `size: 1` throughout where only `paging.total_item` is wanted: the
           // rows themselves belong to the screens those counts link into.
           listStokMinimum({ page: 1, size: 1 }),
-          // Not a `size: 1` count like its neighbours: this one walks the
-          // catalogue, because the denominator it answers ("berapa produk yang
-          // punya stok minimum") has no filter behind it. See
-          // `hitungAmbangStok()`.
-          hitungAmbangStok(),
+          laporanKesehatanStok(),
           listPembelian({ page: 1, size: DOC_PREVIEW }),
           // The one extra light read issue #45 allows on launch. Every native
           // tab mounts eagerly, so this rides the same batch rather than
@@ -433,15 +431,15 @@ export default function BerandaScreen() {
       ]);
       if (!alive) return;
 
-      if (reorder.status === 'fulfilled') {
-        setLowTotal(reorder.value.paging.total_item ?? 0);
-        setLowErr('');
-      } else {
-        setLowTotal(0);
-        setLowErr(messageOf(reorder.reason, 'Stok minimum tidak terbaca.'));
-      }
+      setLowTotal(reorder.status === 'fulfilled' ? (reorder.value.paging.total_item ?? 0) : -1);
 
-      setAmbang(dasar.status === 'fulfilled' ? dasar.value : null);
+      if (kesehatan.status === 'fulfilled') {
+        setSkor(kesehatan.value.skor ?? null);
+        setSkorErr('');
+      } else {
+        setSkor(null);
+        setSkorErr(messageOf(kesehatan.reason, 'Skor kesehatan stok tidak terbaca.'));
+      }
 
       if (recent.status === 'fulfilled') {
         setDocs(recent.value.data);
@@ -556,22 +554,6 @@ export default function BerandaScreen() {
     }
     void jalankanMasuk();
   }, [hariIni, jalankanMasuk]);
-
-  /**
-   * Derived during render, not written from an effect — all three are pure
-   * functions of state already in hand, and `react-hooks/set-state-in-effect`
-   * is an error in this config for exactly that shape.
-   *
-   * `dasarSkor` is the denominator only when it is one: a partial walk is a
-   * floor, and a ratio over a floor is a number nobody can defend.
-   */
-  const dasarSkor = ambang && ambang.lengkap && ambang.berambang > 0 ? ambang.berambang : null;
-  const skor =
-    !lowErr && dasarSkor !== null
-      ? Math.max(0, Math.round(100 * (1 - Math.min(lowTotal, dasarSkor) / dasarSkor)))
-      : null;
-  /** A catalogue nobody has given a reorder point to — countable, and zero. */
-  const tanpaAmbang = ambang !== null && ambang.lengkap && ambang.berambang === 0;
 
   const activeUnit = session?.grants.find(
     (g) => g.id_user_role === session.active?.id_user_role
@@ -729,9 +711,11 @@ export default function BerandaScreen() {
                 style={styles.metric}
                 onPress={() => router.navigate('/produk')}
                 accessibilityRole="button"
-                accessibilityLabel={`Perlu dipesan ulang, ${lowTotal} barang. Buka katalog`}>
+                accessibilityLabel={`Perlu dipesan ulang, ${lowTotal < 0 ? 'tidak terbaca' : lowTotal} barang. Buka katalog`}>
                 <Text style={styles.metricLabel}>Perlu dipesan ulang</Text>
-                <Text style={styles.metricValue}>{loading ? '—' : formatNumber(lowTotal)}</Text>
+                <Text style={styles.metricValue}>
+                  {loading || lowTotal < 0 ? '—' : formatNumber(lowTotal)}
+                </Text>
               </Pressable>
               <View style={styles.metricDivider} />
               <Pressable
@@ -757,27 +741,19 @@ export default function BerandaScreen() {
             </View>
           </View>
 
-          {/* The score card, and the two things that stand in for it: an error
-              line when the reads behind it did not land, and one grey line when
-              they landed and there is simply nothing to score yet. */}
-          {lowErr ? (
-            <RamahInlineError message={lowErr} onRetry={reload} />
-          ) : tanpaAmbang ? (
-            /*
-              No product has a reorder point, so there is nothing to score — and
-              saying "100" here would be the card marking an empty exam. One
-              line in the card's own slot instead, and it is the one thing the
-              reader can do about it: the thresholds are set per product, in
-              Katalog, which the metric above and the tile below both open.
-            */
-            <RamahNote icon="alert-circle">Stok minimum belum diatur di produk.</RamahNote>
+          {/* The score card, and the error line that stands in for it when the
+              read behind it did not land. `skor === null` with no error is the
+              server's own "nothing in scope to score" — drawn the same as no
+              card at all, not as a zero. */}
+          {skorErr ? (
+            <RamahInlineError message={skorErr} onRetry={reload} />
           ) : skor !== null ? (
             <RamahScoreCard
               label="Skor kesehatan stok"
               score={skor}
               note={catatanSkor(skor)}
               onPress={() => router.navigate('/produk')}
-              accessibilityLabel={`Skor kesehatan stok ${skor} dari 100. ${catatanSkor(skor)}. ${formatNumber(lowTotal)} dari ${formatNumber(dasarSkor ?? 0)} barang yang punya stok minimum sudah sampai titik pesan ulang. Buka katalog`}
+              accessibilityLabel={`Skor kesehatan stok ${skor} dari 100. ${catatanSkor(skor)}. Buka katalog`}
             />
           ) : null}
 

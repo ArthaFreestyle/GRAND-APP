@@ -61,15 +61,13 @@
  * two-metric card follows: tone belongs to a note or a chip, never to the bare
  * number.
  */
-import Feather from '@expo/vector-icons/Feather';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { RamahInlineError, RamahSectionHeader, RamahStatCard } from '@/components/shell/ramah';
 import { formatRupiah } from '@/constants/produk';
 import {
   RamahColors as C,
-  RamahIcon,
   RamahLayout as L,
   RamahRadius as R,
   RamahType as T,
@@ -166,7 +164,16 @@ export default function PendapatanScreen() {
 
   return (
     <View style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={readAt !== null && loading}
+            onRefresh={reload}
+            tintColor={C.brand}
+            colors={[C.brand]}
+          />
+        }>
         <Text style={styles.title}>Pendapatan</Text>
 
         <View style={styles.card}>
@@ -181,6 +188,9 @@ export default function PendapatanScreen() {
               {`+ ${formatRupiah(ppn)} PPN dipungut, di luar pendapatan`}
             </Text>
           ) : null}
+          {/* No visible refresh chrome (issue #37) — the `ScrollView`'s pull
+              gesture reloads this card. The `Pressable` stays, unstyled as a
+              control, for TalkBack/VoiceOver. */}
           <Pressable
             onPress={reload}
             accessibilityRole="button"
@@ -190,11 +200,6 @@ export default function PendapatanScreen() {
             <Text style={styles.cardFootText}>
               {readAt ? stempelPembaruan(readAt) : 'Membaca…'}
             </Text>
-            {loading ? (
-              <ActivityIndicator color={C.iconMuted} size="small" />
-            ) : (
-              <Feather name="refresh-cw" size={RamahIcon.meta} color={C.iconMuted} />
-            )}
           </Pressable>
         </View>
 

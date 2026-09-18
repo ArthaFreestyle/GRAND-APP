@@ -208,6 +208,14 @@ function RootNavigator() {
         */}
         <Stack.Screen name="stok-opname" />
         {/*
+          Mutasi and pemakaian (issue #10), beside the tabs like the rest and
+          reached from Beranda's "Lihat semua". Two sections rather than the one
+          screen they used to share, because the contract gives them two
+          different flows — see `services/mutasi.ts` and `services/pemakaian.ts`.
+        */}
+        <Stack.Screen name="mutasi" />
+        <Stack.Screen name="pemakaian" />
+        {/*
           Pengaturan unit kerja & ruang, beside the tabs for the same hard
           reason as the five above. Issue #23: it exists so five screens across
           the app — kasir, pembelian's nota baru, produk's katalog and detail,

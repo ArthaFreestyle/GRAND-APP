@@ -211,6 +211,15 @@ export default function KatalogScreen() {
   const [loadedKey, setLoadedKey] = useState('');
   /** False until `GET /ruang` has answered — before that there is nothing to load *from*. */
   const [ruangReady, setRuangReady] = useState(false);
+  /**
+   * The pull-to-refresh spinner needs a narrower signal than `listLoading`:
+   * that flag also flips while typing in the search field or switching
+   * gudang, and a `RefreshControl` spinning on every keystroke is the bug
+   * issue #37 calls out. This tracks only whether the *last* read to settle
+   * answered the *current* `reloadToken` — a search or gudang change never
+   * touches it either way, so it stays quiet unless someone actually pulled.
+   */
+  const [loadedToken, setLoadedToken] = useState(-1);
 
   // ---- the reorder set, as ids ----
   const [lowIds, setLowIds] = useState<ReadonlySet<number>>(NO_LOW);
@@ -350,6 +359,7 @@ export default function KatalogScreen() {
       // that no longer exists.
       setMoreErr('');
       setLoadedKey(requestKey);
+      setLoadedToken(reloadToken);
     })();
 
     return () => {
@@ -565,13 +575,14 @@ export default function KatalogScreen() {
           answers to, and a link doing the same job on one screen is a control
           somebody has to find rather than one they already know.
 
-          Only once page one has landed, so the pull spinner and the empty
-          placeholder's own `ActivityIndicator` are never on screen together —
-          the same guard `app/pembelian/index.tsx` uses.
+          `loadedToken !== reloadToken`, never `listLoading`: the general flag
+          also folds in the search box and the gudang chip, and reusing it here
+          would spin the pull indicator on every keystroke, not only on an
+          actual pull (CLAUDE.md's issue #37 rule).
         */
         refreshControl={
           <RefreshControl
-            refreshing={rows.length > 0 && listLoading}
+            refreshing={rows.length > 0 && loadedToken !== reloadToken}
             onRefresh={reload}
             tintColor={C.brand}
             colors={[C.brand]}
@@ -607,10 +618,19 @@ export default function KatalogScreen() {
                 on the list now. It stays because a stock figure with no time on
                 it cannot be told apart from a stale one. */}
             {readAt ? (
-              <View style={styles.stamp}>
-                <Feather name="clock" size={RamahIcon.meta} color={C.iconMuted} />
+              // The visible "Muat ulang" label and icon are gone — reloading
+              // is the platform's pull-to-refresh gesture now (issue #37).
+              // The `Pressable` survives with no visible chrome: TalkBack and
+              // VoiceOver cannot perform a swipe gesture, so this is the one
+              // path a screen reader still has to reload the figures.
+              <Pressable
+                onPress={reload}
+                accessibilityRole="button"
+                accessibilityLabel="Muat ulang stok"
+                style={styles.stamp}
+                hitSlop={6}>
                 <Text style={styles.stampText}>Stok per {stempelPembaruan(readAt)}</Text>
-              </View>
+              </Pressable>
             ) : null}
             {ruangErr ? (
               <View style={styles.ruangErrBox}>

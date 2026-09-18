@@ -167,6 +167,7 @@ import {
   ActivityIndicator,
   FlatList,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text as RNText,
@@ -669,6 +670,13 @@ export default function KasirScreen() {
   const [loadedKey, setLoadedKey] = useState('');
   const requestKey = ruangId === null ? '' : `${ruangId}|${search}|${reloadToken}`;
   const katalogLoading = !ruangReady || (ruangId !== null && loadedKey !== requestKey);
+  /**
+   * Narrower than `katalogLoading`, which also flips on a search keystroke or
+   * a gudang change — a pull spinner spinning for those reads is the bug
+   * issue #37 calls out. Only a read triggered by the current `reloadToken`
+   * clears it.
+   */
+  const [loadedToken, setLoadedToken] = useState(-1);
 
   // Search is server-side on `GET /pos/product`, so the field is debounced
   // rather than filtering the pages in hand — that is the lie a paged list must
@@ -712,13 +720,16 @@ export default function KasirScreen() {
       } finally {
         // Answered either way: a failed read is still an answer, and it is what
         // stops the spinner so the error line can be the thing on screen.
-        if (alive) setLoadedKey(requestKey);
+        if (alive) {
+          setLoadedKey(requestKey);
+          setLoadedToken(reloadToken);
+        }
       }
     })();
     return () => {
       alive = false;
     };
-  }, [requestKey, ruangId, search]);
+  }, [requestKey, ruangId, search, reloadToken]);
 
   /**
    * The next page, appended and de-duplicated by id.
@@ -1423,6 +1434,14 @@ export default function KasirScreen() {
       keyboardShouldPersistTaps="handled"
       onEndReached={() => void loadMore()}
       onEndReachedThreshold={0.5}
+      refreshControl={
+        <RefreshControl
+          refreshing={produkRows.length > 0 && loadedToken !== reloadToken}
+          onRefresh={reloadKatalog}
+          tintColor={C.brand}
+          colors={[C.brand]}
+        />
+      }
       // Only on the tablet: there the list runs to the bottom edge of the
       // window, while on the phone the docked cart sits under it and owns that
       // inset already.

@@ -29,7 +29,7 @@
  */
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -112,6 +112,13 @@ export default function PergerakanScreen() {
   const bulan = bulanList[bulanIdx];
   const requestKey = `${bulan.kode}|${ruangId ?? 'semua'}|${reloadToken}`;
   const loading = loadedKey !== requestKey;
+  /**
+   * Narrower than `loading`, which also flips when the month or gudang
+   * picker changes — a pull spinner spinning for those reads is the bug
+   * issue #37 calls out. Only a read triggered by the current `reloadToken`
+   * clears it.
+   */
+  const [loadedToken, setLoadedToken] = useState(-1);
 
   const reload = useCallback(() => setReloadToken((n) => n + 1), []);
 
@@ -150,7 +157,10 @@ export default function PergerakanScreen() {
         setRows([]);
         setErr(messageOf(e, 'Gagal memuat pergerakan stok.'));
       } finally {
-        if (alive) setLoadedKey(requestKey);
+        if (alive) {
+          setLoadedKey(requestKey);
+          setLoadedToken(reloadToken);
+        }
       }
     })();
     return () => {
@@ -210,6 +220,14 @@ export default function PergerakanScreen() {
         )}
         style={styles.list}
         contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + L.space8 }]}
+        refreshControl={
+          <RefreshControl
+            refreshing={rows.length > 0 && loadedToken !== reloadToken}
+            onRefresh={reload}
+            tintColor={C.brand}
+            colors={[C.brand]}
+          />
+        }
         ListHeaderComponent={
           <View style={styles.controls}>
             <View style={styles.chipRow}>

@@ -41,6 +41,9 @@ export interface StatusMeta {
 export const DOKUMEN_META: Record<StatusAlur, StatusMeta> = {
   DRAFT: { label: 'Draft', tone: 'neutral' },
   DIAJUKAN: { label: 'Diajukan', tone: 'amber' },
+  // The two below are pemakaian's alone — see `services/pemakaian.ts`.
+  DISETUJUI: { label: 'Disetujui', tone: 'amber' },
+  DITOLAK: { label: 'Ditolak', tone: 'red' },
   POSTED: { label: 'Posted', tone: 'green' },
   BATAL: { label: 'Batal', tone: 'red' },
 };
@@ -72,6 +75,13 @@ export const DOKUMEN_META: Record<StatusAlur, StatusMeta> = {
 export const DOKUMEN_RAMAH: Record<StatusAlur, { label: string; tone: RamahBadgeTone }> = {
   DRAFT: { label: DOKUMEN_META.DRAFT.label, tone: 'neutral' },
   DIAJUKAN: { label: DOKUMEN_META.DIAJUKAN.label, tone: 'info' },
+  // Tinted, not filled: approval decides how much may leave, and nothing has
+  // left yet. Amber rather than `info` so "waiting to be approved" and
+  // "approved, waiting to be posted" are two different glances.
+  DISETUJUI: { label: DOKUMEN_META.DISETUJUI.label, tone: 'warn' },
+  // Filled, like `BATAL`: a rejected request is terminal and cannot be taken
+  // back — the requester files a new one.
+  DITOLAK: { label: DOKUMEN_META.DITOLAK.label, tone: 'danger' },
   POSTED: { label: DOKUMEN_META.POSTED.label, tone: 'success' },
   BATAL: { label: DOKUMEN_META.BATAL.label, tone: 'danger' },
 };
