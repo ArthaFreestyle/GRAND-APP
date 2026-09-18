@@ -73,13 +73,13 @@ export default function PembelianLayout() {
         <Stack.Screen name="index" options={{ title: 'Pembelian', animation: 'none' }} />
         <Stack.Screen
           name="[id]"
-          options={{ title: 'Detail Faktur', animation: 'slide_from_right' }}
+          options={{ title: 'Detail pembelian', animation: 'slide_from_right' }}
         />
         {/* One route holding the board's whole create flow — pick the goods, pick
             the supplier, and optionally photograph the faktur on the way. */}
         <Stack.Screen
           name="baru"
-          options={{ title: 'Nota pembelian baru', animation: 'slide_from_right' }}
+          options={{ title: 'Pembelian baru', animation: 'slide_from_right' }}
         />
       </Stack>
     </View>

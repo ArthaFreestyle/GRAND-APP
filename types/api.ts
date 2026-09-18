@@ -694,6 +694,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/laporan/kesehatan-stok": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Skor kesehatan stok unit kerja aktif (0–100)
+         * @description Isu #37 — bacaan yang bukan modul, tanpa tabel, tanpa migrasi, dan skornya **tidak pernah disimpan**. Satu angka 0–100 untuk unit_kerja aktif sesi pemanggil, **selalu bersama rinciannya**: skor, bobot, dan angka mentah tiap komponen. Konteks global menilai seluruh perusahaan.
+         *
+         *     Empat komponen, rata-rata berbobot: `KETERSEDIAAN` (35) — produk aktif ber-`stok_minimum` yang pernah bergerak di cakupan, `sehat` (> minimum) bernilai 1, `menipis` (0 < total <= minimum) ½, `habis` 0; ambangnya sama persis dengan `GET /product/stok-minimum`. `STOK_MATI` (25) — `1 − nilai stok mati / nilai persediaan`; stok mati adalah barang yang tidak terjual/terpakai di **mana pun dalam unit** selama 90 hari dan kedatangan pertamanya ke unit lebih tua dari itu. Mutasi keluar dan baris pembalik bukan permintaan; mutasi masuk dari ruang dalam unit yang sama bukan kedatangan. `AKURASI_OPNAME` (25) — per ruang pemegang stok, opname `POSTED` terakhir dalam 90 hari: `1 − (surplus + defisit) / nilai dihitung`, surplus dan defisit dijumlahkan mutlak, baris `stok_so` kosong tidak ikut; ruang tanpa opname bernilai **0**; dibobot nilai persediaan ruang. `CAKUPAN_MINIMUM` (15) — porsi produk yang sedang dipegang yang punya `stok_minimum`.
+         *
+         *     Komponen yang tidak berlaku (tidak ada yang bisa dinilai) bernilai `null` dan skor unit dinormalisasi ulang atas bobot sisanya; kalau tidak ada satu pun yang berlaku, `skor` dan `status` `null`. Skor unit dihitung dari nilai eksak komponen lalu dibulatkan sekali. `status`: `SEHAT` ≥ 80, `PERLU_PERHATIAN` 60–79, `KRITIS` < 60.
+         *
+         *     `id_ruang` di luar unit aktif tidak menghasilkan error — cakupannya kosong, jadi `skor: null`, sama seperti bacaan berbentuk daftar lain (isu #12 fase 6).
+         */
+        get: operations["getLaporanKesehatanStok"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/pembelian": {
         parameters: {
             query?: never;
@@ -2928,6 +2954,178 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/presensi/masuk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Tombol masuk
+         * @description Mencatat jam masuk pemanggil, sekali tekan. **Tanpa body sama sekali** — dan itu memang intinya, bukan kelalaian.
+         *
+         *     `id_user` datang dari token, tidak pernah dari request. Kalau ia bisa dikirim klien, satu karyawan bisa mengabsenkan temannya yang belum sampai kantor, dan seluruh modul ini kehilangan alasannya untuk ada.
+         *
+         *     **Shift disimpulkan server dari jam tekan**, bukan dipilih: sebelum 17:30 WIB jadi `PAGI`, selain itu `MALAM`. Satu tombol tetap satu tombol, dan tidak ada yang bisa mengaku hadir di shift malam sambil menekan tombolnya pukul delapan pagi. Klien tidak pernah menyimpulkan shift sendiri — di sekitar 17:30, jam handphone yang meleset beberapa menit sudah cukup untuk menaruh kehadiran seseorang di shift yang salah.
+         *
+         *     Kalau pemanggil masih punya shift lain yang terbuka (lupa menekan tombol pulang), baris itu **ditandai `LUPA_PULANG` di transaksi yang sama** — `jam_pulang` dibiarkan `NULL` selamanya, karena mengarangnya adalah satu kebohongan yang paling ingin dihindari modul ini.
+         *
+         *     `id_unit_kerja` diambil sebagai **snapshot** konteks aktif sesi saat itu. Sesi tanpa konteks aktif (pemegang lebih dari satu grant yang belum `switch-context`) **tetap boleh absen**; barisnya hanya tidak membawa unit, dan karena itu tidak muncul di daftar pemanggil mana pun yang terikat satu unit.
+         *
+         *     Rute ini **tanpa guard peran**, setingkat `auth/me`: setiap karyawan absen untuk dirinya sendiri, apa pun perannya.
+         */
+        post: operations["presensiMasuk"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/presensi/pulang": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Tombol pulang
+         * @description Menutup shift yang sedang terbuka milik pemanggil — **tanpa body**, dan tanpa peduli tanggal atau shift mana yang sedang berjalan sekarang. Ada tepat satu baris `BUKA` milik satu orang pada satu saat (`presensi_terbuka_uidx`), jadi rute ini tidak pernah perlu menebak baris mana yang dimaksud.
+         *
+         *     **Tidak menyimpulkan ulang shift dan tidak membandingkan jam tekan dengan jam selesai shift.** Shift ditentukan sekali, saat masuk; lembur dan pulang telat bukan urusan modul ini untuk dinilai. Menutup baris yang dibuka kemarin (lewat tengah malam) tetap berfungsi walau tidak ada shift yang menyeberang tengah malam dengan jam yang berlaku hari ini — sengaja ditulis begitu untuk tap pulang yang genuinely lewat tengah malam.
+         */
+        post: operations["presensiPulang"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/presensi/saya/hari-ini": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Keadaan kedua shift hari ini
+         * @description Apa yang harus digambar tombolnya. Menjawab keadaan **kedua shift sekaligus**, bukan hanya yang sedang berjalan — itulah yang membuat layar bisa menampilkan "pagi sudah tercatat, malam belum" tanpa panggilan kedua, dan persis itu yang dilihat orang yang hendak lanjut shift kedua.
+         *
+         *     Shift yang belum punya baris menjawab `status: "BELUM_MASUK"`, **bukan 404** — jawaban sintetis, bentuk yang sama dengan `periode` yang menjawab `BUKA` sintetis untuk bulan yang tidak punya baris.
+         *
+         *     `shift_sekarang` adalah kesimpulan server dari jamnya sendiri, supaya klien tidak pernah perlu menyimpulkannya dari jam handphone.
+         */
+        get: operations["presensiHariIni"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/presensi/saya": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Riwayat kehadiran sendiri
+         * @description Riwayat kehadiran pemanggil sendiri, berpaginasi — dibangun di atas mesin pencarian yang sama dengan `GET /presensi`, hanya saja `id_user` dipaksa ke pemanggil dan tidak bisa dialihkan lewat query string.
+         *
+         *     **Tidak disaring unit kerja sama sekali**, satu-satunya bacaan di proyek ini yang memang begitu: riwayat sendiri adalah milik sendiri, termasuk hari-hari saat yang bersangkutan bertugas di unit lain.
+         */
+        get: operations["presensiSaya"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/presensi": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Daftar presensi
+         * @description **SUPERADMIN.** Penyimpangan sadar dari "bacaan terbuka untuk setiap pemanggil terautentikasi": aturan itu lahir untuk data barang dan harga, sedangkan jam datang seseorang adalah data pribadi rekan kerjanya. `GET /presensi/saya` menutup kebutuhan yang sah bagi semua orang.
+         *
+         *     Baris di luar unit aktif pemanggil **dihilangkan diam-diam**, tidak pernah 404 — daftar tidak punya identitas sumber daya tunggal untuk di-404-kan. Penyaringannya jatuh pada `presensi.id_unit_kerja` yang sudah ada di barisnya, tanpa join ke tabel lain. Baris ber-`id_unit_kerja` null hanya terlihat oleh pemanggil bergrant global.
+         */
+        get: operations["listPresensi"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/presensi/rekap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Rekap kehadiran satu bulan
+         * @description **SUPERADMIN.** Satu baris per karyawan untuk satu bulan, seluruh halaman dalam **satu query** — bukan satu query per karyawan. `hari_dua_shift` jadi satu agregasi bertingkat di dalam query itu, bukan loop di Go.
+         *
+         *     **Rekap melaporkan, tidak memutuskan.** Ia menghitung hari hadir per shift dan hari hadir dua shift; ia tidak memutuskan baris mana yang layak dibayar. Itu pertanyaan penggajian, dan menjawabnya di sini berarti mengunci kebijakan gaji ke dalam query rekap sebelum kebijakannya sendiri ditulis.
+         */
+        get: operations["rekapPresensi"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/presensi/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Koreksi presensi
+         * @description **SUPERADMIN.** Yang tidak boleh terjadi adalah baris hasil koreksi tidak bisa dibedakan dari baris hasil klik: setiap PATCH yang berhasil mengisi `dikoreksi_oleh`, `ts_koreksi`, dan menandai `sumber_masuk`/`sumber_pulang` yang bersangkutan menjadi `KOREKSI`.
+         *
+         *     **`shift` boleh dikoreksi, tapi tidak pernah disimpulkan ulang dari `jam_masuk` yang baru.** Koreksi jam dan koreksi shift adalah dua keputusan terpisah; menautkannya berarti membetulkan salah ketik satu menit diam-diam memindahkan orang ke shift lain.
+         *
+         *     **`jam_pulang` boleh diisi atau dipindah, tapi tidak boleh dikosongkan kembali.** Membuka kembali shift yang sudah `SELESAI` akan mengaktifkan lagi `presensi_terbuka_uidx` untuk hari yang sudah lewat, dan orangnya tidak bisa absen lagi besok pagi.
+         *
+         *     **`status` dihitung ulang dari kolomnya, tidak pernah diterima dari form.** `jam_pulang` terisi setelah patch → `SELESAI`; kalau tidak, statusnya tetap seperti sebelumnya (`BUKA` atau `LUPA_PULANG`). Mengoreksi baris `LUPA_PULANG` dengan mengisi `jam_pulang`-nya membuatnya `SELESAI` dengan sendirinya.
+         *
+         *     `id_user` dan `tanggal` **tidak ada di DTO**: memindahkan presensi ke orang lain atau ke hari lain bukan koreksi. `jam_masuk`/`jam_pulang` diberikan sebagai jam dinding WIB dan ditempelkan pada `tanggal` baris itu sendiri, jadi sebuah koreksi tidak bisa menyeberang hari.
+         *
+         *     `alasan_koreksi` **wajib** dan tidak bisa dikosongkan — satu-satunya catatan kenapa jam seseorang berubah. Kebijakan, bukan constraint; presedennya `keterangan_selisih` dan `retur_pembelian.alasan`.
+         */
+        patch: operations["updatePresensi"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4496,6 +4694,85 @@ export interface components {
             /** @description Rincian per ruang di balik `total_stok`. */
             per_ruang?: components["schemas"]["StokRuang"][];
         };
+        /** @description Skor kesehatan stok — isu */
+        KesehatanStok: {
+            /**
+             * Format: int64
+             * @description Unit aktif sesi; null untuk konteks global.
+             */
+            id_unit_kerja?: number | null;
+            /** Format: int64 */
+            id_ruang?: number | null;
+            /** @example 74 */
+            skor?: number | null;
+            /** @enum {string|null} */
+            status?: "SEHAT" | "PERLU_PERHATIAN" | "KRITIS" | null;
+            /** Format: date-time */
+            dihitung_pada?: string;
+            /** @description Selalu empat entri, urutan tetap. */
+            komponen?: components["schemas"]["KesehatanStokKomponen"][];
+            /** @description Ruang pemegang stok, terburuk dulu. */
+            ruang?: components["schemas"]["KesehatanStokRuang"][];
+        };
+        KesehatanStokKomponen: {
+            /** @enum {string} */
+            kode?: "KETERSEDIAAN" | "STOK_MATI" | "AKURASI_OPNAME" | "CAKUPAN_MINIMUM";
+            /** @example 35 */
+            bobot?: number;
+            /** @description Dibulatkan untuk tampilan; skor unit memakai nilai eksaknya. */
+            skor?: number | null;
+            /** @description Bentuknya menurut `kode`. */
+            rincian?: {
+                /** Format: int64 */
+                produk_dinilai?: number;
+                /** Format: int64 */
+                sehat?: number;
+                /** Format: int64 */
+                menipis?: number;
+                /** Format: int64 */
+                habis?: number;
+            } | {
+                /** @example 152000000.00 */
+                nilai_persediaan?: string;
+                /** @example 48640000.00 */
+                nilai_stok_mati?: string;
+                /** @example 90 */
+                hari_ambang?: number;
+            } | {
+                /** Format: int64 */
+                ruang_dinilai?: number;
+                /** Format: int64 */
+                ruang_tanpa_opname?: number;
+                /** @description Surplus + defisit, keduanya mutlak. */
+                nilai_selisih?: string;
+                nilai_dihitung?: string;
+                /** @example 90 */
+                hari_ambang?: number;
+            } | {
+                /** Format: int64 */
+                produk_dipegang?: number;
+                /** Format: int64 */
+                produk_berminimum?: number;
+            };
+        };
+        /** @description Rincian per ruang untuk dua komponen yang berwatak ruang. `KETERSEDIAAN` dan `CAKUPAN_MINIMUM` tidak dipecah per ruang karena `stok_minimum` angka per produk. */
+        KesehatanStokRuang: {
+            /** Format: int64 */
+            id_ruang?: number;
+            nama_ruang?: string;
+            /** Format: int64 */
+            total_stok?: number;
+            nilai_persediaan?: string;
+            nilai_stok_mati?: string;
+            skor_stok_mati?: number | null;
+            /** @description Null berarti tidak ada opname POSTED dalam 90 hari. */
+            nomor_opname?: string | null;
+            /** Format: date-time */
+            ts_cutoff_opname?: string | null;
+            nilai_selisih_opname?: string | null;
+            /** @description 0, bukan null, untuk ruang tanpa opname. */
+            skor_akurasi_opname?: number;
+        };
         /** @description Nilai persediaan satu ruang saat ini — isu */
         NilaiPersediaan: {
             /** Format: int64 */
@@ -4870,6 +5147,108 @@ export interface components {
             total_item?: number;
             /** Format: int64 */
             total_page?: number;
+        };
+        /** @description Satu shift kehadiran: orang ini masuk di sini, pada jam ini, di shift ini, dan (kalau sudah ditutup) pulang pada jam itu. */
+        Presensi: {
+            /** Format: int64 */
+            id?: number;
+            /** Format: int64 */
+            id_user?: number;
+            /** @description `nama_lengkap`, jatuh ke `username` kalau kosong — daftar kehadiran dengan nama kosong tidak ada gunanya, dan setiap user pasti punya username. */
+            nama_user?: string;
+            /**
+             * Format: date
+             * @description Tanggal kalender **WIB** dari `jam_masuk`, dipotong di server. WIB dipakai sebagai offset tetap UTC+7, bukan `time.LoadLocation` — Indonesia bagian barat tidak punya DST dan tidak ada yang bergantung pada tzdata terpasang di container.
+             */
+            tanggal?: string;
+            /**
+             * @description Disimpulkan server dari jam tekan tombol masuk (batas 17:30 WIB), tidak pernah dipilih klien. Boleh dikoreksi lewat PATCH, tapi tidak pernah disimpulkan ulang dari jam yang dikoreksi.
+             * @enum {string}
+             */
+            shift?: "PAGI" | "MALAM";
+            /** Format: date-time */
+            jam_masuk?: string;
+            /**
+             * Format: date-time
+             * @description `null` selama shift masih `BUKA` atau kalau berakhir `LUPA_PULANG` — tidak pernah diisi jam karangan. Hanya terisi lewat tombol pulang atau lewat koreksi eksplisit.
+             */
+            jam_pulang?: string | null;
+            /**
+             * @description `BUKA` sejak tombol masuk sampai ditutup; `SELESAI` setelah tombol pulang atau koreksi yang mengisi `jam_pulang`; `LUPA_PULANG` kalau ditutup tanpa jam pulang — oleh tap berikutnya yang membuka shift lain, atau oleh sapuan harian di worker. Selalu dihitung ulang, tidak pernah diterima dari form.
+             * @enum {string}
+             */
+            status?: "BUKA" | "SELESAI" | "LUPA_PULANG";
+            /** @description Dihitung saat dibaca dari `jam_pulang - jam_masuk`, **tidak disimpan** — satu-satunya angka turunan di proyek ini yang sengaja bukan snapshot, karena koreksi yang menggeser salah satu jamnya harus menggeser durasinya juga. `null`, bukan `0`, selama shift belum `SELESAI`. */
+            durasi_kerja_menit?: number | null;
+            /**
+             * Format: int64
+             * @description **Snapshot** konteks aktif sesi saat menekan tombol masuk, bukan turunan yang dibaca ulang nanti: grant seseorang bisa berpindah unit bulan depan, dan rekap bulan lalu tidak boleh ikut berpindah bersamanya. Null berarti grantnya global.
+             */
+            id_unit_kerja?: number | null;
+            nama_unit_kerja?: string | null;
+            /**
+             * @description `TOMBOL` berarti orangnya menekan sendiri; `KOREKSI` berarti jam masuknya diketik atau digeser orang lain. Baris yang jamnya diketik orang lain harus selamanya terbaca begitu.
+             * @enum {string}
+             */
+            sumber_masuk?: "TOMBOL" | "KOREKSI";
+            /** @enum {string|null} */
+            sumber_pulang?: "TOMBOL" | "KOREKSI" | null;
+            /** @description `ctx.IP()` apa adanya. **Belum membuktikan apa pun**: proyek ini tidak punya konfigurasi trusted-proxy di mana pun, jadi di belakang reverse proxy setiap permintaan bisa menunjukkan alamat yang sama. Diisi supaya berguna begitu setelan itu ada, bukan supaya dipercaya hari ini. */
+            ip_masuk?: string | null;
+            ip_pulang?: string | null;
+            /** Format: int64 */
+            dikoreksi_oleh?: number | null;
+            /** Format: date-time */
+            ts_koreksi?: string | null;
+            alasan_koreksi?: string | null;
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        PresensiShiftHariIni: {
+            /** @enum {string} */
+            shift?: "PAGI" | "MALAM";
+            /**
+             * @description `BELUM_MASUK` untuk shift yang belum punya baris — jawaban sintetis, bukan 404. Setiap field lain ikut kosong dalam keadaan itu.
+             * @enum {string}
+             */
+            status?: "BELUM_MASUK" | "BUKA" | "SELESAI" | "LUPA_PULANG";
+            /** Format: int64 */
+            id?: number | null;
+            /** Format: date-time */
+            jam_masuk?: string | null;
+            /** Format: date-time */
+            jam_pulang?: string | null;
+            durasi_kerja_menit?: number | null;
+        };
+        PresensiHariIni: {
+            /** Format: date */
+            tanggal?: string;
+            /**
+             * @description Kesimpulan server dari jamnya sendiri — yang memutuskan tombol mana digambar, bukan handphone.
+             * @enum {string}
+             */
+            shift_sekarang?: "PAGI" | "MALAM";
+            pagi?: components["schemas"]["PresensiShiftHariIni"];
+            malam?: components["schemas"]["PresensiShiftHariIni"];
+        };
+        /** @description Satu bulan milik satu karyawan. Angka yang ditunggu penggajian, dilaporkan tanpa memutuskan apa pun. */
+        RekapPresensi: {
+            /** Format: int64 */
+            id_user?: number;
+            nama_user?: string;
+            tahun?: number;
+            bulan?: number;
+            hari_pagi_selesai?: number;
+            hari_malam_selesai?: number;
+            /** @description Hari kalender yang `PAGI` **dan** `MALAM`-nya sama-sama `SELESAI`. Angka tersendiri, bukan sesuatu yang bisa diturunkan klien: `hari_pagi_selesai + hari_malam_selesai` menghitung hari itu dua kali dan tidak bisa menyebut hari mana yang bertindih. */
+            hari_dua_shift?: number;
+            /** @description Dihitung terpisah, tidak pernah dilebur ke `hari_pagi_selesai` — apakah hari `LUPA_PULANG` tetap dihitung hadir adalah kebijakan penggajian yang belum ditulis. */
+            hari_lupa_pulang_pagi?: number;
+            hari_lupa_pulang_malam?: number;
+            total_menit_kerja_pagi?: number;
+            total_menit_kerja_malam?: number;
         };
     };
     responses: {
@@ -5918,6 +6297,32 @@ export interface operations {
                 content: {
                     "application/json": {
                         data?: components["schemas"]["Pergerakan"][];
+                    };
+                };
+            };
+            400: components["responses"]["ValidationError"];
+        };
+    };
+    getLaporanKesehatanStok: {
+        parameters: {
+            query?: {
+                /** @description Persempit ke satu ruang. Permintaan dan kedatangan untuk `STOK_MATI` tetap dinilai se-unit — yang dipersempit hanya stok yang dinilai. */
+                id_ruang?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Skor kesehatan stok beserta rinciannya */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["KesehatanStok"];
                     };
                 };
             };
@@ -9947,6 +10352,253 @@ export interface operations {
                 };
             };
             404: components["responses"]["Error"];
+        };
+    };
+    presensiMasuk: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Jam masuk tercatat */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["Presensi"];
+                    };
+                };
+            };
+            /** @description Sudah ada presensi di shift ini hari ini, atau masih ada shift lain yang sedang terbuka. Pesannya menyebut jam yang sudah tercatat, cukup bagi klien untuk menggambar keadaan yang benar — handphone di jaringan buruk akan mengirim tap yang sama dua kali, dan yang kedua tidak boleh melahirkan baris kedua maupun berpura-pura baru mencatat sesuatu. Shift yang **lain** di hari yang sama bukan duplikat: itu justru hari yang paling bernilai bagi penggajian. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example null */
+                        data?: unknown;
+                        /** @example sudah presensi masuk shift PAGI hari ini pukul 08:03 */
+                        errors?: string;
+                    };
+                };
+            };
+        };
+    };
+    presensiPulang: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Jam pulang tercatat */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["Presensi"];
+                    };
+                };
+            };
+            /** @description Belum ada presensi masuk yang terbuka. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example null */
+                        data?: unknown;
+                        /** @example belum presensi masuk */
+                        errors?: string;
+                    };
+                };
+            };
+        };
+    };
+    presensiHariIni: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Keadaan hari ini */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["PresensiHariIni"];
+                    };
+                };
+            };
+        };
+    };
+    presensiSaya: {
+        parameters: {
+            query?: {
+                page?: components["parameters"]["Page"];
+                size?: components["parameters"]["Size"];
+                tanggal_dari?: string;
+                tanggal_sampai?: string;
+                shift?: "PAGI" | "MALAM";
+                status?: "BUKA" | "SELESAI" | "LUPA_PULANG";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Halaman hasil */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["Presensi"][];
+                        paging?: components["schemas"]["PageMetadata"];
+                    };
+                };
+            };
+            400: components["responses"]["ValidationError"];
+        };
+    };
+    listPresensi: {
+        parameters: {
+            query?: {
+                page?: components["parameters"]["Page"];
+                size?: components["parameters"]["Size"];
+                id_user?: number;
+                tanggal_dari?: string;
+                tanggal_sampai?: string;
+                shift?: "PAGI" | "MALAM";
+                status?: "BUKA" | "SELESAI" | "LUPA_PULANG";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Halaman hasil */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["Presensi"][];
+                        paging?: components["schemas"]["PageMetadata"];
+                    };
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            403: components["responses"]["Error"];
+        };
+    };
+    rekapPresensi: {
+        parameters: {
+            query: {
+                page?: components["parameters"]["Page"];
+                size?: components["parameters"]["Size"];
+                tahun: number;
+                bulan: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Halaman hasil */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["RekapPresensi"][];
+                        paging?: components["schemas"]["PageMetadata"];
+                    };
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            403: components["responses"]["Error"];
+        };
+    };
+    updatePresensi: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * @description Jam dinding WIB (`HH:MM`), ditempelkan pada tanggal baris ini.
+                     * @example 06:45
+                     */
+                    jam_masuk?: string;
+                    /**
+                     * @description Jam dinding WIB (`HH:MM`). Tidak boleh dikirim `null` — itu berarti membuka kembali shift yang sudah selesai, yang ditolak 400.
+                     * @example 17:05
+                     */
+                    jam_pulang?: string;
+                    /** @enum {string} */
+                    shift?: "PAGI" | "MALAM";
+                    alasan_koreksi: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Baris setelah dikoreksi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["Presensi"];
+                    };
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            /** @description Koreksi `shift` bertabrakan dengan `presensi_user_tanggal_shift_uidx` — orangnya sudah punya baris di shift tujuan pada tanggal yang sama. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example null */
+                        data?: unknown;
+                        /** @example orang ini sudah punya presensi di shift itu pada tanggal yang sama */
+                        errors?: string;
+                    };
+                };
+            };
         };
     };
 }

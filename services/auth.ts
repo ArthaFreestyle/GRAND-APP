@@ -19,6 +19,10 @@ import {
   type Session,
   type User,
 } from '@/services/session';
+import type { components } from '@/types/api';
+
+/** What `GET /auth/me` answers — the token's own claims, not a fresh read of `users`. Strictly less than `Session` above; see `getMe` for why it is read at all. */
+export type MeSession = components['schemas']['Session'];
 
 /**
  * The contract answers every login failure — unknown username, wrong password,
@@ -154,6 +158,24 @@ export async function changePassword(
     }
     throw e;
   }
+}
+
+/**
+ * Reads what the current token authorizes, straight from the server.
+ *
+ * `app/(admin)/profil.tsx` deliberately does **not** call this for its own
+ * identity block — `Session` here is strictly less than what login already put
+ * in `services/session.ts`. The one caller that needs it is issue #42's own
+ * self-edit trap in `app/pengguna/[id]/ubah.tsx`: saving a change to *your own*
+ * grants does not refresh the token, because the active context lives inside
+ * the credential and only `auth/switch-context` can change it. Reading this
+ * afterwards is how that screen tells whether the grant it is still running as
+ * survived the edit, without waiting for the token to expire to find out.
+ */
+export async function getMe(): Promise<MeSession> {
+  const session = getSession();
+  if (!session) throw new ApiError('Sesi sudah berakhir. Masuk lagi.', 401);
+  return apiRequest<MeSession>('/api/v1/auth/me', { token: session.token });
 }
 
 /**

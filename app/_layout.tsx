@@ -236,6 +236,15 @@ function RootNavigator() {
           styles. See `app/penjualan/_layout.tsx`.
         */}
         <Stack.Screen name="penjualan" />
+        {/*
+          Manajemen pengguna (issue #42), beside the tabs for the same hard
+          reason as every section above. Reached from Profil's "Administrasi"
+          group, drawn only for SUPERADMIN — but that hidden row is not the
+          guard. `GET /user` is SUPERADMIN-only even to read, so
+          `app/pengguna/index.tsx` draws its own "tidak berwenang" page rather
+          than trusting the door being closed. See `app/pengguna/_layout.tsx`.
+        */}
+        <Stack.Screen name="pengguna" />
       </Stack.Protected>
     </Stack>
   );

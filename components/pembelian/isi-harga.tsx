@@ -133,7 +133,7 @@ export function IsiHargaStep({
         </View>
         {buatErr ? <RamahInlineError message={buatErr} /> : null}
         <RamahPrimaryButton
-          label={membuat ? 'Membuat nota…' : 'Buat nota pembelian'}
+          label={membuat ? 'Menyimpan…' : 'Simpan pembelian'}
           icon="file-plus"
           onPress={onBuat}
           disabled={membuat}

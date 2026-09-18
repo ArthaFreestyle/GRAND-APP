@@ -34,6 +34,7 @@
  * there is no shared picker hook in this codebase to reach for instead.
  */
 import Feather from '@expo/vector-icons/Feather';
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -54,12 +55,30 @@ import { RamahColors as C, RamahIcon, RamahLayout as L, RamahRadius as R, RamahT
 import { messageOf } from '@/services/api';
 import { changePassword, logout } from '@/services/auth';
 import * as printer from '@/services/bluetooth-printer';
-import { roleLabel } from '@/services/permissions';
+import { roleLabel, useActiveRole, useCanWrite } from '@/services/permissions';
 import { PAPER_LABEL, PAPER_OPTIONS, encodeTestReceipt, type PaperColumns } from '@/services/receipt';
 import { useSession } from '@/services/session';
 
 export default function ProfilScreen() {
+  const router = useRouter();
   const session = useSession();
+  /**
+   * Gates only "Presensi tim" and "Rekap bulanan" below — "Riwayat presensi" is
+   * everyone's own, the tombol on Beranda needs no `WriteArea` at all, and this
+   * is the one entry permission `services/permissions.ts` adds for the whole
+   * module (issue #45).
+   */
+  const canOpenPresensiTim = useCanWrite('presensi');
+  /**
+   * Gates the whole "Administrasi" group below (issue #42), not just a write
+   * button — `app/pengguna/` is the first section where reading itself is
+   * role-gated (`GET /user` answers 403 for INVENTARIS and CASHIER), so a tile
+   * that opened for them would be a door onto a page that fails. Not a tile on
+   * Beranda's own grid: that screen is deliberately identical for every role
+   * (see CLAUDE.md), and this module is not strong enough to be its first
+   * exception — two of three roles would see a petak answering 403.
+   */
+  const isSuperadmin = useActiveRole() === 'SUPERADMIN';
 
   const [roleOpen, setRoleOpen] = useState(false);
   const [pwOpen, setPwOpen] = useState(false);
@@ -195,6 +214,43 @@ export default function ProfilScreen() {
 
         {pwKabar ? <RamahNote icon="check-circle">{pwKabar}</RamahNote> : null}
 
+        {/*
+          Presensi, above Wewenang: this is the one surface every role actually
+          reaches. `homeRouteFor` sends CASHIER straight to `/kasir`, whose bar
+          stays hidden until "Kembali" is pressed — a cashier never opens
+          Beranda at all, so Profil is where their own "Riwayat presensi" has
+          to live. "Presensi tim" and "Rekap bulanan" are SUPERADMIN only.
+        */}
+        <View style={styles.group}>
+          <RamahSectionHeader>Presensi</RamahSectionHeader>
+          <View style={styles.card}>
+            <RamahStackRow
+              icon="clock"
+              tone="akun"
+              title="Riwayat presensi"
+              onPress={() => router.push('/presensi')}
+            />
+            {canOpenPresensiTim ? (
+              <>
+                <View style={styles.divider} />
+                <RamahStackRow
+                  icon="users"
+                  tone="akun"
+                  title="Presensi tim"
+                  onPress={() => router.push('/presensi/tim')}
+                />
+                <View style={styles.divider} />
+                <RamahStackRow
+                  icon="bar-chart-2"
+                  tone="akun"
+                  title="Rekap bulanan"
+                  onPress={() => router.push('/presensi/rekap')}
+                />
+              </>
+            ) : null}
+          </View>
+        </View>
+
         <View style={styles.group}>
           <RamahSectionHeader>Wewenang</RamahSectionHeader>
           <View style={styles.card}>
@@ -221,6 +277,15 @@ export default function ProfilScreen() {
             <RamahStackRow icon="printer" tone="akun" title="Printer struk" subtitle={printerLabel} onPress={bukaPrinter} />
           </View>
         </View>
+
+        {isSuperadmin ? (
+          <View style={styles.group}>
+            <RamahSectionHeader>Administrasi</RamahSectionHeader>
+            <View style={styles.card}>
+              <RamahStackRow icon="users" tone="akun" title="Pengguna" onPress={() => router.push('/pengguna')} />
+            </View>
+          </View>
+        ) : null}
 
         <View style={styles.keluarWrap}>
           <RamahSecondaryButton label="Keluar akun" icon="log-out" fullWidth height={L.controlH} onPress={() => void logout()} />
@@ -333,6 +398,7 @@ const styles = StyleSheet.create({
     borderColor: C.borderHairline,
     overflow: 'hidden',
   },
+  divider: { height: 1, backgroundColor: C.borderHairline, marginHorizontal: L.cardPad },
 
   // Signing out is not one more setting, so it stands a group away from them.
   keluarWrap: { marginTop: L.group - L.stack },

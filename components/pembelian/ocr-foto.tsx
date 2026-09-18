@@ -40,11 +40,22 @@ import {
 } from '@/constants/theme-ramah';
 import type { JenisDokumenOcr } from '@/services/ocr-pembelian';
 
-/** Quality only, matching `FotoNotaStep` — see that file for why not size. */
+/**
+ * Quality only, matching `FotoNotaStep` — see that file for why not size.
+ *
+ * `copyToCacheDirectory` is explicitly true (it is the default, but stated
+ * here on purpose): on Android 10+ with Scoped Storage the picker can return
+ * a `content://media/...` URI that OkHttp inside React Native's `fetch`
+ * cannot stream directly in a multipart body, causing the upload to throw a
+ * `TypeError: Network request failed` before the request ever leaves the
+ * device. Copying to the app's own cache directory gives a `file://` path
+ * that OkHttp can open without any permission negotiation.
+ */
 const PICKER_OPTIONS: ImagePicker.ImagePickerOptions = {
   mediaTypes: ['images'],
   quality: 0.7,
   exif: false,
+  copyToCacheDirectory: true,
 };
 
 export interface FotoOcr {
@@ -117,7 +128,7 @@ export function OcrFotoStep({
 
   return (
     <View style={styles.screen}>
-      <RamahHeader title="Baca isi nota" onBack={onBack} />
+      <RamahHeader title="Baca isi foto" onBack={onBack} />
       <ScrollView style={styles.scroll} contentContainerStyle={styles.body}>
         <View style={styles.group}>
           <RamahSectionHeader>Jenis dokumen</RamahSectionHeader>
@@ -185,7 +196,7 @@ export function OcrFotoStep({
       </ScrollView>
 
       <View style={[styles.dock, { paddingBottom: dockPad }]}>
-        <RamahPrimaryButton label="Baca isi nota" icon="zap" onPress={onBaca} disabled={!foto} />
+        <RamahPrimaryButton label="Baca isi foto" icon="zap" onPress={onBaca} disabled={!foto} />
       </View>
     </View>
   );

@@ -135,6 +135,14 @@ async function requestEnvelope<T>(
   options: RequestOptions = {}
 ): Promise<ErrorEnvelope & { data?: T; paging?: PageMetadata }> {
   const { method = 'GET', body, token } = options;
+
+  // Serializing is not networking: a body that fails to encode (a circular
+  // reference, a BigInt slipped in by a caller) must never be reported as
+  // "can't reach the server" — that sends whoever is debugging it toward their
+  // Wi-Fi instead of the payload. Doing this outside the try below, before the
+  // controller/timeout even exist, keeps it out of the network catch entirely.
+  const encodedBody = body === undefined ? undefined : JSON.stringify(body);
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
@@ -148,10 +156,23 @@ async function requestEnvelope<T>(
         ...(body === undefined ? null : { 'Content-Type': 'application/json' }),
         ...(token ? { Authorization: `Bearer ${token}` } : null),
       },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: encodedBody,
     });
   } catch (e) {
     const aborted = e instanceof Error && e.name === 'AbortError';
+    if (__DEV__) {
+      // The three-line message below is deliberately vague for the person
+      // using the app; this is the one place that keeps the real cause —
+      // whatever `fetch` actually threw — so it can be told apart from an
+      // honest dead connection instead of guessed at from the outside.
+      console.log(
+        '[apiRequest] fetch threw',
+        '\nmethod:', method,
+        '\npath:', path,
+        '\nerror name:', e instanceof Error ? e.name : typeof e,
+        '\nerror message:', e instanceof Error ? e.message : String(e)
+      );
+    }
     throw new ApiError(
       aborted
         ? 'Server tidak menjawab tepat waktu. Coba lagi.'
@@ -271,52 +292,113 @@ export async function apiUpload<T>(
   token?: string | null,
   opts: UploadOptions = {}
 ): Promise<T> {
+  if (__DEV__) {
+    console.log(
+      '[apiUpload] START',
+      '\npath:', path,
+      '\nfield:', field,
+      '\nfile.uri:', file.uri,
+      '\nfile.name:', file.name,
+      '\nfile.type:', file.type,
+      '\ntoken present:', !!token
+    );
+  }
+
   const form = new FormData();
-  // The cast is unavoidable and is not a lie about the runtime: RN's FormData
-  // accepts this object shape and streams the file behind it, while the DOM
-  // lib's type for `append` only knows about `Blob | string`.
+  // The cast is unavoidable and is not a lie about the runtime: RN's XHR native
+  // layer accepts this object shape and streams the file behind it, while the
+  // DOM lib's type for `append` only knows about `Blob | string`.
+  //
+  // NOTE: This intentionally uses XMLHttpRequest, NOT fetch. React Native's New
+  // Architecture changed fetch's FormData handling on iOS: appending a plain
+  // { uri, name, type } object now throws "Unsupported FormDataPart
+  // implementation" before the request ever leaves the device. XHR's native
+  // layer (NSURLSession on iOS, OkHttp on Android) still accepts this pattern,
+  // making XHR the only reliable way to upload a file URI in RN New Arch.
   form.append(field, file as unknown as Blob);
   for (const [key, value] of Object.entries(opts.fields ?? {})) {
     form.append(key, value);
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), opts.timeoutMs ?? UPLOAD_TIMEOUT_MS);
-  const onExternalAbort = () => controller.abort();
-  opts.signal?.addEventListener('abort', onExternalAbort);
+  return new Promise<T>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${API_BASE_URL}${path}`);
+    xhr.setRequestHeader('Accept', 'application/json');
+    // Content-Type is deliberately NOT set — the multipart boundary is appended
+    // automatically by the XHR / native layer, for the same reason the old fetch
+    // path never set it either.
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    // Native timeout: fires ontimeout if no complete response within this budget.
+    xhr.timeout = opts.timeoutMs ?? UPLOAD_TIMEOUT_MS;
 
-  let response: Response;
-  try {
-    response = await fetch(`${API_BASE_URL}${path}`, {
-      method: 'POST',
-      signal: controller.signal,
-      headers: {
-        Accept: 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : null),
-      },
-      body: form,
-    });
-  } catch (e) {
-    if (opts.signal?.aborted) {
-      throw new ApiError('Dibatalkan.', -1);
-    }
-    const aborted = e instanceof Error && e.name === 'AbortError';
-    throw new ApiError(
-      aborted
-        ? 'Unggahan tidak selesai tepat waktu. Coba lagi dengan sinyal yang lebih baik.'
-        : 'Tidak bisa menghubungi server. Periksa koneksi Anda.',
-      0
-    );
-  } finally {
-    clearTimeout(timeout);
-    opts.signal?.removeEventListener('abort', onExternalAbort);
-  }
+    // Wire up the external cancel signal (the screen's "Batalkan" button).
+    const onExternalAbort = () => xhr.abort();
+    opts.signal?.addEventListener('abort', onExternalAbort);
+    const cleanup = () => opts.signal?.removeEventListener('abort', onExternalAbort);
 
-  const envelope = await parseEnvelope<T>(response);
-  if (envelope.data === undefined) {
-    throw new ApiError('Jawaban server tidak sesuai kontrak.', 200);
-  }
-  return envelope.data;
+    xhr.onload = () => {
+      cleanup();
+      let envelope: (ErrorEnvelope & { data?: T }) | null = null;
+      try {
+        envelope = JSON.parse(xhr.responseText) as ErrorEnvelope & { data?: T };
+      } catch {
+        envelope = null;
+      }
+      if (xhr.status < 200 || xhr.status >= 300) {
+        reject(
+          new ApiError(
+            envelope?.errors || `Server menjawab ${xhr.status}.`,
+            xhr.status,
+            envelope?.validation_errors
+          )
+        );
+        return;
+      }
+      if (!envelope) {
+        reject(new ApiError('Jawaban server tidak sesuai kontrak.', xhr.status));
+        return;
+      }
+      if (envelope.data === undefined) {
+        reject(new ApiError('Jawaban server tidak sesuai kontrak.', 200));
+        return;
+      }
+      resolve(envelope.data);
+    };
+
+    xhr.onerror = () => {
+      cleanup();
+      reject(new ApiError('Tidak bisa menghubungi server. Periksa koneksi Anda.', 0));
+    };
+
+    xhr.ontimeout = () => {
+      cleanup();
+      reject(
+        new ApiError(
+          'Unggahan tidak selesai tepat waktu. Coba lagi dengan sinyal yang lebih baik.',
+          0
+        )
+      );
+    };
+
+    xhr.onabort = () => {
+      cleanup();
+      // External signal means the person tapped "Batalkan" — status -1 so the
+      // screen knows not to show it as an error. Any other abort (currently
+      // unused) is treated the same as a timeout.
+      if (opts.signal?.aborted) {
+        reject(new ApiError('Dibatalkan.', -1));
+      } else {
+        reject(
+          new ApiError(
+            'Unggahan tidak selesai tepat waktu. Coba lagi dengan sinyal yang lebih baik.',
+            0
+          )
+        );
+      }
+    };
+
+    xhr.send(form);
+  });
 }
 
 /** Performs one API call and returns the `data` payload. */

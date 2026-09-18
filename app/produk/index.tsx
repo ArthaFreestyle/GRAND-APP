@@ -63,7 +63,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Feather from '@expo/vector-icons/Feather';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useDockPadding } from '@/hooks/use-keyboard-height';
@@ -551,6 +559,24 @@ export default function KatalogScreen() {
         keyboardShouldPersistTaps="handled"
         onEndReached={onEndReached}
         onEndReachedThreshold={0.4}
+        /*
+          Pull to refresh. It replaces a "Muat ulang" link that sat beside the
+          stamp — the gesture is what every other list in this app already
+          answers to, and a link doing the same job on one screen is a control
+          somebody has to find rather than one they already know.
+
+          Only once page one has landed, so the pull spinner and the empty
+          placeholder's own `ActivityIndicator` are never on screen together —
+          the same guard `app/pembelian/index.tsx` uses.
+        */
+        refreshControl={
+          <RefreshControl
+            refreshing={rows.length > 0 && listLoading}
+            onRefresh={reload}
+            tintColor={C.brand}
+            colors={[C.brand]}
+          />
+        }
         ListHeaderComponent={
           <View style={styles.controls}>
             <RamahSearchField
@@ -577,17 +603,14 @@ export default function KatalogScreen() {
                 }
               />
             </View>
+            {/* The stamp, and nothing else: re-reading is the pull gesture
+                on the list now. It stays because a stock figure with no time on
+                it cannot be told apart from a stale one. */}
             {readAt ? (
-              <Pressable
-                onPress={reload}
-                accessibilityRole="button"
-                accessibilityLabel="Muat ulang stok"
-                style={styles.stamp}
-                hitSlop={6}>
-                <Feather name="refresh-cw" size={RamahIcon.meta} color={C.iconMuted} />
+              <View style={styles.stamp}>
+                <Feather name="clock" size={RamahIcon.meta} color={C.iconMuted} />
                 <Text style={styles.stampText}>Stok per {stempelPembaruan(readAt)}</Text>
-                <Text style={styles.stampAction}>Muat ulang</Text>
-              </Pressable>
+              </View>
             ) : null}
             {ruangErr ? (
               <View style={styles.ruangErrBox}>
@@ -822,7 +845,6 @@ const styles = StyleSheet.create({
 
   stamp: { flexDirection: 'row', alignItems: 'center', gap: L.space2 },
   stampText: { ...T.bodySmall, color: C.textMuted, flexShrink: 1 },
-  stampAction: { ...T.caption, color: C.textLink },
 
   // The group card. Each row draws the edges it owns, so the two groups read as
   // two white blocks on the grey canvas without either being one element — see

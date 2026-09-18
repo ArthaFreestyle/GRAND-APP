@@ -471,7 +471,6 @@ export default function ProdukDetailScreen() {
         right={
           canWrite ? (
             <View style={styles.headerActions}>
-              <RamahIconButton icon="edit-2" label="Ubah produk" onPress={openUbah} />
               {/* Archiving, not deleting — the contract has no `DELETE /product`
                   and `is_aktif: false` is the only removal there is. The bin is
                   what everyone reads as "take this out of the way", and the way
@@ -575,11 +574,7 @@ export default function ProdukDetailScreen() {
         </View>
 
         <View style={styles.group}>
-          <RamahSectionHeader
-            action={canWrite ? 'Ubah' : undefined}
-            onAction={canWrite ? openUbah : undefined}>
-            Satuan &amp; harga jual
-          </RamahSectionHeader>
+          <RamahSectionHeader>Satuan &amp; harga jual</RamahSectionHeader>
           <RamahStackCard>
             {product.satuan.map((s) => {
               const berlaku = hargaBerlaku(product.harga, s.idSatuan);

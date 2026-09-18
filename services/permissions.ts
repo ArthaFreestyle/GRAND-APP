@@ -75,7 +75,9 @@ export type WriteArea =
   | 'opname'
   | 'ruang'
   | 'unit-kerja'
-  | 'periode';
+  | 'periode'
+  | 'presensi'
+  | 'user';
 
 /**
  * The role that owns each area's writes. `SUPERADMIN` is not listed because it
@@ -107,6 +109,18 @@ const OWNER: Record<WriteArea, RoleName> = {
   // `SUPERADMIN` on both `tutup` and `buka` — "a month anybody could open was
   // never really closed" — and closing one stops every other role's postings.
   periode: 'SUPERADMIN',
+  // Gates only the correction and recap screens (issue #45) — the tombol
+  // itself needs no `WriteArea` at all, because presensi's owner is whoever
+  // is pressing it: every role clocks itself in, and `services/presensi.ts`
+  // never checks this constant on the way to `POST /presensi/masuk`.
+  presensi: 'SUPERADMIN',
+  // Unlike every other area here, `user` is not the write half of a screen
+  // whose reading is open — the contract names it explicitly (openapi.yaml:89:
+  // "role dan user khusus SUPERADMIN, termasuk untuk membaca"). Reading this
+  // area's own list answers 403 for INVENTARIS and CASHIER too, so
+  // `app/pengguna/index.tsx` draws its own "tidak berwenang" page rather than
+  // shooting a request it knows will fail.
+  user: 'SUPERADMIN',
 };
 
 /** Narrows a role name off the wire; anything unrecognized authorizes nothing. */

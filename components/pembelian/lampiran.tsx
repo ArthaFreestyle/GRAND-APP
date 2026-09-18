@@ -98,7 +98,7 @@ export function LampiranCard({
       } catch (e) {
         if (!alive) return;
         setRows([]);
-        setErr(messageOf(e, 'Gagal memuat lampiran nota.'));
+        setErr(messageOf(e, 'Gagal memuat lampiran pembelian.'));
       } finally {
         if (alive) setLoadedKey(requestKey);
       }

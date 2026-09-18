@@ -203,7 +203,7 @@ export default function PembelianBaruScreen() {
           setRuangId(pick.id);
           setRuangErr('');
         } else {
-          setRuangErr('Tidak ada gudang di unit kerja ini, jadi nota tidak bisa dibuat.');
+          setRuangErr('Tidak ada gudang di unit kerja ini, jadi pembelian tidak bisa dibuat.');
         }
       } catch (e) {
         if (alive) setRuangErr(messageOf(e, 'Gagal memuat daftar gudang.'));
@@ -504,7 +504,7 @@ export default function PembelianBaruScreen() {
         },
       });
     } catch (e) {
-      setBuatErr(messageOf(e, 'Gagal membuat nota pembelian.'));
+      setBuatErr(messageOf(e, 'Gagal membuat pembelian.'));
       setMembuat(false);
     }
   }, [membuat, supplier, ruangId, selection, barisHarga, pages, router]);
@@ -613,7 +613,7 @@ export default function PembelianBaruScreen() {
         },
       });
     } catch (e) {
-      setBuatErr(messageOf(e, 'Gagal membuat nota pembelian.'));
+      setBuatErr(messageOf(e, 'Gagal membuat pembelian.'));
       setMembuat(false);
     }
   }, [membuat, ocrHasil, ocrDetail, ocrFoto, pages, router]);
