@@ -3,10 +3,11 @@
  * `LayarGudang.dc.html` draws it at `screen: 'ubah'`.
  *
  * Name, reorder point, and one selling price per unit; plus the unit that was
- * only discovered later. Reached from the detail's "Ubah produk" pill, from its
- * header pencil, and from the "Ubah" word on its satuan heading — all three of
- * which push this route, and from `/produk/[id]?ubah=1`, which pushes the detail
- * and then this.
+ * only discovered later. Reached from the detail's docked "Ubah produk" pill —
+ * the header pencil and the "Ubah" word on the satuan heading used to push the
+ * same route too, three doors to one form, and were dropped in favour of the
+ * one within thumb's reach at the bottom of the screen — and from
+ * `/produk/[id]?ubah=1`, which pushes the detail and then this.
  *
  * ## Why this is a route and not a dialog
  *

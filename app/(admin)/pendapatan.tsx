@@ -20,21 +20,20 @@
  * screens read the same field the same way on purpose, so a shop owner moving
  * between them never has to re-learn what a number means.
  *
- * ## Laba kotor and harga pokok, for every role
+ * ## Laba kotor and harga pokok — SUPERADMIN only, not a contract restriction
  *
  * The contract carries **no `Role:` line on any `laporan/*` endpoint** — unlike
  * every write endpoint in this app, which states one explicitly (`Role:
- * CASHIER.`, `Role: SUPERADMIN.`, …). That silence is read here as "open to
- * any authenticated grant", the same reading `app/laporan/index.tsx` already
- * gives it with no role branch anywhere in that screen. So this tab shows the
- * same harga pokok and laba kotor to CASHIER as to SUPERADMIN — consistent with
- * this app's standing rule that Beranda is identical for every role rather than
- * hidden per grant, and with the plain fact that the person who typed the notas
- * a margin is computed from has as much reason to see the result as anyone. If
- * a live server disagrees and answers 403 for CASHIER, this card fails exactly
- * like any other failed read — an inline error with a retry — because a screen
- * that already treats "the read failed" as a state to draw does not need a
- * special case for one more reason it could fail.
+ * CASHIER.`, `Role: SUPERADMIN.`, …). That silence means the *read* would
+ * answer for any grant; what closes this whole tab to `INVENTARIS` and
+ * `CASHIER` is a product decision, not the API — harga pokok and laba kotor
+ * are a margin figure this app keeps off the till and the warehouse floor.
+ * `app/(admin)/_layout.tsx` hides the "Pendapatan" trigger itself for those
+ * two roles rather than this screen self-checking on mount, because a hidden
+ * trigger is unreachable, not merely unlisted — no deep link reaches it
+ * either. This is the one place this app departs from Beranda's own rule of
+ * an identical screen for every role; that rule is about *content* on a
+ * shared screen, not about which reports a tab bar hands out.
  *
  * ## The seven-day list
  *

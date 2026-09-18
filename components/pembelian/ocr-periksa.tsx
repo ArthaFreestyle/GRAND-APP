@@ -192,7 +192,7 @@ export function OcrPeriksaStep({
       <View style={[styles.dock, { paddingBottom: dockPad }]}>
         {buatErr ? <RamahInlineError message={buatErr} /> : null}
         <RamahPrimaryButton
-          label={membuat ? 'Membuat nota…' : 'Buat nota pembelian'}
+          label={membuat ? 'Menyimpan…' : 'Simpan pembelian'}
           icon="file-plus"
           onPress={onBuat}
           disabled={membuat || detail.length === 0}

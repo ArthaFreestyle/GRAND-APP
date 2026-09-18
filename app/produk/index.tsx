@@ -569,6 +569,17 @@ export default function KatalogScreen() {
         keyboardShouldPersistTaps="handled"
         onEndReached={onEndReached}
         onEndReachedThreshold={0.4}
+        /*
+          Pull to refresh. It replaces a "Muat ulang" link that sat beside the
+          stamp — the gesture is what every other list in this app already
+          answers to, and a link doing the same job on one screen is a control
+          somebody has to find rather than one they already know.
+
+          `loadedToken !== reloadToken`, never `listLoading`: the general flag
+          also folds in the search box and the gudang chip, and reusing it here
+          would spin the pull indicator on every keystroke, not only on an
+          actual pull (CLAUDE.md's issue #37 rule).
+        */
         refreshControl={
           <RefreshControl
             refreshing={rows.length > 0 && loadedToken !== reloadToken}
@@ -603,6 +614,9 @@ export default function KatalogScreen() {
                 }
               />
             </View>
+            {/* The stamp, and nothing else: re-reading is the pull gesture
+                on the list now. It stays because a stock figure with no time on
+                it cannot be told apart from a stale one. */}
             {readAt ? (
               // The visible "Muat ulang" label and icon are gone — reloading
               // is the platform's pull-to-refresh gesture now (issue #37).

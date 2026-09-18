@@ -529,6 +529,7 @@ export const RamahRadius = {
  * |---|---|
  * | Every bottom dock (the green pill, the transition buttons) | `low` |
  * | Kasir's totals foot, keypad foot and docked phone cart | `low` |
+ * | Beranda's identity block — a header the page passes beneath | `low` |
  * | A hand-drawn floating sheet (`role-switcher.tsx`) | `high` |
  * | Cards, rows, chips, tiles, fields | none |
  * | `RamahSheet` | none — the native sheet draws the platform's own |

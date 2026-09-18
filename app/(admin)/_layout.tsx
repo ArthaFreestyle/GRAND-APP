@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TAB_ITEMS } from '@/components/shell/AppShell';
 import { RamahColors as C, RamahType as T } from '@/constants/theme-ramah';
+import { useActiveRole } from '@/services/permissions';
 
 /**
  * The back office shell: five tab roots, and the sections that hang off them.
@@ -93,6 +94,8 @@ export default function AdminLayout() {
   const insets = useSafeAreaInsets();
   const segments = useSegments();
   const onKasir = segments.includes('kasir' as never);
+  // Pendapatan is SUPERADMIN-only chrome — see `TAB_ITEMS`'s own comment.
+  const role = useActiveRole();
 
   return (
     <View
@@ -141,7 +144,11 @@ export default function AdminLayout() {
             // The flag's *presence* is the answer — `TAB_ITEMS` is `as const`,
             // so a root that does not pad its own bottom edge does not carry
             // the key at all.
-            disableAutomaticContentInsets={'ownsBottomInset' in t}>
+            disableAutomaticContentInsets={'ownsBottomInset' in t}
+            // `hidden` means unreachable, not merely unlisted — which is what
+            // this wants: a superadmin is the only grant this report is for,
+            // so every other role gets no door to `/pendapatan` at all.
+            hidden={t.key === 'pendapatan' && role !== 'SUPERADMIN'}>
             <NativeTabs.Trigger.Label>{t.label}</NativeTabs.Trigger.Label>
             {/*
               `sf` is used on iOS and `src` on Android, so each platform gets the

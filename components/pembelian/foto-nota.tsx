@@ -259,7 +259,7 @@ export function FotoNotaStep({
 
   return (
     <View style={styles.screen}>
-      <RamahHeader title="Foto nota faktur" onBack={onBack} />
+      <RamahHeader title="Foto faktur" onBack={onBack} />
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.body}>
         <View style={styles.countRow}>

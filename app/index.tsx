@@ -338,7 +338,7 @@ export default function LoginScreen() {
                     }}
                     onFocus={() => setFocused('username')}
                     onBlur={() => setFocused(null)}
-                    placeholder="mis. rina.gudang"
+                    placeholder="Username"
                     placeholderTextColor={D.textMuted}
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -371,7 +371,7 @@ export default function LoginScreen() {
                     }}
                     onFocus={() => setFocused('password')}
                     onBlur={() => setFocused(null)}
-                    placeholder="Sandi akun"
+                    placeholder="Password"
                     placeholderTextColor={D.textMuted}
                     secureTextEntry={!showPw}
                     autoCapitalize="none"

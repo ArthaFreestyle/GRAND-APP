@@ -71,6 +71,14 @@ export const TAB_ITEMS = [
     "How much did today bring in" — the daily counterpart to the monthly
     `app/laporan/` section, which Beranda's own "Laporan" tile still reaches.
     See `app/(admin)/pendapatan.tsx` for why the two do not overlap.
+
+    **SUPERADMIN only, as a product decision rather than a contract one.**
+    `GET /laporan/laba-kotor` carries no `Role:` line, so the read itself is
+    open to any grant — but harga pokok and laba kotor are a margin figure
+    the shop chose to keep off the till and the warehouse floor. `_layout.tsx`
+    hides this trigger for `INVENTARIS` and `CASHIER`; a hidden trigger is
+    unreachable, not merely unlisted, so neither role gets a door to it at
+    all, deep link included.
   */
   { key: 'pendapatan', label: 'Pendapatan', icon: 'trending-up', sf: 'chart.line.uptrend.xyaxis' },
   /*
