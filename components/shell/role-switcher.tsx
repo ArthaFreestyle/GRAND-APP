@@ -19,9 +19,10 @@
  * anywhere: the active context is inside the credential, checked server-side on
  * every request, and cannot be spoofed by editing local state.
  */
+import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Box } from '@/components/ui/box';
 import { Pressable as UiPressable } from '@/components/ui/pressable';
@@ -50,6 +51,7 @@ export function RoleSwitcherSheet({ visible, onClose }: { visible: boolean; onCl
   const session = useSession();
   const [error, setError] = useState('');
   const [busy, setBusy] = useState<number | null>(null);
+  const [pressedId, setPressedId] = useState<number | null>(null);
 
   const grants = session?.grants ?? [];
   const activeId = session?.active?.id_user_role;
@@ -94,38 +96,44 @@ export function RoleSwitcherSheet({ visible, onClose }: { visible: boolean; onCl
       <View style={styles.sheetWrap} pointerEvents="box-none">
         <View style={styles.sheet}>
           <Text style={styles.sheetTitle}>Bertindak sebagai</Text>
-          <Text style={styles.sheetSub}>
-            Peran menentukan apa yang boleh Anda kerjakan dan atas nama siapa dokumen tercatat.
-          </Text>
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
-          <ScrollView style={styles.list} contentContainerStyle={{ gap: L.related }}>
-            {grants.map((g) => {
+          {/* Press feedback is state, not `style={({ pressed }) => …}`: under
+              NativeWind that callback is dropped and the row loses every style,
+              which is what pushed the tick under the text. */}
+          <ScrollView style={styles.list}>
+            {grants.map((g, i) => {
               const isActive = g.id_user_role === activeId;
+              const isBusy = busy === g.id_user_role;
               return (
-                <Pressable
-                  key={g.id_user_role}
-                  onPress={() => choose(g.id_user_role)}
-                  disabled={busy !== null}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: isActive }}
-                  style={({ pressed }) => [
-                    styles.row,
-                    isActive && styles.rowActive,
-                    pressed && styles.rowPressed,
-                    busy !== null && styles.rowBusy,
-                  ]}>
-                  <View style={styles.rowText}>
-                    <Text style={styles.rowRole}>{roleLabel(g.role)}</Text>
-                    <Text style={styles.rowUnit} numberOfLines={1}>
-                      {g.nama_unit_kerja ?? 'Semua unit kerja'}
-                    </Text>
-                  </View>
-                  <Text style={styles.rowMark}>
-                    {busy === g.id_user_role ? '…' : isActive ? '✓' : '›'}
-                  </Text>
-                </Pressable>
+                <View key={g.id_user_role}>
+                  {i > 0 ? <View style={styles.divider} /> : null}
+                  <Pressable
+                    onPress={() => choose(g.id_user_role)}
+                    disabled={busy !== null}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isActive }}
+                    onPressIn={() => setPressedId(g.id_user_role ?? null)}
+                    onPressOut={() => setPressedId(null)}
+                    style={[
+                      styles.row,
+                      pressedId === g.id_user_role && styles.rowPressed,
+                      busy !== null && !isBusy && styles.rowBusy,
+                    ]}>
+                    <View style={styles.rowText}>
+                      <Text style={styles.rowRole}>{roleLabel(g.role)}</Text>
+                      <Text style={styles.rowUnit} numberOfLines={1}>
+                        {g.nama_unit_kerja ?? 'Semua unit kerja'}
+                      </Text>
+                    </View>
+                    {isBusy ? (
+                      <ActivityIndicator size="small" color={C.primaryDark} />
+                    ) : isActive ? (
+                      <Feather name="check" size={20} color={C.primaryDark} />
+                    ) : null}
+                  </Pressable>
+                </View>
               );
             })}
           </ScrollView>
@@ -202,8 +210,6 @@ const styles = StyleSheet.create({
     ...E.high,
   },
   sheetTitle: { ...T.titleSmall, color: C.text },
-  // muted3, not muted2: muted2 is 3.19:1 on white and this is a sentence.
-  sheetSub: { ...T.bodySmall, color: C.muted3 },
   error: { ...T.bodySmall, color: '#B03434' },
   // Capped rather than free-growing: an account with many grants must not push
   // the Batal button off a phone in landscape, which is where kasir lives.
@@ -214,20 +220,14 @@ const styles = StyleSheet.create({
     gap: L.space3,
     minHeight: 56,
     paddingVertical: L.space3,
-    paddingHorizontal: L.space4,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: C.border,
     backgroundColor: C.card,
   },
-  rowActive: { borderColor: C.primary, backgroundColor: C.bg },
-  rowPressed: { borderColor: C.primary },
-  rowBusy: { opacity: 0.6 },
+  rowPressed: { opacity: 0.6 },
+  rowBusy: { opacity: 0.5 },
+  divider: { height: 1, backgroundColor: C.border },
   rowText: { flex: 1, gap: L.inline },
   rowRole: { ...T.titleTiny, color: C.text },
   rowUnit: { ...T.bodySmall, color: C.muted3 },
-  // primaryDark: primary is 4.27:1 on the active row's `bg`.
-  rowMark: { ...T.titleSmall, color: C.primaryDark },
   cancel: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   cancelText: { ...T.titleTiny, color: C.muted3 },
 });
