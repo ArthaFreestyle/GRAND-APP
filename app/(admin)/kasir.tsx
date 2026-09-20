@@ -1351,19 +1351,28 @@ export default function KasirScreen() {
    */
   const compact = wide && winH < 640;
   const padDisplayH = compact ? 44 : 60;
-  const payH = compact ? 64 : 96;
+  const payH = compact ? 52 : 96;
   /**
    * Four rows of keys and three gaps, out of what the column has left after its
    * head and its foot. Never under the guide's 44pt `tapMin`; if the arithmetic
    * asks for less, `padBody` scrolls instead — which is survivable, where a key
    * too small to hit is not.
    */
+  // What the keypad's scroll actually got, measured. The arithmetic below is a
+  // guess at head and foot heights that drifts with font scale and insets; on a
+  // small phone it guessed high and the last key row ran off the bottom.
+  const [padBodyH, setPadBodyH] = useState(0);
   const wideKeyH = compact
-    ? Math.max(
-        L.tapMin,
-        // `3 * L.space2` is the three gaps between the four rows of `padGrid`.
-        Math.min(78, Math.floor((winH - 120 - (payH + 30 + insets.bottom) - 24 - 3 * L.space2) / 4))
-      )
+    ? padBodyH > 0
+      ? Math.max(
+          32,
+          // Two vertical paddings of `padBodyPad` and the three gaps of `padGrid`.
+          Math.min(78, Math.floor((padBodyH - 2 * L.space3 - 3 * L.space2) / 4))
+        )
+      : Math.max(
+          L.tapMin,
+          Math.min(78, Math.floor((winH - 120 - (payH + 30 + insets.bottom) - 24 - 3 * L.space2) / 4))
+        )
     : 78;
 
   // ---- pieces --------------------------------------------------------------
@@ -1774,7 +1783,10 @@ export default function KasirScreen() {
               ) : null}
             </View>
 
-            <ScrollView style={styles.padBody} contentContainerStyle={styles.padBodyPad}>
+            <ScrollView
+              style={styles.padBody}
+              contentContainerStyle={styles.padBodyPad}
+              onLayout={(e) => setPadBodyH(Math.round(e.nativeEvent.layout.height))}>
               {isBayar ? metodeChips : null}
               {isBayar && !isQris ? cepatChips : null}
               {!isQris || !isBayar ? keypad : null}
