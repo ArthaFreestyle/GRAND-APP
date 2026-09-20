@@ -325,6 +325,8 @@ export interface paths {
          *     **Satuan dasar didaftarkan otomatis dengan `faktor = 1`** dari `id_satuan_dasar`, jadi `satuan` boleh dikosongkan dan produk tidak pernah berakhir tanpa satuan dasar. Menyebut satuan dasar sekali lagi di dalam `satuan` diperbolehkan dan melebur ke baris otomatis itu; menyebutnya dengan `faktor` selain 1 ditolak 400.
          *
          *     `created_by` diambil dari token, tidak pernah dari body.
+         *
+         *     **Katalog per unit kerja.** Produk tetap satu baris global; yang per-unit hanya keanggotaannya di `product_unit_kerja`, dan setiap dokumen yang memindahkan barang menolak produk di luar katalog unit ruangnya. Tidak ada field untuk memilih unit: produk baru masuk ke katalog **unit aktif sesi** (konteks dari token), atau ke **semua unit aktif** bila sesinya global (`SUPERADMIN`, atau belum memilih konteks) — default yang sama dengan backfill migrasi 000029. Sesi yang unit aktifnya sudah nonaktif ditolak 400. Ubah kemudian lewat `PUT /product/{id}/unit-kerja`.
          */
         post: operations["createProduct"];
         delete?: never;
@@ -374,6 +376,32 @@ export interface paths {
          *     Satuan dasar hanya boleh `faktor = 1`.
          */
         post: operations["addProductSatuan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/product/{id}/unit-kerja": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Ganti himpunan katalog unit kerja sebuah produk
+         * @description Mengganti **seluruh** himpunan unit yang katalognya memuat produk ini — aturan yang sama dengan `grants` pada user dan baris pada dokumen: `[]` mengosongkan, sebuah daftar menyisakan tepat isinya, dan `null` atau field yang hilang ditolak 400 karena endpoint ini tidak punya "biarkan". Duplikat melebur.
+         *
+         *     Hanya keanggotaan **baru** yang wajib menyebut unit aktif; mengirim balik unit nonaktif yang sudah memuat produk ini adalah cara mempertahankannya, bukan permintaan menambahkannya.
+         *
+         *     **Mengeluarkan produk dari sebuah unit ditolak 409 selama ruang mana pun di unit itu masih menyimpan stoknya** (`stok_akhir > 0`) — stok yang tidak diakui katalog mana pun tidak bisa dijual, dihitung, atau dipindahkan dokumen apa pun, tapi tetap tampil di laporan nilai persediaan. Kosongkan dulu dengan `mutasi` atau `pemakaian`. Penolakan tidak mengubah apa pun; katalog tetap seperti semula.
+         *
+         *     Di dalam transaksi, baris keanggotaan dihapus **lebih dulu** baru stoknya dibaca. Posting yang sedang berjalan menahan baris itu `FOR SHARE`, jadi pencabutan menunggu posting itu commit lalu melihat stok yang ditulisnya — tidak ada celah tempat sebuah posting menyelip di antara pemeriksaan dan pencabutan.
+         */
+        put: operations["setProductUnitKerja"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1713,6 +1741,182 @@ export interface paths {
          *     Role: `SUPERADMIN`.
          */
         post: operations["batalPemakaian"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/saldo_awal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List dokumen saldo awal
+         * @description Tidak menyertakan `detail`; kuncinya hilang sama sekali, bukan array kosong. `search` mencocokkan nomor dokumen maupun alasannya. Disaring oleh unit_kerja aktif sesi: dokumen yang ruangnya di luar unit itu hilang dari halaman begitu saja, tidak pernah 404.
+         */
+        get: operations["listSaldoAwal"];
+        put?: never;
+        /**
+         * Buat draft saldo awal
+         * @description Stok pembukaan untuk unit kerja yang baru migrasi dan sudah memegang barang di raknya sebelum baris pertama masuk ke sistem. Nomor diambil dari `document_counter` dengan prefix `SA`, dikunci pada unit pemilik ruang dokumennya.
+         *
+         *     **Satu `(barang, ruang)` seumur hidup.** Barang yang sudah punya baris `kartu_stok` apa pun di ruang itu — dari `pembelian`, `mutasi`, `saldo_awal` sebelumnya, atau baris pembaliknya — ditolak 409 dengan pesan yang menyebut `kode_barang`, ruangnya, dan `stok_opname` sebagai jalan yang benar. Pemeriksaan di sini hanya untuk pesan yang lebih dini; yang menentukan ada di `posting`.
+         *
+         *     `detail` boleh kosong di sini, tetapi mengajukan menolak dokumen tanpa baris. Produk yang sama **tidak** boleh muncul dua kali dalam satu dokumen. Produk di luar katalog unit pemilik ruang ditolak 400.
+         *
+         *     Role: `INVENTARIS`.
+         */
+        post: operations["createSaldoAwal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/saldo_awal/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Detail saldo awal beserta barisnya
+         * @description 404 juga untuk dokumen yang ruangnya di luar unit_kerja aktif.
+         */
+        get: operations["getSaldoAwal"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Ubah header saldo awal
+         * @description **Hanya saat `DRAFT`.** Ketiga kolomnya `NOT NULL`: boleh diubah, tidak boleh dikosongkan — `null` eksplisit dan `alasan` yang hanya spasi ditolak 400. `alasan` adalah satu-satunya catatan mengapa nilai persediaan diciptakan tanpa dokumen di belakangnya.
+         *
+         *     Role: `INVENTARIS`.
+         */
+        patch: operations["updateSaldoAwal"];
+        trace?: never;
+    };
+    "/api/v1/saldo_awal/{id}/detail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Ganti seluruh baris saldo awal
+         * @description **Hanya saat `DRAFT`.** Barisnya diganti sekaligus — inilah bentuk yang dipakai mengetik 500 SKU, sehingga pengunggah CSV/Excel adalah pekerjaan sisi klien, bukan modul ini. `detail` wajib berisi minimal satu baris.
+         *
+         *     `nilai_masuk` tiap baris adalah `qty_input × harga_satuan_input` dari angka yang diketik, dibulatkan sekali. `harga_satuan_input` nol, negatif, atau lebih dari dua desimal ditolak 400; `qty_input` × `faktor_konversi` harus bilangan bulat.
+         *
+         *     Role: `INVENTARIS`.
+         */
+        put: operations["replaceSaldoAwalDetail"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/saldo_awal/{id}/ajukan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ajukan draft saldo awal
+         * @description `DRAFT` → `DIAJUKAN`. Menolak dokumen tanpa baris. Tidak membawa body.
+         *
+         *     Role: `INVENTARIS`.
+         */
+        post: operations["ajukanSaldoAwal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/saldo_awal/{id}/tolak": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Tolak saldo awal
+         * @description `DIAJUKAN` → `DRAFT`, dengan `alasan_tolak` — mengikuti `pembelian`, bukan `pemakaian`: penolakan di sini berarti hitung ulang karena angkanya tidak cocok, koreksi kertas, bukan keputusan bisnis.
+         *
+         *     Role: `SUPERADMIN`.
+         */
+        post: operations["tolakSaldoAwal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/saldo_awal/{id}/posting": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Posting saldo awal ke kartu stok
+         * @description `DIAJUKAN` → `POSTED`. Menulis satu baris `kartu_stok` masuk per baris detail: `jenis_transaksi = 'SALDO_AWAL'`, `stok_masuk = qty_dasar`, `nilai_masuk` persis `qty_input × harga_satuan_input`. `total_nilai` header dijumlahkan sekali setelah loop.
+         *
+         *     **Pagarnya ada di sini.** Setelah kunci periode, ruang, dan saldo tiap `(barang, ruang)` dipegang, posting ditolak **409** bila `kartu_stok` sudah punya baris **apa pun** untuk pasangan itu — termasuk yang ditulis modul ini sendiri dan baris pembaliknya. Dua draft boleh sama-sama mengklaim pasangan yang sama (draft bukan posting); yang pertama diposting lolos, yang kedua ditolak di sini.
+         *
+         *     Baris bertanggal `tanggal` dokumen, bukan hari ini, sehingga posting ditolak 400 bila periode yang memuat `tanggal` sudah `TUTUP`. Ruang yang dibekukan `stok_opname` terbuka ditolak 409. Produk yang sudah keluar dari katalog unit ruang sejak draft diketik ditolak 400.
+         *
+         *     Role: `SUPERADMIN`.
+         */
+        post: operations["postingSaldoAwal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/saldo_awal/{id}/batal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Batalkan saldo awal
+         * @description Dari `DRAFT`/`DIAJUKAN` hanya mengubah status — tidak ada baris `kartu_stok` yang pernah ditulis, jadi pasangannya tetap terbuka untuk dokumen yang dikoreksi. Dari `POSTED`: menambah baris pembalik `PEMBATALAN_TRANSAKSI` bertanggal hari ini.
+         *
+         *     **Pembatalan dari `POSTED` menutup pintunya selamanya.** Baris pembalik adalah riwayat, sehingga pasangan `(barang, ruang)` itu tidak pernah bisa diberi saldo awal lagi. Ini pagarnya bekerja, bukan efek samping yang perlu diperbaiki; saldo awal yang salah ketik dikoreksi dengan `stok_opname`, yang sejak baris pembalik ada punya `id_kartu_stok_cutoff` untuk ditunjuk.
+         *
+         *     Jumlah selalu kembali seimbang, nilai tidak selalu: baris keluarnya dinilai trigger pada rata-rata bergerak ruang saat itu, dan barang saldo awal sudah tercampur ke sana. Ditolak 400 bila barangnya sudah keluar dari ruang — catat pengeluarannya dengan `pemakaian`, `penjualan`, atau `mutasi` yang sesuai. Ruang yang dibekukan `stok_opname` terbuka ditolak 409.
+         *
+         *     Role: `SUPERADMIN`.
+         */
+        post: operations["batalSaldoAwal"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3403,6 +3607,8 @@ export interface components {
             satuan?: components["schemas"]["ProductSatuan"][];
             /** @description Hanya pada endpoint detail. Terbaru lebih dulu. */
             harga_jual?: components["schemas"]["ProductHargaJual"][];
+            /** @description Hanya pada endpoint detail. Unit yang katalognya memuat produk ini, termasuk unit yang sudah nonaktif (keanggotaannya masih nyata dan masih perlu bisa dicabut). **Produk yang tidak dimuat unit mana pun menjawab `[]`, bukan menghilangkan kuncinya.** */
+            unit_kerja?: components["schemas"]["ProductUnitKerja"][];
             /** Format: date-time */
             created_at?: string;
             /**
@@ -3414,6 +3620,14 @@ export interface components {
             updated_at?: string;
             /** Format: int64 */
             updated_by?: number | null;
+        };
+        ProductUnitKerja: {
+            /** Format: int64 */
+            id_unit_kerja?: number;
+            kode?: string | null;
+            nama?: string;
+            /** @description Status **unit**-nya, bukan keanggotaannya. */
+            is_aktif?: boolean;
         };
         ProductSatuan: {
             /** Format: int64 */
@@ -4449,6 +4663,121 @@ export interface components {
              * @description Diperiksa terhadap `qty_dasar` baris itu sendiri di usecase.
              */
             qty_disetujui_dasar: number;
+        };
+        /**
+         * @description Stok pembukaan untuk unit kerja yang baru migrasi. Dokumen kedelapan yang menulis `kartu_stok`, dan **satu-satunya yang harga pokoknya diketik** — karena itu yang menentukan bukan alurnya melainkan pagarnya: satu `(barang, ruang)` seumur hidup, dan saldo awal yang salah ketik tidak bisa diulang (koreksinya `stok_opname`).
+         *
+         *     Tidak ada supplier, tidak ada utang, tidak ada total yang ditagihkan: tidak ada lawan transaksi sama sekali. Satu-satunya angka uang adalah nilai yang masuk ke persediaan.
+         *
+         *     Alurnya `DRAFT → DIAJUKAN → POSTED → BATAL`, dengan `DIAJUKAN → DRAFT` pada penolakan — kendali dua orang wajib karena dokumen ini menciptakan nilai dari tidak ada apa-apa.
+         */
+        SaldoAwal: {
+            /** Format: int64 */
+            id?: number;
+            /**
+             * @description Seri sendiri, prefix `SA`.
+             * @example SA/KODE/2026/08/0001
+             */
+            nomor?: string;
+            /**
+             * Format: date-time
+             * @description Tanggal cutover; baris `kartu_stok` bertanggal ini, bukan hari ini.
+             */
+            tanggal?: string;
+            /** Format: int64 */
+            id_ruang?: number;
+            nama_ruang?: string;
+            alasan?: string;
+            /** @enum {string} */
+            status?: "DRAFT" | "DIAJUKAN" | "POSTED" | "BATAL";
+            /**
+             * @description Null sampai `POSTED`. Jumlah `nilai_masuk` seluruh baris.
+             * @example 352.50
+             */
+            total_nilai?: string | null;
+            /** @description Hanya pada endpoint detail. Kuncinya hilang pada list. */
+            detail?: components["schemas"]["SaldoAwalDetail"][];
+            /** Format: int64 */
+            created_by?: number;
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: int64 */
+            diajukan_oleh?: number | null;
+            /** Format: date-time */
+            diajukan_pada?: string | null;
+            /** Format: int64 */
+            disetujui_oleh?: number | null;
+            /** Format: date-time */
+            disetujui_pada?: string | null;
+            /** Format: date-time */
+            posted_at?: string | null;
+            /** Format: int64 */
+            dibatalkan_oleh?: number | null;
+            alasan_batal?: string | null;
+            alasan_tolak?: string | null;
+        };
+        SaldoAwalDetail: {
+            /** Format: int64 */
+            id?: number;
+            /** Format: int64 */
+            id_product?: number;
+            kode_barang?: string;
+            nama_product?: string;
+            /** @example 3.0000 */
+            qty_input?: string;
+            /** Format: int64 */
+            id_satuan_input?: number;
+            nama_satuan?: string;
+            /** Format: int64 */
+            faktor_konversi?: number;
+            /**
+             * Format: int64
+             * @example 36
+             */
+            qty_dasar?: number;
+            nama_satuan_dasar?: string;
+            /**
+             * @description Harga per satuan input, sebagaimana diketik.
+             * @example 100.00
+             */
+            harga_satuan_input?: string;
+            /**
+             * @description `harga_satuan_input / faktor_konversi`, dibulatkan sekali. Hanya diturunkan supaya baris bisa dibaca per satuan dasar — nilai yang masuk ke stok tidak lewat pembagian ini.
+             * @example 8.3333
+             */
+            harga_pokok_satuan_dasar?: string;
+            /**
+             * @description `qty_input × harga_satuan_input`, dari angka yang diketik dan dibulatkan sekali — bukan `qty_dasar × harga_pokok_satuan_dasar` (300.00, bukan 299.99).
+             * @example 300.00
+             */
+            nilai_masuk?: string;
+            /**
+             * Format: int64
+             * @description Null sampai diposting; diisi dari `RETURNING` baris masuknya.
+             */
+            id_kartu_stok?: number | null;
+        };
+        SaldoAwalDetailInput: {
+            /**
+             * Format: int64
+             * @description Tidak boleh muncul dua kali dalam satu dokumen — kuotanya "tepat satu, selamanya", bukan saldo ruang. `saldo_awal_detail_baris_uidx` adalah jaring pengaman.
+             */
+            id_product: number;
+            /**
+             * Format: int64
+             * @description Harus terdaftar di `product_satuan` produk itu.
+             */
+            id_satuan_input: number;
+            /**
+             * @description Lebih dari nol, paling banyak 4 desimal; kali `faktor_konversi` harus bilangan bulat.
+             * @example 3
+             */
+            qty_input: string;
+            /**
+             * @description Harga pokok yang diketik per satuan input. **Lebih dari nol, paling banyak 2 desimal.** Nol ditolak dengan sengaja: barang gratis akan menyeret rata-rata bergerak ruang itu ke bawah secara permanen; bila memang perlu, itu `pembelian` dengan diskon penuh.
+             * @example 100.00
+             */
+            harga_satuan_input: string;
         };
         /**
          * @description Satu nota keluar — dokumen keenam yang menulis `kartu_stok`, dan yang pertama mengeluarkan barang ke pihak luar dengan uang di sisi lain. `pembelian` membentuk utang, `mutasi` tidak membentuk apa-apa, ini yang pertama membentuk **piutang**, dan hanya pada nota `KREDIT`.
@@ -5884,6 +6213,39 @@ export interface operations {
         responses: {
             /** @description Created */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["Product"];
+                    };
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    setProductUnitKerja: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    id_unit_kerja: number[];
+                };
+            };
+        };
+        responses: {
+            /** @description OK — detail produk dengan `unit_kerja` yang baru. */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -7892,6 +8254,295 @@ export interface operations {
                 content: {
                     "application/json": {
                         data?: components["schemas"]["Pemakaian"];
+                    };
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    listSaldoAwal: {
+        parameters: {
+            query?: {
+                page?: components["parameters"]["Page"];
+                size?: components["parameters"]["Size"];
+                search?: string;
+                status?: "DRAFT" | "DIAJUKAN" | "POSTED" | "BATAL";
+                id_ruang?: number;
+                tanggal_dari?: string;
+                tanggal_sampai?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Halaman hasil */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["SaldoAwal"][];
+                        paging?: components["schemas"]["PageMetadata"];
+                    };
+                };
+            };
+            400: components["responses"]["ValidationError"];
+        };
+    };
+    createSaldoAwal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * Format: date
+                     * @description Tanggal cutover migrasi; baris `kartu_stok` bertanggal ini.
+                     */
+                    tanggal: string;
+                    /** Format: int64 */
+                    id_ruang: number;
+                    /** @description Wajib dan tidak boleh dikosongkan lewat `PATCH`. */
+                    alasan: string;
+                    detail?: components["schemas"]["SaldoAwalDetailInput"][];
+                };
+            };
+        };
+        responses: {
+            /** @description Draft dibuat */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["SaldoAwal"];
+                    };
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            403: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    getSaldoAwal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Found */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["SaldoAwal"];
+                    };
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            404: components["responses"]["Error"];
+        };
+    };
+    updateSaldoAwal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: date */
+                    tanggal?: string;
+                    /** Format: int64 */
+                    id_ruang?: number;
+                    alasan?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["SaldoAwal"];
+                    };
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    replaceSaldoAwalDetail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    detail: components["schemas"]["SaldoAwalDetailInput"][];
+                };
+            };
+        };
+        responses: {
+            /** @description Baris diganti */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["SaldoAwal"];
+                    };
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    ajukanSaldoAwal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Diajukan */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["SaldoAwal"];
+                    };
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    tolakSaldoAwal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    alasan: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Dikembalikan ke DRAFT */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["SaldoAwal"];
+                    };
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    postingSaldoAwal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Diposting */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["SaldoAwal"];
+                    };
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    batalSaldoAwal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    alasan_batal: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Dibatalkan */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["SaldoAwal"];
                     };
                 };
             };

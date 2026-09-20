@@ -33,6 +33,7 @@ diputuskan tim backend.
 | 12 | Tingkat harga jual | Tier di `harga-jual` + parameter `tier` di `GET /pos/product` | Perubahan besar | Rendah |
 | 13 | Perbandingan periode | `pembanding` di `GET /laporan/laba-kotor` | Perubahan | Rendah |
 | 14 | Saran jumlah beli | `saran_beli` di `GET /product/stok-minimum` | Perubahan | Rendah |
+| 16 | Produk per unit kerja | `id_unit_kerja` di `GET /product` | Perubahan | Sedang |
 
 ~~15. Skor kesehatan stok — `GET /laporan/kesehatan-stok`~~ — **dipenuhi (issue #37).** Beranda
 membacanya lewat `laporanKesehatanStok()` di `services/laporan.ts`; lihat catatan di kepala
@@ -228,3 +229,22 @@ GET /product/stok-minimum → tiap baris + { saran_beli, satuan_saran }
 - **Dampak sekarang:** baris dari antrean stok menipis dibuka dengan jumlah sebesar selisihnya.
 - **Dipakai di:** `components/pembelian/pilih-barang.tsx`.
 
+## 16. Produk per unit kerja
+
+```
+GET /product?id_unit_kerja=
+```
+
+- **Kenapa kurang:** `GET /product` hanya menerima `page`, `size`, `search`, `is_aktif`. Menyaring
+  di klien atas halaman yang sudah diambil sama bohongnya dengan pencarian sisi klien di atas
+  daftar berhalaman.
+- **Dampak sekarang:** layar "produk apa saja yang ada di katalog unit ini" tidak digambar di
+  `app/pengaturan/[id]/index.tsx`. Keanggotaan hanya terbaca per produk (`unit_kerja` di detail).
+- **Dipakai di:** `app/pengaturan/[id]/index.tsx` (belum ada).
+
+## Pertanyaan untuk backend
+
+`GET /pos/product` mewajibkan `id_ruang`, dan ruang selalu milik satu unit kerja, tetapi deskripsinya
+tidak menyebut apakah hasilnya sudah disaring katalog unit itu. Katalog (`app/produk/index.tsx`) dan
+katalog kasir bergantung pada jawabannya; jika belum disaring, kasir bisa memasukkan produk yang
+`POST /penjualan`-nya menolak. Jawabannya perlu ditulis di deskripsi endpoint.

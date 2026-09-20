@@ -95,6 +95,10 @@ export default function ProdukLayout() {
           name="[id]/ubah"
           options={{ title: 'Ubah produk', animation: 'slide_from_right' }}
         />
+        <Stack.Screen
+          name="[id]/katalog"
+          options={{ title: 'Katalog unit kerja', animation: 'slide_from_right' }}
+        />
         <Stack.Screen name="baru" options={{ title: 'Produk baru', animation: 'slide_from_right' }} />
       </Stack>
     </View>
