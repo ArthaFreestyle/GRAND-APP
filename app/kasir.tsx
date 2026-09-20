@@ -78,14 +78,13 @@
  *
  * ## Where this screen sits, and why it has one button the board does not draw
  *
- * **Kasir is the middle tab, and the tab bar is hidden while it is open.** It
- * lives under `(admin)` so the bar can offer it at all, and
- * `app/(admin)/_layout.tsx` passes `hidden` to `NativeTabs` whenever the
- * segments say we are here — the container prop, which hides the *bar* and
- * leaves every tab reachable, not the trigger prop, which would make this route
- * unreachable. The reason is the bottom row: a 96pt pay button and a keypad
- * cannot share an edge with a tab bar, and a POS that shows the rest of the app
- * along its bottom is a POS somebody leaves by accident mid-sale.
+ * **Kasir sits beside the tabs on the root stack, not in them.** It was the
+ * middle tab with `hidden` on `NativeTabs`, and on Android portrait that left a
+ * ~120dp strip along the bottom that took no touches — the Bayar button was
+ * drawn and dead. Off the tab navigator there is no bar to hide. The reason for
+ * wanting no bar is unchanged: a 96pt pay button and a keypad cannot share an
+ * edge with one, and a POS that shows the rest of the app along its bottom is a
+ * POS somebody leaves by accident mid-sale.
  *
  * That is also why the `more-vertical` button exists. With the bar hidden it
  * is the only way out, and it has to be. **It carries two or three entries
@@ -97,14 +96,11 @@
  * hidden, so this is what un-hides it), "Gudang" (only when there is a second
  * one to pick), and PPN, a setting this screen alone owns.
  *
- * **Insets: this screen owns its bottom edge and nothing else.** The group
- * layout pads top, left and right outside the navigator, so those are already
- * spent by the time this renders. The bottom is this screen's own because the
- * bar it would normally be padding for is not on screen — which is what
- * `ownsBottomInset` on the tab registry entry (`disableAutomaticContentInsets`
- * on the trigger) switches off. It is spent three times, each by whatever owns
- * that edge: the cart's totals foot, the keypad's CTA foot, and the product
- * list's `contentContainerStyle` on the tablet.
+ * **Insets: this screen owns all four edges.** It sits on the root stack, which
+ * pays none. Top, left and right are the root `View`'s padding; the bottom is
+ * spent three times, each by whatever owns that edge: the cart's totals foot,
+ * the keypad's CTA foot, and the product list's `contentContainerStyle` on the
+ * tablet.
  *
  * ## Wired, and what it talks to
  *
@@ -434,8 +430,8 @@ function hargaOf(s: PosSatuanRow | null): number {
 export default function KasirScreen() {
   const router = useRouter();
   const session = useSession();
-  // Only `insets.bottom` is read here. Top, left and right are spent by
-  // `app/(admin)/_layout.tsx` outside the navigator — see the file header.
+  // The till sits on the root stack, which pays no inset at all, so this screen
+  // spends all four edges itself — see the file header.
 
   const role = useActiveRole();
   const bp = useBreakpoint();
@@ -1245,11 +1241,10 @@ export default function KasirScreen() {
   }
 
   /**
-   * The way out, and the only one: with the tab bar hidden there is nothing
-   * else to press.
+   * The way out, and the only one: the till has no bar.
    *
-   * `replace`, not `back()` — this is a tab root, so there is usually nothing
-   * to pop, and "back" from a tab means whatever the navigator feels like.
+   * Pops when the till was pushed (Beranda's tile), and `replace`s otherwise —
+   * a cold start has nothing underneath it to pop to.
    * `homeRouteFor` is asked rather than hardcoding `/beranda` because it is the
    * one place that knows where a grant belongs, and for a cashier that answer is
    * this very screen: staying put is the correct outcome for the one person who
@@ -1257,7 +1252,8 @@ export default function KasirScreen() {
    */
   function keluarKasir() {
     setMenuOpen(false);
-    router.replace(homeRouteFor(role));
+    if (router.canDismiss()) router.dismiss();
+    else router.replace(homeRouteFor(role));
   }
 
   // ---- derived view data ---------------------------------------------------
@@ -1351,19 +1347,28 @@ export default function KasirScreen() {
    */
   const compact = wide && winH < 640;
   const padDisplayH = compact ? 44 : 60;
-  const payH = compact ? 64 : 96;
+  const payH = compact ? 52 : 96;
   /**
    * Four rows of keys and three gaps, out of what the column has left after its
    * head and its foot. Never under the guide's 44pt `tapMin`; if the arithmetic
    * asks for less, `padBody` scrolls instead — which is survivable, where a key
    * too small to hit is not.
    */
+  // What the keypad's scroll actually got, measured. The arithmetic below is a
+  // guess at head and foot heights that drifts with font scale and insets; on a
+  // small phone it guessed high and the last key row ran off the bottom.
+  const [padBodyH, setPadBodyH] = useState(0);
   const wideKeyH = compact
-    ? Math.max(
-        L.tapMin,
-        // `3 * L.space2` is the three gaps between the four rows of `padGrid`.
-        Math.min(78, Math.floor((winH - 120 - (payH + 30 + insets.bottom) - 24 - 3 * L.space2) / 4))
-      )
+    ? padBodyH > 0
+      ? Math.max(
+          32,
+          // Two vertical paddings of `padBodyPad` and the three gaps of `padGrid`.
+          Math.min(78, Math.floor((padBodyH - 2 * L.space3 - 3 * L.space2) / 4))
+        )
+      : Math.max(
+          L.tapMin,
+          Math.min(78, Math.floor((winH - 120 - (payH + 30 + insets.bottom) - 24 - 3 * L.space2) / 4))
+        )
     : 78;
 
   // ---- pieces --------------------------------------------------------------
@@ -1590,7 +1595,11 @@ export default function KasirScreen() {
   // ---- layouts -------------------------------------------------------------
 
   return (
-    <View style={styles.screen}>
+    <View
+      style={[
+        styles.screen,
+        { paddingTop: insets.top, paddingLeft: insets.left, paddingRight: insets.right },
+      ]}>
       {wide ? (
         <View style={styles.columns}>
           {/* kolom 1 · keranjang */}
@@ -1774,7 +1783,10 @@ export default function KasirScreen() {
               ) : null}
             </View>
 
-            <ScrollView style={styles.padBody} contentContainerStyle={styles.padBodyPad}>
+            <ScrollView
+              style={styles.padBody}
+              contentContainerStyle={styles.padBodyPad}
+              onLayout={(e) => setPadBodyH(Math.round(e.nativeEvent.layout.height))}>
               {isBayar ? metodeChips : null}
               {isBayar && !isQris ? cepatChips : null}
               {!isQris || !isBayar ? keypad : null}

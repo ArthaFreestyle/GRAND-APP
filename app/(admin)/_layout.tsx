@@ -1,5 +1,5 @@
 import Feather from '@expo/vector-icons/Feather';
-import { VectorIcon, useSegments } from 'expo-router';
+import { VectorIcon } from 'expo-router';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,7 +9,7 @@ import { RamahColors as C, RamahType as T } from '@/constants/theme-ramah';
 import { useActiveRole } from '@/services/permissions';
 
 /**
- * The back office shell: five tab roots, and the sections that hang off them.
+ * The back office shell: four tab roots, and the sections that hang off them.
  *
  * **Native tabs** (`expo-router/unstable-native-tabs`), which render the real
  * platform tab bar — UIKit's on iOS, Material's on Android — rather than a bar
@@ -50,19 +50,13 @@ import { useActiveRole } from '@/services/permissions';
  *    tab here once and moving it out is what fixed its docked button sitting
  *    under the bar (issue #24).
  *
- * ### The till hides the bar
+ * ### The till is not in here
  *
- * `hidden` on `NativeTabs` — the container, not a trigger — is a different
- * thing entirely: it hides the *bar*, leaving every tab reachable. That is what
- * makes Kasir a tab you can enter without the POS having to live with a tab bar
- * across the bottom of a screen whose bottom row is a 96pt pay button and a
- * keypad. Tapping Kasir takes the whole screen; the way back out is the
- * `more-vertical` menu the POS carries for exactly this reason.
- *
- * It is computed from the segments rather than from a tab-change callback,
- * because a deep link to `/kasir` and a cold start on a cashier's
- * `homeRouteFor` both have to arrive with the bar already gone — a callback
- * only fires when somebody presses something.
+ * Kasir used to be the middle tab, with `hidden` on `NativeTabs` to take the bar
+ * away. On Android portrait that left a ~120dp strip along the bottom edge that
+ * received no touches, so the Bayar button was drawn and dead. It lives on the
+ * root stack now (`app/kasir.tsx`), full-screen with no bar to hide; Beranda's
+ * tile and a cashier's `homeRouteFor` are how it is reached.
  *
  * Each tab is a *directory* with its own `_layout.tsx` Stack, which is what
  * keeps the bar from flattening the depth: a detail is pushed over its list
@@ -92,8 +86,6 @@ export default function AdminLayout() {
    * and obvious on every device with one.
    */
   const insets = useSafeAreaInsets();
-  const segments = useSegments();
-  const onKasir = segments.includes('kasir' as never);
   // Pendapatan is SUPERADMIN-only chrome — see `TAB_ITEMS`'s own comment.
   const role = useActiveRole();
 
@@ -134,17 +126,11 @@ export default function AdminLayout() {
         // read, and come back on the way up. Beranda is the root this matters
         // on — its own scroll runs from the identity block down through the
         // invoice preview at the foot of the screen.
-        minimizeBehavior="onScrollDown"
-        // The POS is full-screen. See the note above the component.
-        hidden={onKasir}>
+        minimizeBehavior="onScrollDown">
         {TAB_ITEMS.map((t) => (
           <NativeTabs.Trigger
             key={t.key}
             name={t.key}
-            // The flag's *presence* is the answer — `TAB_ITEMS` is `as const`,
-            // so a root that does not pad its own bottom edge does not carry
-            // the key at all.
-            disableAutomaticContentInsets={'ownsBottomInset' in t}
             // `hidden` means unreachable, not merely unlisted — which is what
             // this wants: a superadmin is the only grant this report is for,
             // so every other role gets no door to `/pendapatan` at all.

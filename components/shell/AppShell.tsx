@@ -82,16 +82,6 @@ export const TAB_ITEMS = [
   */
   { key: 'pendapatan', label: 'Pendapatan', icon: 'trending-up', sf: 'chart.line.uptrend.xyaxis' },
   /*
-    The **till**, dead centre — a place you stand for a whole shift, not a
-    question you arrive at. A cashier's `homeRouteFor` is this screen.
-
-    `ownsBottomInset` is what makes the bar-hidden layout work: the POS is
-    drawn full-screen with the bar hidden (see `app/(admin)/_layout.tsx`), so
-    the bottom edge is its own to pad, and Android's automatic tab-bar inset
-    would be padding for a bar that is not there.
-  */
-  { key: 'kasir', label: 'Kasir', icon: 'shopping-cart', sf: 'cart', ownsBottomInset: true },
-  /*
     "What did we actually sell" — every nota, grouped by day, the record of
     what the till beside it produced. `app/penjualan/[id].tsx` is where a row
     opens, and it sits on the root stack rather than in this tab for the same
@@ -109,19 +99,10 @@ export const TAB_ITEMS = [
 ] as const satisfies readonly {
   key: string;
   /** Feather, via `VectorIcon` — the same family the rest of the app draws in. Used on Android. */
-  icon: 'home' | 'trending-up' | 'shopping-cart' | 'clock' | 'user';
+  icon: 'home' | 'trending-up' | 'clock' | 'user';
   /** SF Symbol, used on iOS where the platform has its own vocabulary for these. */
-  sf: 'house' | 'chart.line.uptrend.xyaxis' | 'cart' | 'clock.arrow.circlepath' | 'person.crop.circle';
+  sf: 'house' | 'chart.line.uptrend.xyaxis' | 'clock.arrow.circlepath' | 'person.crop.circle';
   label: string;
-  /**
-   * This root pads its own bottom edge, so the navigator must not.
-   *
-   * Android wraps every tab screen in a `SafeAreaView` applying the bottom
-   * inset *for the tab bar*; `disableAutomaticContentInsets` on the trigger is
-   * what switches that off for a root that hides the bar and reaches the edge
-   * itself.
-   */
-  ownsBottomInset?: true;
 }[];
 
 export type TabKey = (typeof TAB_ITEMS)[number]['key'];

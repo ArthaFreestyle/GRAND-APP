@@ -797,19 +797,36 @@ function ledgerLook(k: KartuStokRow): { icon: FeatherName; tone: RamahTileToneNa
   if (k.idAsal !== null) {
     return { icon: 'rotate-ccw', tone: 'akun', label: 'pembalikan' };
   }
+  // `jenis_transaksi` and `ref_table` together: the first names the movement, the
+  // second the document, and either can carry the word that identifies it.
   const jenis = k.jenis.toLowerCase();
+  const ref = `${jenis} ${k.refTable.toLowerCase()}`;
+  // Before the direction split, because it is always the *first* row of a chain
+  // and the one somebody asking "kenapa saldonya segitu" reaches — which must
+  // not call itself a purchase that never happened.
+  if (ref.includes('saldo_awal')) {
+    return { icon: 'flag', tone: 'akun', label: 'saldo awal' };
+  }
   // `repeat` rather than the board's `arrow-left-right`: Feather has no such
   // glyph, and a mutasi is a round trip between two rooms rather than a single
   // direction, so the substitution says the same thing.
   if (jenis.includes('mutasi')) {
     return { icon: 'repeat', tone: 'dokumen', label: k.masuk > 0 ? 'mutasi masuk' : 'mutasi keluar' };
   }
-  if (jenis.includes('opname')) return { icon: 'clipboard', tone: 'akun', label: 'stok opname' };
+  if (ref.includes('opname') || jenis.startsWith('so_')) {
+    return { icon: 'clipboard', tone: 'akun', label: 'stok opname' };
+  }
+  // Each direction names what it recognises and otherwise says only which way the
+  // stock went — a second guess here is how a `pemakaian` used to read "penjualan".
   if (k.masuk > 0) {
     if (jenis.includes('susulan')) return { icon: 'truck', tone: 'laporan', label: 'kiriman susulan' };
-    return { icon: 'download', tone: 'katalog', label: 'pembelian' };
+    if (ref.includes('pembelian')) return { icon: 'download', tone: 'katalog', label: 'pembelian' };
+    return { icon: 'download', tone: 'katalog', label: 'stok masuk' };
   }
-  return { icon: 'upload', tone: 'stok', label: 'penjualan' };
+  if (ref.includes('pemakaian')) return { icon: 'upload', tone: 'stok', label: 'pemakaian' };
+  if (ref.includes('retur')) return { icon: 'upload', tone: 'stok', label: 'retur pembelian' };
+  if (ref.includes('penjualan')) return { icon: 'upload', tone: 'stok', label: 'penjualan' };
+  return { icon: 'upload', tone: 'stok', label: 'stok keluar' };
 }
 
 /**

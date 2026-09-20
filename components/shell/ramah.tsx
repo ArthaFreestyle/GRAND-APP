@@ -811,7 +811,17 @@ export function RamahSheet({
       }}
       backgroundStyle={sheetStyles.background}>
       <BottomSheetView
-        style={{ maxHeight: maxH, paddingLeft: insets.left, paddingRight: insets.right }}>
+        style={{
+          maxHeight: maxH,
+          // Material's sheet is at most 640 wide and centred, but the library
+          // lays its content out at the full window width, so in landscape the
+          // text ran past the sheet's edge and was clipped away. Pin the content
+          // to the width the sheet actually has.
+          // The library's wrapper is window-wide and the sheet is centred on it,
+          // so the content has to be centred too or it starts left of the sheet.
+          alignSelf: 'center',
+          width: Math.min(window.width - insets.left - insets.right, SHEET_MAX_W),
+        }}>
         {/*
           The title is **in the body, not in a handle**. It lived in
           `handleComponent` when this was `@gorhom/bottom-sheet`, which is not an
@@ -828,8 +838,14 @@ export function RamahSheet({
           long list would keep its full height and run out of the bottom of a
           sheet that had already stopped growing.
         */}
+        {/*
+          An explicit cap as well as `flexShrink`: inside a content-sized native
+          host there is no definite parent height to shrink against, so in a
+          short landscape window the list collapsed to nothing. The title above
+          takes ~56.
+        */}
         <ScrollView
-          style={sheetStyles.body}
+          style={[sheetStyles.body, { maxHeight: Math.max(96, maxH - SHEET_TITLE_H) }]}
           contentContainerStyle={sheetStyles.bodyPad}
           keyboardShouldPersistTaps="handled">
           {children}
@@ -838,6 +854,8 @@ export function RamahSheet({
     </BottomSheetModal>
   );
 }
+const SHEET_MAX_W = 640;
+const SHEET_TITLE_H = 56;
 const sheetStyles = StyleSheet.create({
   body: { flexGrow: 0, flexShrink: 1 },
   bodyPad: { paddingBottom: L.space6 },

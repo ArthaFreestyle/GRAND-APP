@@ -148,6 +148,15 @@ function RootNavigator() {
       <Stack.Protected guard={ready}>
         <Stack.Screen name="(admin)" />
         {/*
+          The till, beside the tabs. It was the middle tab with the bar hidden
+          (`hidden` on `NativeTabs`), and on Android portrait that left a dead
+          strip of about 120dp along the bottom edge: the Bayar button was drawn
+          but never received a touch. Off the tab navigator there is no bar to
+          hide and no native container to disagree with the layout. It pays its
+          own four insets, like every section on this stack.
+        */}
+        <Stack.Screen name="kasir" />
+        {/*
           Katalog sits **beside** the tabs for the same reason susulan does,
           below — and it moved out the day the till took the middle tab.
 
