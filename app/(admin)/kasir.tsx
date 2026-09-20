@@ -227,6 +227,7 @@ import {
   type PaperColumns,
   type ReceiptData,
 } from '@/services/receipt';
+import { logout } from '@/services/auth';
 import { useSession } from '@/services/session';
 
 /**
@@ -2042,7 +2043,14 @@ export default function KasirScreen() {
         nowhere else.
       */}
       <RamahSheet visible={menuOpen} title="Menu kasir" onClose={() => setMenuOpen(false)}>
-        <RamahSheetOption label="Kembali" sub="Tutup layar kasir" selected={false} onPress={keluarKasir} />
+        {/*
+          A cashier's home *is* this screen, so "Kembali" would be a no-op for
+          them and the bar is hidden here: without this entry the only way out
+          of the account was a tab they cannot reach.
+        */}
+        {role !== 'CASHIER' ? (
+          <RamahSheetOption label="Kembali" sub="Tutup layar kasir" selected={false} onPress={keluarKasir} />
+        ) : null}
         {/*
           The gudang is not a preference, it is what every figure on this screen
           is *about*: `GET /pos/product` requires `id_ruang`, and the nota's own
@@ -2068,6 +2076,15 @@ export default function KasirScreen() {
           onPress={() => {
             setMenuOpen(false);
             setPpnOpen(true);
+          }}
+        />
+        <RamahSheetOption
+          label="Keluar akun"
+          sub="Akhiri sesi di perangkat ini"
+          selected={false}
+          onPress={() => {
+            setMenuOpen(false);
+            void logout();
           }}
         />
       </RamahSheet>

@@ -35,6 +35,7 @@ import {
   type BottomSheetMethods,
 } from '@expo/ui/community/bottom-sheet';
 import LottieView from 'lottie-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Children, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
@@ -791,6 +792,14 @@ export function RamahSheet({
    * cause the render a one-shot read would be sampled in.
    */
   const window = useWindowDimensions();
+  /**
+   * In landscape the window is short and the cutout sits on the *side*, so a
+   * flat 85% of the height still ran under the status bar and the sheet's own
+   * content touched the notch. Cap by what is left below the top inset, and
+   * pad the sides by the side insets.
+   */
+  const insets = useSafeAreaInsets();
+  const maxH = Math.round(Math.min(window.height * 0.85, window.height - insets.top - L.space6));
 
   return (
     <BottomSheetModal
@@ -801,7 +810,8 @@ export function RamahSheet({
         if (wantsOpen.current) onClose();
       }}
       backgroundStyle={sheetStyles.background}>
-      <BottomSheetView style={{ maxHeight: Math.round(window.height * 0.85) }}>
+      <BottomSheetView
+        style={{ maxHeight: maxH, paddingLeft: insets.left, paddingRight: insets.right }}>
         {/*
           The title is **in the body, not in a handle**. It lived in
           `handleComponent` when this was `@gorhom/bottom-sheet`, which is not an
