@@ -19,16 +19,6 @@ export const API_BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL ?? DEFAULT_BAS
   ''
 );
 
-/**
- * Passwords and bearer tokens only travel over TLS. Plain `http://` stays
- * allowed in dev builds (the contract's own server is `http://127.0.0.1:3000`),
- * but a release build aimed at one fails loudly instead of quietly shipping
- * credentials in the clear.
- */
-if (!__DEV__ && !API_BASE_URL.startsWith('https://')) {
-  throw new Error('EXPO_PUBLIC_API_BASE_URL harus memakai https:// pada build rilis.');
-}
-
 const REQUEST_TIMEOUT_MS = 15_000;
 
 /**

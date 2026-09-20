@@ -134,10 +134,16 @@ export function PenggunaPasswordField({
   value,
   onChangeText,
   error,
+  confirmValue,
+  onChangeConfirm,
+  confirmError,
 }: {
   value: string;
   onChangeText: (v: string) => void;
   error?: string;
+  confirmValue: string;
+  onChangeConfirm: (v: string) => void;
+  confirmError?: string;
 }) {
   return (
     <View style={styles.fields}>
@@ -150,6 +156,15 @@ export function PenggunaPasswordField({
         autoCapitalize="none"
         helper={error ? undefined : 'Minimal 8 karakter.'}
         error={error}
+      />
+      <RamahField
+        label="Ulangi password"
+        required
+        value={confirmValue}
+        onChangeText={onChangeConfirm}
+        secureTextEntry
+        autoCapitalize="none"
+        error={confirmError}
       />
     </View>
   );

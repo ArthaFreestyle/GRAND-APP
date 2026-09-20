@@ -32,6 +32,16 @@
  * contract one: nothing in `services/presensi.ts` refuses a superadmin's
  * `POST /presensi/masuk`, the app simply never offers the button.
  *
+ * **The feature grid now spends it too — its second and last exception.**
+ * "Pengguna" moved here from Profil's own "Administrasi" group, on direct
+ * request, and it is filtered out of both the grid and the "Lihat semua"
+ * sheet for anyone who is not `SUPERADMIN`, the same reasoning Profil's
+ * version of this row carried: `app/pengguna/` is the one section where
+ * reading itself is role-gated (`GET /user` answers 403 for INVENTARIS and
+ * CASHIER), so a tile that opened for them would be a door onto a page that
+ * fails. It sits after Pemakaian in `FITUR`, behind "Lihat semua" like
+ * susulan/mutasi/pemakaian, so the first eight tiles are unchanged.
+ *
  * ## Where the numbers come from
  *
  * Four reads, all real, none narrowed to a single ruang: `GET
@@ -143,6 +153,13 @@ const ART = {
   pemasok: require('@/assets/icons-3d/fast-delivery.png'),
   unitKerja: require('@/assets/icons-3d/warehouse.png'),
   susulan: require('@/assets/icons-3d/delivery-schedule.png'),
+  // Same logistics pack as the four above: boxes moving onto a crate for a
+  // transfer, a plain stack for goods taken out for use.
+  mutasi: require('@/assets/icons-3d/mutasi-boxes.png'),
+  pemakaian: require('@/assets/icons-3d/pemakaian-boxes.png'),
+  // The one orphan: no logistics render draws a person, and this is a grey clay
+  // "Users" from another contributor (Hesam Sanei). Swap it when a family match exists.
+  pengguna: require('@/assets/icons-3d/pengguna-users.png'),
 } as const;
 
 /**
@@ -228,6 +245,14 @@ interface Fitur {
   art: RamahTileArt;
   /** `undefined` while the screen behind it does not exist. */
   route?: Href;
+  /**
+   * The second role branch on this screen (the first is the presensi card,
+   * above). `app/pengguna/` is the one section where reading itself is
+   * role-gated — `GET /user` answers 403 for INVENTARIS and CASHIER — so
+   * this tile is filtered out for both rather than opening a door onto a
+   * page that fails for them.
+   */
+  superadminOnly?: boolean;
 }
 
 const FITUR: readonly Fitur[] = [
@@ -332,14 +357,29 @@ const FITUR: readonly Fitur[] = [
   {
     key: 'mutasi',
     label: 'Mutasi gudang',
-    art: { kind: 'glyph', icon: 'repeat', tone: 'stok' },
+    art: { kind: 'art3d', source: ART.mutasi },
     route: '/mutasi',
   },
   {
     key: 'pemakaian',
     label: 'Pemakaian',
-    art: { kind: 'glyph', icon: 'tool', tone: 'stok' },
+    art: { kind: 'art3d', source: ART.pemakaian },
     route: '/pemakaian',
+  },
+  /*
+    Moved off Profil (was its "Administrasi" group) onto this grid, on
+    direct request. It stays out of the first eight rather than displacing
+    one of them — an account-management errand belongs beside susulan,
+    mutasi and pemakaian behind "Lihat semua", not among the things a shop
+    opens the app to check. No render exists for it in either 3D family, so
+    it holds a glyph on `akun` grey, the same tone the row wore on Profil.
+  */
+  {
+    key: 'pengguna',
+    label: 'Pengguna',
+    art: { kind: 'art3d', source: ART.pengguna },
+    route: '/pengguna',
+    superadminOnly: true,
   },
 ];
 
@@ -577,6 +617,11 @@ export default function BerandaScreen() {
     if (f.route) router.navigate(f.route);
   };
 
+  // Pengguna is `superadminOnly`; everyone else's grid and "Lihat semua"
+  // sheet are drawn from the same filtered list so the two can never
+  // disagree about what the count is capped from.
+  const fitur = isSuperadmin ? FITUR : FITUR.filter((f) => !f.superadminOnly);
+
   const tile = (f: Fitur) => (
     <RamahTile
       key={f.key}
@@ -770,7 +815,7 @@ export default function BerandaScreen() {
                 accessibilityLabel="Lihat semua fitur"
               />
             </View>
-            <View style={styles.grid}>{FITUR.slice(0, GRID_MAX).map(tile)}</View>
+            <View style={styles.grid}>{fitur.slice(0, GRID_MAX).map(tile)}</View>
           </View>
 
           {/* The secondary path: the last three invoices, newest first, as the
@@ -821,7 +866,7 @@ export default function BerandaScreen() {
 
       {/* "Lihat semua": the same table, unsliced. */}
       <RamahSheet visible={fiturOpen} title="Semua fitur" onClose={() => setFiturOpen(false)}>
-        <View style={styles.sheetGrid}>{FITUR.map(tile)}</View>
+        <View style={styles.sheetGrid}>{fitur.map(tile)}</View>
       </RamahSheet>
 
       {/*

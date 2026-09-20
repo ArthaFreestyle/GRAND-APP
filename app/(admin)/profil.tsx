@@ -55,7 +55,7 @@ import { RamahColors as C, RamahIcon, RamahLayout as L, RamahRadius as R, RamahT
 import { messageOf } from '@/services/api';
 import { changePassword, logout } from '@/services/auth';
 import * as printer from '@/services/bluetooth-printer';
-import { roleLabel, useActiveRole, useCanWrite } from '@/services/permissions';
+import { roleLabel, useCanWrite } from '@/services/permissions';
 import { PAPER_LABEL, PAPER_OPTIONS, encodeTestReceipt, type PaperColumns } from '@/services/receipt';
 import { useSession } from '@/services/session';
 
@@ -69,16 +69,6 @@ export default function ProfilScreen() {
    * module (issue #45).
    */
   const canOpenPresensiTim = useCanWrite('presensi');
-  /**
-   * Gates the whole "Administrasi" group below (issue #42), not just a write
-   * button — `app/pengguna/` is the first section where reading itself is
-   * role-gated (`GET /user` answers 403 for INVENTARIS and CASHIER), so a tile
-   * that opened for them would be a door onto a page that fails. Not a tile on
-   * Beranda's own grid: that screen is deliberately identical for every role
-   * (see CLAUDE.md), and this module is not strong enough to be its first
-   * exception — two of three roles would see a petak answering 403.
-   */
-  const isSuperadmin = useActiveRole() === 'SUPERADMIN';
 
   const [roleOpen, setRoleOpen] = useState(false);
   const [pwOpen, setPwOpen] = useState(false);
@@ -278,18 +268,20 @@ export default function ProfilScreen() {
           </View>
         </View>
 
-        {isSuperadmin ? (
-          <View style={styles.group}>
-            <RamahSectionHeader>Administrasi</RamahSectionHeader>
-            <View style={styles.card}>
-              <RamahStackRow icon="users" tone="akun" title="Pengguna" onPress={() => router.push('/pengguna')} />
-            </View>
-          </View>
-        ) : null}
-
         <View style={styles.keluarWrap}>
           <RamahSecondaryButton label="Keluar akun" icon="log-out" fullWidth height={L.controlH} onPress={() => void logout()} />
         </View>
+
+        {/*
+          Empty space below the last control, on direct request: the native
+          tab bar's automatic bottom inset (see CLAUDE.md's "Safe areas") pads
+          this tab's `SafeAreaView` for the bar itself, but that inset alone
+          left "Keluar akun" reading as flush against it rather than clear of
+          it. A dedicated spacer after the button, rather than a bigger
+          `content.paddingBottom`, keeps every earlier group's spacing exactly
+          as it was.
+        */}
+        <View style={styles.bottomSpace} />
       </ScrollView>
 
       <RoleSwitcherSheet visible={roleOpen} onClose={() => setRoleOpen(false)} />
@@ -402,6 +394,9 @@ const styles = StyleSheet.create({
 
   // Signing out is not one more setting, so it stands a group away from them.
   keluarWrap: { marginTop: L.group - L.stack },
+  // Clears the native tab bar past what its own automatic inset reserves —
+  // see the comment at the spacer's call site.
+  bottomSpace: { height: L.section + L.group },
 
   sheetBody: { paddingHorizontal: L.gutter, gap: L.space3, paddingBottom: L.space4 },
   hint: { ...T.bodySmall, color: C.textBody },
