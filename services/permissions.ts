@@ -73,6 +73,7 @@ export type WriteArea =
   | 'mutasi'
   | 'pemakaian'
   | 'opname'
+  | 'saldo-awal'
   | 'ruang'
   | 'unit-kerja'
   | 'periode'
@@ -102,6 +103,9 @@ const OWNER: Record<WriteArea, RoleName> = {
   mutasi: 'INVENTARIS',
   pemakaian: 'INVENTARIS',
   opname: 'INVENTARIS',
+  // Types and submits like `opname`; posting and cancelling are SUPERADMIN's, in the
+  // module's own `AKSI` table.
+  'saldo-awal': 'INVENTARIS',
   pelanggan: 'CASHIER',
   penjualan: 'CASHIER',
   'unit-kerja': 'SUPERADMIN',

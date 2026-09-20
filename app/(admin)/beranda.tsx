@@ -157,6 +157,9 @@ const ART = {
   // transfer, a plain stack for goods taken out for use.
   mutasi: require('@/assets/icons-3d/mutasi-boxes.png'),
   pemakaian: require('@/assets/icons-3d/pemakaian-boxes.png'),
+  // A clipboard with a parcel and a tick: the list of what is on the shelf when the
+  // books open. Semusim Kreatif's logistics pack, like the renders above it.
+  saldoAwal: require('@/assets/icons-3d/package-list.png'),
   // The one orphan: no logistics render draws a person, and this is a grey clay
   // "Users" from another contributor (Hesam Sanei). Swap it when a family match exists.
   pengguna: require('@/assets/icons-3d/pengguna-users.png'),
@@ -228,7 +231,8 @@ const ART = {
  * point for the persetujuan *queue* — `/pembelian?status=DIAJUKAN` — for later,
  * and re-sourcing a clipboard-and-check render that already fits the guide's
  * every rule would be wasted work. Delete it only alongside the decision that
- * queue is never getting its own tile.
+ * queue is never getting its own tile. (Saldo awal has since taken this render, so
+ * the persetujuan queue would need a different one.)
  */
 
 /**
@@ -365,6 +369,23 @@ const FITUR: readonly Fitur[] = [
     label: 'Pemakaian',
     art: { kind: 'art3d', source: ART.pemakaian },
     route: '/pemakaian',
+  },
+  /*
+    Saldo awal: opening stock for a unit kerja that has just migrated. It is typed
+    once per room in the life of a unit and never again, so it sits behind "Lihat
+    semua" with mutasi and pemakaian rather than among the eight a shop opens four
+    times a day.
+
+    The render is `package-list`, from the same Semusim Kreatif logistics pack as
+    the tiles above (IconScout, free for commercial use): a checked list beside a
+    parcel reads as "what is on the shelf when the books open". It had sat
+    unreferenced since Persetujuan left the grid (see `ART`).
+  */
+  {
+    key: 'saldo-awal',
+    label: 'Saldo awal',
+    art: { kind: 'art3d', source: ART.saldoAwal },
+    route: '/saldo-awal',
   },
   /*
     Moved off Profil (was its "Administrasi" group) onto this grid, on
