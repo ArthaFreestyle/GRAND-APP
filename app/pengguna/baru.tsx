@@ -35,6 +35,8 @@ export default function PenggunaBaruScreen() {
 
   const [identity, setIdentity] = useState<PenggunaIdentityValues>(EMPTY_PENGGUNA_IDENTITY);
   const [password, setPassword] = useState('');
+  const [password2, setPassword2] = useState('');
+  const [errPassword2, setErrPassword2] = useState('');
   const [grants, setGrants] = useState<GrantValue[]>([]);
   const [errUsername, setErrUsername] = useState('');
   const [errEmail, setErrEmail] = useState('');
@@ -51,15 +53,18 @@ export default function PenggunaBaruScreen() {
     if (saving) return;
     const identitySalah = penggunaIdentityError(identity);
     const passwordSalah = penggunaPasswordError(password);
-    if (identitySalah || passwordSalah) {
+    const konfirmasiSalah = !passwordSalah && password !== password2 ? 'Konfirmasi tidak sama dengan password.' : '';
+    if (identitySalah || passwordSalah || konfirmasiSalah) {
       setErrUsername(identitySalah);
       setErrPassword(passwordSalah);
+      setErrPassword2(konfirmasiSalah);
       return;
     }
     setSaving(true);
     setErrUsername('');
     setErrEmail('');
     setErrPassword('');
+    setErrPassword2('');
     setErrGeneral('');
     try {
       const created = await createPengguna({
@@ -77,7 +82,7 @@ export default function PenggunaBaruScreen() {
       setErrGeneral(fielded.general ?? (fielded.username || fielded.email || fielded.password ? '' : messageOf(e, 'Gagal menyimpan pengguna.')));
       setSaving(false);
     }
-  }, [saving, identity, password, grants, router]);
+  }, [saving, identity, password, password2, grants, router]);
 
   return (
     <View style={styles.screen}>
@@ -101,6 +106,12 @@ export default function PenggunaBaruScreen() {
             setErrPassword('');
           }}
           error={errPassword || undefined}
+          confirmValue={password2}
+          onChangeConfirm={(v) => {
+            setPassword2(v);
+            setErrPassword2('');
+          }}
+          confirmError={errPassword2 || undefined}
         />
         <GrantEditor values={grants} onChange={setGrants} />
       </ScrollView>
