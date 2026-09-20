@@ -746,6 +746,7 @@ export default function PembelianDetailScreen() {
               lines={lines}
               onChange={updateLines}
               idSupplier={doc.idSupplier}
+              idRuang={doc.idRuang}
               pakaiKoli={!doc.ditanggungSupplier && totalKoli > 0}
               editable
             />
