@@ -56,7 +56,7 @@ import {
 } from '@/constants/theme-ramah';
 import { decimalToNumber, numericToDecimal, rupiahToDecimal } from '@/services/decimal';
 import type { PembelianLine, PembelianLineInput } from '@/services/pembelian';
-import { getProduct, listProducts, listRiwayatBeli } from '@/services/produk';
+import { getProduct, listPosProducts, listRiwayatBeli } from '@/services/produk';
 
 const CARI_SIZE = 8;
 
@@ -249,11 +249,19 @@ export function PembelianLineEditor({
   lines,
   onChange,
   idSupplier,
+  idRuang,
   pakaiKoli,
   editable,
 }: {
   lines: LineDraft[];
   onChange: LinesUpdater;
+  /**
+   * The gudang this invoice receives into. The picker reads `GET /pos/product`
+   * for it rather than the global `GET /product`, so it never offers a product
+   * outside the catalogue of the room's unit kerja — a line the server would
+   * refuse only when the whole set is saved.
+   */
+  idRuang: number;
   /** Narrows the "last bought for" lookup to the supplier this document names. */
   idSupplier: number | null;
   /** The header carries freight to spread, so each line needs its carton share. */
@@ -293,6 +301,7 @@ export function PembelianLineEditor({
             index={i}
             line={line}
             idSupplier={idSupplier}
+            idRuang={idRuang}
             pakaiKoli={pakaiKoli}
             editable={editable}
             onPatch={patch}
@@ -318,6 +327,7 @@ function LineRow({
   index,
   line,
   idSupplier,
+  idRuang,
   pakaiKoli,
   editable,
   onPatch,
@@ -326,6 +336,7 @@ function LineRow({
   index: number;
   line: LineDraft;
   idSupplier: number | null;
+  idRuang: number;
   pakaiKoli: boolean;
   editable: boolean;
   onPatch: (key: string, next: Partial<LineDraft>) => void;
@@ -335,12 +346,19 @@ function LineRow({
   const [productSheet, setProductSheet] = useState(false);
   const [satuanSheet, setSatuanSheet] = useState(false);
 
-  const cariProduk = useCallback(async (term: string): Promise<RamahSearchOption[]> => {
-    const page = await listProducts({ search: term || undefined, size: CARI_SIZE, is_aktif: true });
-    // No `sub`: the product code is how the server finds a row, not how a
-    // person recognises one. The search still matches it.
-    return page.data.map((p) => ({ value: String(p.id), label: p.nama }));
-  }, []);
+  const cariProduk = useCallback(
+    async (term: string): Promise<RamahSearchOption[]> => {
+      const page = await listPosProducts({
+        id_ruang: idRuang,
+        search: term || undefined,
+        size: CARI_SIZE,
+      });
+      // No `sub`: the product code is how the server finds a row, not how a
+      // person recognises one. The search still matches it.
+      return page.data.map((p) => ({ value: String(p.id), label: p.nama }));
+    },
+    [idRuang]
+  );
 
   /**
    * Choosing a product costs two more reads, and both earn their place: the
