@@ -90,6 +90,7 @@ import { messageOf } from '@/services/api';
 import { rupiahToDecimal } from '@/services/decimal';
 import { useCanWrite } from '@/services/permissions';
 import { addHarga, createProduct, listSatuan, produkBus } from '@/services/produk';
+import { useSession } from '@/services/session';
 import type { components } from '@/types/api';
 
 type ApiSatuan = components['schemas']['Satuan'];
@@ -144,6 +145,19 @@ export default function ProdukBaruScreen() {
   // ---- saving, and what came of it ----
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState('');
+  const session = useSession();
+  /**
+   * Where the product landed, said on the confirmation page. `POST /product`
+   * has no unit field: it enters the session's active unit, or every active unit
+   * when the session is global — so the same button puts a product in different
+   * places for different people, and nothing else on screen would say so.
+   */
+  const activeUnitId = session?.active?.id_unit_kerja ?? null;
+  const katalogUnit =
+    activeUnitId == null
+      ? 'semua unit kerja aktif'
+      : (session?.grants.find((g) => g.id_unit_kerja === activeUnitId)?.nama_unit_kerja ??
+        'unit kerja aktif');
   const [created, setCreated] = useState<{ id: number; hargaGagal: number } | null>(null);
 
   useEffect(() => {
@@ -355,7 +369,7 @@ export default function ProdukBaruScreen() {
           <View style={styles.doneHead}>
             <Text style={styles.doneTitle}>Produk tersimpan</Text>
             <Text style={styles.doneSub}>
-              {`${nama.trim()} sudah masuk katalog. Saldonya nol sampai ada nota pembelian yang diposting ke gudang.`}
+              {`${nama.trim()} sudah masuk katalog ${katalogUnit}. Saldonya nol sampai ada nota pembelian yang diposting ke gudang.`}
             </Text>
           </View>
           <RamahSummaryCard rows={ringkas} />

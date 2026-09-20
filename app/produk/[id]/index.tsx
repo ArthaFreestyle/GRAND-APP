@@ -85,6 +85,7 @@ import {
 } from '@/constants/theme-ramah';
 import { messageOf } from '@/services/api';
 import { useCanWrite } from '@/services/permissions';
+import { useSession } from '@/services/session';
 import {
   getProduct,
   listKartuStok,
@@ -120,6 +121,16 @@ export default function ProdukDetailScreen() {
   const params = useLocalSearchParams<{ id: string; ruang?: string; ubah?: string; baru?: string }>();
   const id = Number(params.id);
   const canWrite = useCanWrite('produk');
+  const session = useSession();
+  /**
+   * Whether this session knows of more than one unit kerja. A global grant
+   * (`id_unit_kerja: null`) spans every unit, so it counts as many; scoped
+   * grants count by the distinct units they name. With one unit, every product
+   * would carry the same sentence, which is noise rather than a field.
+   */
+  const manyUnits =
+    (session?.grants ?? []).some((g) => g.id_unit_kerja == null) ||
+    new Set((session?.grants ?? []).map((g) => g.id_unit_kerja)).size > 1;
 
   /**
    * A malformed `:id` is a fact about the *route*, known the moment the params
@@ -408,6 +419,10 @@ export default function ProdukDetailScreen() {
     router.push({ pathname: '/produk/[id]/ubah', params: { id: String(id) } });
   }, [router, id]);
 
+  const openKatalog = useCallback(() => {
+    router.push({ pathname: '/produk/[id]/katalog', params: { id: String(id) } });
+  }, [router, id]);
+
   const goBack = useCallback(() => {
     // `dismiss()` targets this section's own Stack; `back()` is offered to the
     // navigator containing the tabs first, which may answer by switching tabs.
@@ -623,6 +638,31 @@ export default function ProdukDetailScreen() {
             })}
           </RamahStackCard>
         </View>
+
+        {manyUnits ? (
+          <View style={styles.group}>
+            <RamahSectionHeader
+              action={canWrite ? 'Ubah' : undefined}
+              onAction={canWrite ? openKatalog : undefined}>
+              Katalog unit kerja
+            </RamahSectionHeader>
+            {product.unitKerja.length === 0 ? (
+              <RamahNote icon="alert-circle">Belum ada unit yang memuat barang ini.</RamahNote>
+            ) : (
+              <RamahStackCard>
+                {product.unitKerja.map((u) => (
+                  <RamahStackRow
+                    key={u.id}
+                    icon="briefcase"
+                    tone="akun"
+                    title={u.nama}
+                    value={u.aktif ? undefined : 'Nonaktif'}
+                  />
+                ))}
+              </RamahStackCard>
+            )}
+          </View>
+        ) : null}
 
         {/* Drawn only when there is more than one room holding this product.
             With one, it would repeat the saldo card above it word for word —

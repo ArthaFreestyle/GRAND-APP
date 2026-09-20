@@ -57,10 +57,24 @@ export interface ProductHargaRow {
   sampai: string | null;
 }
 
+/**
+ * One unit kerja whose catalogue holds a product. `aktif` is the status of the
+ * **unit**, not of the membership — the list deliberately includes retired units
+ * because the membership is still real and still has to be revocable.
+ */
+export interface ProductUnitKerjaRow {
+  id: number;
+  kode: string | null;
+  nama: string;
+  aktif: boolean;
+}
+
 export interface ProductDetail extends ProductRow {
   idDasar: number;
   satuan: ProductSatuanRow[];
   harga: ProductHargaRow[];
+  /** `[]` is a fact (no catalogue holds this product), not "not read yet". */
+  unitKerja: ProductUnitKerjaRow[];
 }
 
 /**
@@ -138,6 +152,12 @@ function toDetail(p: ApiProduct): ProductDetail {
       harga: h.harga ?? '0',
       dari: h.berlaku_dari ?? '',
       sampai: h.berlaku_sampai ?? null,
+    })),
+    unitKerja: (p.unit_kerja ?? []).map((u) => ({
+      id: u.id_unit_kerja ?? 0,
+      kode: u.kode ?? null,
+      nama: u.nama ?? '',
+      aktif: u.is_aktif ?? true,
     })),
   };
 }
@@ -378,6 +398,25 @@ export async function addHarga(
 ): Promise<ProductDetail> {
   return toDetail(
     await authedRequest<ApiProduct>(`/api/v1/product/${id}/harga-jual`, { method: 'POST', body })
+  );
+}
+
+/**
+ * Replaces the **whole** set of unit kerja whose catalogue holds this product.
+ * `[]` empties it; there is no "leave it alone" — the contract rejects a missing
+ * field. Only a *new* membership must name an active unit, so sending a retired
+ * unit back is how it is kept. Answers 409 while any ruang of a revoked unit
+ * still holds stock of the product.
+ */
+export async function setProductUnitKerja(
+  id: number,
+  idUnitKerja: number[]
+): Promise<ProductDetail> {
+  return toDetail(
+    await authedRequest<ApiProduct>(`/api/v1/product/${id}/unit-kerja`, {
+      method: 'PUT',
+      body: { id_unit_kerja: idUnitKerja },
+    })
   );
 }
 
